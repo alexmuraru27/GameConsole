@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build_elf",
+            "command": "make",
+            "args": [
+                "-j"
+            ],
+            "type": "shell"
+        },
+        {
+            "label": "flash_elf",
+            "command": "make",
+            "args": [
+                "flash"
+            ],
+            "type": "shell"
+        },
+    ]
+}
