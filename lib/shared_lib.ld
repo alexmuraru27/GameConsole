@@ -12,7 +12,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >BOOTLOADERROM
+  } >LIBRARYROM
 
   /* The program code and other data goes into FLASH */
   .text :
@@ -29,7 +29,7 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >BOOTLOADERROM
+  } >LIBRARYROM
 
   /* Constant data goes into FLASH */
   .rodata :
@@ -38,14 +38,14 @@ SECTIONS
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >BOOTLOADERROM
+  } >LIBRARYROM
 
-  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >BOOTLOADERROM
+  .ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >LIBRARYROM
   .ARM : {
     __exidx_start = .;
     *(.ARM.exidx*)
     __exidx_end = .;
-  } >BOOTLOADERROM
+  } >LIBRARYROM
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
@@ -60,7 +60,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> BOOTLOADERROM
+  } >RAM AT> LIBRARYROM
   
   /* Uninitialized data section */
   . = ALIGN(4);
