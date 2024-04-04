@@ -98,5 +98,3 @@ clean:
 # dependencies
 #######################################
 -include $(wildcard $(BUILD_DIR)/*.d)
-
-# *** EOF ***
