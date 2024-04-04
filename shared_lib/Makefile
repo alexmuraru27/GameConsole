@@ -3,6 +3,7 @@ BUILD_DIR = build
 $(BUILD_DIR):
 	mkdir $@		
 
+all: $(BUILD_DIR)
 # clean up
 #######################################
 clean:
