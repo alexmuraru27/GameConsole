@@ -7,7 +7,7 @@
         {
             "name": "Cortex Debug",
             "cwd": "${workspaceFolder}",
-            "executable": "./build/TaskScheduler.elf",
+            "executable": "./bootloader/build/Bootloader.elf",
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
@@ -18,11 +18,15 @@
                 "target/stm32f4x.cfg"
             ],
             "svdFile": "./STM32F407.svd",
-            "preLaunchTask": "flash_elf",
+            "preLaunchTask": "",
             "liveWatch": {
                 "enabled": true,
                 "samplesPerSecond": 4
-            }
+            },
+            "symbolFiles": [
+                "./bootloader/build/Bootloader.elf",
+                "./app/build/App.elf"
+            ]
         },
     ]
 }

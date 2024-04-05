@@ -1,4 +1,4 @@
-TARGET = Bomberman
+TARGET = App
 DEBUG = 1
 OPT = -Og -O0
 BUILD_DIR = build

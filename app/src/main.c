@@ -1,5 +1,4 @@
 #include "stm32f407xx.h"
-extern uint32_t _stext;
 
 volatile uint32_t timing_delay = 0U;
 void delayMSSysTick(uint32_t time)
@@ -105,11 +104,12 @@ void BoardInit(void)
     GPIOConfig();
 }
 
+extern uint32_t g_pfnVectors;
 int main(void)
 {
     // Sets the The Vector Table Offset Register to the App text memory section
-    uint32_t *pSrc = (uint32_t *)&_stext;
-    SCB->VTOR = ((uint32_t)pSrc & SCB_VTOR_TBLOFF_Msk);
+    uint32_t *pVSrc = (uint32_t *)&g_pfnVectors;
+    SCB->VTOR = ((uint32_t)pVSrc & SCB_VTOR_TBLOFF_Msk);
     __enable_irq();
 
     BoardInit();
@@ -121,7 +121,7 @@ int main(void)
     while (1)
     {
         GPIOA->BSRR |= (1 << 6);
-        delayMSSysTick(250U);
+        delayMSSysTick(200U);
         GPIOA->BSRR |= (1 << 6) << 16;
         delayMSSysTick(100U);
     }
