@@ -19,8 +19,8 @@ defined in linker script */
 .word  _sbss
 /* end address for the .bss section. defined in linker script */
 .word  _ebss
-/* stack used for SystemInit_ExtMemCtl; always internal RAM used */
-
+/*  start address for the .text section. defined in linker script */
+.word _stext
 /**
  * @brief  This is the code that gets called when the processor first
  *          starts execution following a reset event. Only the absolutely
@@ -37,7 +37,7 @@ Reset_Handler:
   ldr   sp, =_estack     /* set stack pointer */
   
 /* Call the clock system initialization function.*/
-  bl  SystemInit  
+  bl  SystemInit 
 
 /* Copy the data segment initializers from flash to SRAM */  
   ldr r0, =_sdata
