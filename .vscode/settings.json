@@ -13,7 +13,8 @@
         "stddef.h": "c",
         "system_stm32f4xx.h": "c",
         "core_cm4.h": "c",
-        "cmsis_compiler.h": "c"
+        "cmsis_compiler.h": "c",
+        "inttypes.h": "c"
     },
     "editor.formatOnSave": true,
     "editor.suggest.showInlineDetails": true,

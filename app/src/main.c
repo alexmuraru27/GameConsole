@@ -107,11 +107,7 @@ void BoardInit(void)
 extern uint32_t g_pfnVectors;
 int main(void)
 {
-    // Sets the The Vector Table Offset Register to the App text memory section
-    uint32_t *pVSrc = (uint32_t *)&g_pfnVectors;
-    SCB->VTOR = ((uint32_t)pVSrc & SCB_VTOR_TBLOFF_Msk);
     __enable_irq();
-
     BoardInit();
 
     GPIOA->MODER |= (1 << GPIO_MODER_MODER6_Pos);
@@ -123,6 +119,6 @@ int main(void)
         GPIOA->BSRR |= (1 << 6);
         delayMSSysTick(200U);
         GPIOA->BSRR |= (1 << 6) << 16;
-        delayMSSysTick(100U);
+        delayMSSysTick(200U);
     }
 }
