@@ -25,8 +25,8 @@ src/stm32/system_stm32f4xx.c  \
 C_INCLUDES =  \
 -Iincludes \
 -I../drivers/CMSIS/Device/ST/STM32F4xx/Include \
--I../drivers/CMSIS/Include
-
+-I../drivers/CMSIS/Include \
+-I../shared_lib/api
 
 # ASM sources
 ASM_SOURCES =  \
