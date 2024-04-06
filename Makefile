@@ -34,7 +34,6 @@ build_lib:
 # clean up
 #######################################
 clean:
-	-rm -fR $(BUILD_DIR)
 	cd $(BOOTLOADER_DIR)/ && make clean
 	cd $(APP_DIR)/ && make clean
 	cd $(SHARED_LIB_DIR)/ && make clean
