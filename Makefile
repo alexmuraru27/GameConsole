@@ -10,6 +10,11 @@ APP_DIR = app
 APP_BIN = $(APP_DIR)/build/App.bin
 APP_ADDR = 0x8020000
 
+# print color utils
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
 
 # debug build + opt
 ######################################
@@ -18,17 +23,18 @@ DEBUG = 1
 OPT = -Og -O0
 
 # Build path
-all: build_prerequisites
-
-build_prerequisites: build_bootloader build_app build_lib
+all: build_bootloader build_app build_lib
 
 build_bootloader: 
+	@echo -e ${BLUE}"Building Bootloader"${NC}
 	cd $(BOOTLOADER_DIR)/ && make all
 
 build_app:
+	@echo -e ${BLUE}"Building App"${NC}
 	cd $(APP_DIR)/ && make all
 
 build_lib:
+	@echo -e ${BLUE}"Building Lib"${NC}
 	cd $(SHARED_LIB_DIR)/ && make all
 
 # clean up
@@ -41,5 +47,7 @@ clean:
 # openocd
 #######################################
 flash: all
+	@echo -e ${GREEN}"Flashing Bootloader"${NC}
 	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(BOOTLOADER_BIN) verify reset exit $(BOOTLOADER_ADDR)"
+	@echo -e ${GREEN}"Flashing App"${NC}
 	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(APP_BIN) verify reset exit $(APP_ADDR)"
