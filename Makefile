@@ -1,11 +1,15 @@
 BOOTLOADER_DIR = bootloader
-BOOTLOADER_ELF = $(BOOTLOADER_DIR)/build/Bootloader.elf
-
-APP_DIR = app
-APP_ELF = $(APP_DIR)/build/App.elf
+BOOTLOADER_BIN = $(BOOTLOADER_DIR)/build/Bootloader.bin
+BOOTLOADER_ADDR = 0x8000000
 
 SHARED_LIB_DIR = shared_lib
-SHARED_LIB_ELF = $(SHARED_LIB_DIR)/build/SharedLib.elf
+SHARED_LIB_BIN = $(SHARED_LIB_DIR)/build/SharedLib.bin
+SHARED_LIB_ADDR = 0x8010000
+
+APP_DIR = app
+APP_BIN = $(APP_DIR)/build/App.bin
+APP_ADDR = 0x8020000
+
 
 # debug build + opt
 ######################################
@@ -38,5 +42,5 @@ clean:
 # openocd
 #######################################
 flash: all
-	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(BOOTLOADER_ELF) verify reset exit"
-	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(APP_ELF) verify reset exit"
+	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(BOOTLOADER_BIN) verify reset exit $(BOOTLOADER_ADDR)"
+	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(APP_BIN) verify reset exit $(APP_ADDR)"
