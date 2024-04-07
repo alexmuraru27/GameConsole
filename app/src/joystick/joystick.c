@@ -1,23 +1,11 @@
 #include "joystick.h"
 
 volatile static uint16_t axis_values[2];
-volatile static uint8_t adc1_conversion_index = 0U;
-void ADC_IRQHandler(void)
-{
-    if (ADC1->SR & ADC_SR_EOC)
-    {
-        axis_values[adc1_conversion_index] = ADC1->DR;
-        adc1_conversion_index++;
-        adc1_conversion_index = adc1_conversion_index % 2;
-    }
-}
-
 static void joystick_adc_config(void)
 {
     // ######## APB2 Clock ########
     // Enable clock for ADC1
     RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-
     // Prescale clock to APB2/8
     ADC123_COMMON->CCR |= ADC_CCR_ADCPRE_0 | ADC_CCR_ADCPRE_1;
 
@@ -34,37 +22,48 @@ static void joystick_adc_config(void)
     ADC1->CR1 &= ~ADC_CR1_RES_Msk;
     ADC1->CR1 |= ADC_CR1_RES_1;
 
-    // Select the channels (0 and 1)
+    // Channels(0, 1)
     ADC1->SQR3 &= ~ADC_SQR3_SQ1_Msk;
     ADC1->SQR3 |= (1 << ADC_SQR3_SQ2_Pos);
 
-    // Set the number of conversions channels = 2
+    // Nr Conversions(2)
     ADC1->SQR1 |= ADC_SQR1_L_0;
 
     // Continuous conversion mode
     ADC1->CR2 |= ADC_CR2_CONT;
 
-    // Generate interrupt at end of sequence
-    ADC1->CR2 |= ADC_CR2_EOCS;
-    ADC1->CR1 |= ADC_CR1_EOCIE;
-
-    // Set sampling rate to 84 cycles
-    ADC1->SMPR2 &= ~ADC_SMPR2_SMP0_Msk;
+    // Sampling Rate(480 cycles)
     ADC1->SMPR2 |= ADC_SMPR2_SMP0_2 | ADC_SMPR2_SMP0_1 | ADC_SMPR2_SMP0_0;
-    ADC1->SMPR2 &= ~ADC_SMPR2_SMP1_Msk;
     ADC1->SMPR2 |= ADC_SMPR2_SMP1_2 | ADC_SMPR2_SMP1_1 | ADC_SMPR2_SMP1_0;
 
-    // Enable scan mode
+    // Scan mode
     ADC1->CR1 |= ADC_CR1_SCAN;
+
+    // DMA
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+    DMA2_Stream0->CR &= ~DMA_SxCR_DIR;
+    DMA2_Stream0->CR |= DMA_SxCR_CIRC;
+    DMA2_Stream0->CR |= DMA_SxCR_MINC;
+    DMA2_Stream0->CR |= DMA_SxCR_PSIZE_0;
+    DMA2_Stream0->CR |= DMA_SxCR_MSIZE_0;
+    DMA2_Stream0->CR &= ~DMA_SxCR_CHSEL;
+    DMA2_Stream0->PAR = (uint32_t)(&(ADC1->DR));
+    DMA2_Stream0->M0AR = (uint32_t)&axis_values;
+    DMA2_Stream0->NDTR = 2;
+    DMA2_Stream0->CR |= DMA_SxCR_EN;
+
+    // DMA Enable
+    ADC1->CR2 |= ADC_CR2_DMA;
+    ADC1->CR2 |= ADC_CR2_DDS;
+
     // Enable ADC
     ADC1->CR2 |= ADC_CR2_ADON;
 
     // Start conversion
-    __NVIC_EnableIRQ(ADC_IRQn);
     ADC1->CR2 |= ADC_CR2_SWSTART;
 }
 
-void joystick_gpio_init(void)
+static void joystick_gpio_init(void)
 {
     // switch_input
     GPIOA->MODER &= ~(GPIO_MODER_MODER2);
