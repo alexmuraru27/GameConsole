@@ -1,4 +1,4 @@
-#include "clock_config.h"
+#include "clock/clock_config.h"
 
 volatile uint32_t timing_delay = 0U;
 // Interrupt handler

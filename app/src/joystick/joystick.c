@@ -1,4 +1,4 @@
-#include "joystick.h"
+#include "joystick/joystick.h"
 
 volatile static uint16_t axis_values[2] = {128U, 128U};
 static void joystick_adc_config(void)

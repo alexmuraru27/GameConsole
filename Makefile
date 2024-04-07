@@ -2,10 +2,6 @@ BOOTLOADER_DIR = bootloader
 BOOTLOADER_BIN = $(BOOTLOADER_DIR)/build/Bootloader.bin
 BOOTLOADER_ADDR = 0x8000000
 
-SHARED_LIB_DIR = shared_lib
-SHARED_LIB_BIN = $(SHARED_LIB_DIR)/build/SharedLib.bin
-SHARED_LIB_ADDR = 0x8010000
-
 APP_DIR = app
 APP_BIN = $(APP_DIR)/build/App.bin
 APP_ADDR = 0x8020000
@@ -23,7 +19,7 @@ DEBUG = 1
 OPT = -Og -O0
 
 # Build path
-all: build_bootloader build_app build_lib
+all: build_bootloader build_app
 
 build_bootloader: 
 	@echo -e ${BLUE}"Building Bootloader"${NC}
@@ -33,16 +29,12 @@ build_app:
 	@echo -e ${BLUE}"Building App"${NC}
 	cd $(APP_DIR)/ && make all
 
-build_lib:
-	@echo -e ${BLUE}"Building Lib"${NC}
-	cd $(SHARED_LIB_DIR)/ && make all
 
 # clean up
 #######################################
 clean:
 	cd $(BOOTLOADER_DIR)/ && make clean
 	cd $(APP_DIR)/ && make clean
-	cd $(SHARED_LIB_DIR)/ && make clean
 
 # openocd
 #######################################

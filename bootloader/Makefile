@@ -25,7 +25,7 @@ C_INCLUDES =  \
 -Iincludes \
 -I../drivers/CMSIS/Device/ST/STM32F4xx/Include \
 -I../drivers/CMSIS/Include \
--I../shared_lib/api
+-I../
 
 # ASM sources
 ASM_SOURCES =  \
