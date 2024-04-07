@@ -19,12 +19,14 @@ BIN = $(CP) -O binary -S
 C_SOURCES =  \
 src/main.c \
 src/clock/clock_config.c \
+src/joystick/joystick.c \
 src/stm32/system_stm32f4xx.c  \
 
 # C includes
 C_INCLUDES =  \
 -Iincludes \
 -Iincludes/clock \
+-Iincludes/joystick \
 -I../drivers/CMSIS/Device/ST/STM32F4xx/Include \
 -I../drivers/CMSIS/Include \
 -I../shared_lib/api
