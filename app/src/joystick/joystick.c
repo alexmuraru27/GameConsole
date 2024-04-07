@@ -1,6 +1,6 @@
 #include "joystick.h"
 
-volatile static uint16_t axis_values[2];
+volatile static uint16_t axis_values[2] = {128U, 128U};
 static void joystick_adc_config(void)
 {
     // ######## APB2 Clock ########
@@ -77,16 +77,36 @@ void joystick_init(void)
     joystick_gpio_init();
 }
 
-uint16_t get_joystick_x(void)
+JOYSTICK_HORIZONTAL get_joystick_x(void)
 {
-    return axis_values[0U];
+    JOYSTICK_HORIZONTAL xVal = JOYSTICK_HORIZONTAL_CENTERED;
+    if (axis_values[0U] < 100U)
+    {
+        xVal = JOYSTICK_HORIZONTAL_LEFT;
+    }
+    else if (axis_values[0U] > 156U)
+    {
+        xVal = JOYSTICK_HORIZONTAL_RIGHT;
+    }
+    return xVal;
 }
-uint16_t get_joystick_y(void)
+JOYSTICK_VERTICAL get_joystick_y(void)
 {
-    return axis_values[1U];
+    JOYSTICK_HORIZONTAL yVal = JOYSTICK_VERTICAL_CENTERED;
+    if (axis_values[1U] < 100U)
+    {
+        yVal = JOYSTICK_VERTICAL_UP;
+    }
+    else if (axis_values[1U] > 156U)
+    {
+        yVal = JOYSTICK_VERTICAL_DOWN;
+    }
+    return yVal;
 }
 
-uint8_t get_joystick_switch()
+JOYSTICK_SWITCH get_joystick_switch()
 {
-    return (GPIOA->IDR & GPIO_IDR_ID2) >> GPIO_IDR_ID2_Pos == 0U;
+    return ((((GPIOA->IDR & GPIO_IDR_ID2) >> GPIO_IDR_ID2_Pos) != 0U)
+                ? JOYSTICK_SWITCH_OFF
+                : JOYSTICK_SWITCH_ON);
 }
