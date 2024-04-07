@@ -82,10 +82,20 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 
-  .API_SHARED 0x8010000:
+  .console_shared_library :
   {
-    KEEP(*(.API_SHARED))
+    . = ALIGN(4);
+    __console_shared_library_start__ = .;
+    *(.console_shared_library*)
+    __console_shared_library_end__ = .;
   } >LIBRARYROM
+
+  .CONSOLE_SHARED_API 0x8010000:
+  {
+    KEEP(*(.CONSOLE_SHARED_API))
+  } >LIBRARYROM
+  
+  ASSERT(LENGTH(LIBRARYROM) >= (__console_shared_library_end__ - __console_shared_library_start__), "LIBRARYROM OVERFLOW" )
 }
 
 
