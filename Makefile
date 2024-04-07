@@ -48,6 +48,6 @@ clean:
 #######################################
 flash: all
 	@echo -e ${GREEN}"Flashing Bootloader"${NC}
-	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(BOOTLOADER_BIN) verify reset exit $(BOOTLOADER_ADDR)"
+	openocd --debug=1 -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(BOOTLOADER_BIN) verify reset exit $(BOOTLOADER_ADDR)"
 	@echo -e ${GREEN}"Flashing App"${NC}
-	openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(APP_BIN) verify reset exit $(APP_ADDR)"
+	openocd --debug=1 -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program $(APP_BIN) verify reset exit $(APP_ADDR)"
