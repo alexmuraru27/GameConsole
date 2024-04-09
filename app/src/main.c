@@ -1,6 +1,7 @@
 #include "stm32f407xx.h"
 #include "clock/clock_config.h"
 #include "joystick/joystick.h"
+#include "serial_debug/serial_debug.h"
 
 void gpio_config(void)
 {
@@ -14,26 +15,35 @@ void hw_init(void)
     system_clock_config();
     gpio_config();
     joystick_init();
+    serial_init();
 }
 
 int main(void)
 {
     __enable_irq();
     hw_init();
+
     JOYSTICK_VERTICAL y = get_joystick_y();
     JOYSTICK_HORIZONTAL x = get_joystick_x();
     JOYSTICK_SWITCH sw = get_joystick_switch();
+    uint32_t i = 0;
     while (1)
     {
+        i += 25;
         // adc_read();
         // OFF
         y = get_joystick_y();
         x = get_joystick_x();
         sw = get_joystick_switch();
         GPIOA->BSRR |= (1 << 6);
-        delay_ms_systick(100 * x * (sw == JOYSTICK_SWITCH_OFF));
+        delay_ms_systick(100 * (sw == JOYSTICK_SWITCH_OFF));
         // ON
         GPIOA->BSRR |= (1 << 6) << 16;
-        delay_ms_systick(100 * y);
+        // delay_ms_systick(100 * y);
+
+        uart_write_string("TestStringg\r\n");
+        uart_write_string("DefaultText\r\n");
+        uart_write_int(i);
+        uart_write_string("\r\n");
     }
 }

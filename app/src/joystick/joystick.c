@@ -40,7 +40,6 @@ static void joystick_adc_config(void)
     ADC1->CR1 |= ADC_CR1_SCAN;
 
     // DMA
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
     DMA2_Stream0->CR &= ~DMA_SxCR_DIR;
     DMA2_Stream0->CR |= DMA_SxCR_CIRC;
     DMA2_Stream0->CR |= DMA_SxCR_MINC;

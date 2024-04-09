@@ -94,10 +94,20 @@ static void peripherals_clock_enable(void)
     // Pass clock to GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
+    // Pass clock to GPIOC
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+
+    // Pass clock to DMA controllers
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+
+    // ######## APB1 ########
+    // Enable clock for UART4
+    RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+
     // ######## APB2 ########
-    // Enable clock for ADC1 + ADC2
+    // Enable clock for ADC1
     RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-    RCC->APB2ENR |= RCC_APB2ENR_ADC2EN;
 }
 
 void delay_ms_systick(uint32_t time)
