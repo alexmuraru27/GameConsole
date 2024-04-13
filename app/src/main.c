@@ -1,7 +1,7 @@
 #include "stm32f407xx.h"
 #include "clock/clock_config.h"
-#include "joystick/joystick.h"
-#include "serial_debug/serial_debug.h"
+#include "shared/include/joystick_driver/joystick.h"
+#include "shared/include/serial_debug/serial_debug.h"
 
 void gpio_config(void)
 {

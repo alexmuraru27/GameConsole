@@ -1,4 +1,4 @@
-#include "serial_debug/serial_debug.h"
+#include "shared/include/serial_debug/serial_debug.h"
 #include <string.h>
 
 // Max APB1 42MHz

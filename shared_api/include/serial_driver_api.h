@@ -1,4 +1,0 @@
-#ifndef __SERIAL_DRIVER_API_H
-#define __SERIAL_DRIVER_API_H
-
-#endif /*__SERIAL_DRIVER_API_H*/

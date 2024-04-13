@@ -4,6 +4,7 @@
 #include "stm32f407xx.h"
 
 #define SERIAL_BUFFER_SIZE 128
+
 typedef struct
 {
     char uart_write_buffer[SERIAL_BUFFER_SIZE];

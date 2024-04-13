@@ -1,6 +1,7 @@
 #include "clock/clock_config.h"
 
-volatile uint32_t timing_delay = 0U;
+static volatile uint32_t timing_delay = 0U;
+
 // Interrupt handler
 void SysTick_Handler(void)
 {

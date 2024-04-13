@@ -1,4 +1,0 @@
-#ifndef __SPI_EEPROM_DRIVER_API_H
-#define __SPI_EEPROM_DRIVER_API_H
-
-#endif /*__SPI_EEPROM_DRIVER_API_H*/

@@ -1,6 +1,7 @@
-#ifndef __JOYSTICK_DRIVER_API_H
-#define __JOYSTICK_DRIVER_API_H
+#ifndef __JOYSTICK_H
+#define __JOYSTICK_H
 
+#include "stm32f407xx.h"
 typedef enum
 {
     JOYSTICK_HORIZONTAL_LEFT = 1,
@@ -21,4 +22,9 @@ typedef enum
     JOYSTICK_SWITCH_ON = 1,
 } JOYSTICK_SWITCH;
 
-#endif /*__JOYSTICK_DRIVER_API_H*/
+void joystick_init(void);
+JOYSTICK_HORIZONTAL get_joystick_x(void);
+JOYSTICK_VERTICAL get_joystick_y(void);
+JOYSTICK_SWITCH get_joystick_switch(void);
+
+#endif /* __JOYSTICK_H */

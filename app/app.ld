@@ -81,9 +81,4 @@ SECTIONS
   } >RAM
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
-
-  .API_SHARED 0x8010000:
-  {
-    KEEP(*(.API_SHARED))
-  } >LIBRARYROM
 }

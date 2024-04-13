@@ -10,5 +10,3 @@ PROVIDE(__bootloaderrom_start__ = ORIGIN(BOOTLOADERROM));
 PROVIDE(__bootloaderrom_size__ = LENGTH(BOOTLOADERROM));
 PROVIDE(__approm_start__ = ORIGIN(APPROM));
 PROVIDE(__approm_size__ = LENGTH(APPROM));
-PROVIDE(__libraryrom_start__ = ORIGIN(LIBRARYROM));
-PROVIDE(__libraryrom_size__ = LENGTH(LIBRARYROM));
