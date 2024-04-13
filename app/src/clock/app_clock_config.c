@@ -7,6 +7,9 @@ static void peripherals_clock_enable(void)
     // Pass clock to GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 
+    // Pass clock to GPIOB
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+
     // Pass clock to GPIOC
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
 
@@ -17,6 +20,9 @@ static void peripherals_clock_enable(void)
     // ######## APB1 ########
     // Enable clock for UART4
     RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+
+    // Enable clock for SPI1
+    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
 
     // ######## APB2 ########
     // Enable clock for ADC1

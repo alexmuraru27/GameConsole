@@ -24,6 +24,9 @@ src/clock/app_clock_config.c \
 ../shared/src/serial_debug/serial_debug.c \
 ../shared/src/joystick_driver/joystick.c \
 ../shared/src/sys_clock_config/sys_clock_config.c \
+../shared/src/SPI.c \
+../shared/src/spi_lcd_driver/fonts.c \
+../shared/src/spi_lcd_driver/ST7735.c \
 
 
 

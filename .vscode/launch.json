@@ -7,7 +7,7 @@
         {
             "name": "Cortex Debug",
             "cwd": "${workspaceFolder}",
-            "executable": "./bootloader/build/Bootloader.elf",
+            "executable": "./build/bootloader/Bootloader.elf",
             "request": "launch",
             "type": "cortex-debug",
             "runToEntryPoint": "main",
@@ -24,8 +24,8 @@
                 "samplesPerSecond": 4
             },
             "symbolFiles": [
-                "./bootloader/build/Bootloader.elf",
-                "./app/build/App.elf"
+                "./build/bootloader/Bootloader.elf",
+                "./build/app/App.elf"
             ]
         },
     ]

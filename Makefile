@@ -1,9 +1,9 @@
 BOOTLOADER_DIR = bootloader
-BOOTLOADER_BIN = $(BOOTLOADER_DIR)/build/Bootloader.bin
+BOOTLOADER_BIN = build/$(BOOTLOADER_DIR)/Bootloader.bin
 BOOTLOADER_ADDR = 0x8000000
 
 APP_DIR = app
-APP_BIN = $(APP_DIR)/build/App.bin
+APP_BIN = build/$(APP_DIR)/App.bin
 APP_ADDR = 0x8010000
 
 # print color utils
