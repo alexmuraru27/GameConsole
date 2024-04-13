@@ -1,4 +1,4 @@
-#include "clock/clock_config.h"
+#include "shared/include/sys_clock_config/sys_clock_config.h"
 
 static volatile uint32_t timing_delay = 0U;
 
@@ -89,28 +89,6 @@ static void pll_clock_config(void)
     };
 }
 
-static void peripherals_clock_enable(void)
-{
-    // ######## AHB1 ########
-    // Pass clock to GPIOA
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-
-    // Pass clock to GPIOC
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-
-    // Pass clock to DMA controllers
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
-    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
-
-    // ######## APB1 ########
-    // Enable clock for UART4
-    RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
-
-    // ######## APB2 ########
-    // Enable clock for ADC1
-    RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
-}
-
 void delay_ms_systick(uint32_t time)
 {
     timing_delay = time;
@@ -125,6 +103,5 @@ void system_clock_config(void)
     flash_memory_clock_config();
     bus_clock_config();
     pll_clock_config();
-    peripherals_clock_enable();
     CMSIS_clock_config();
 }

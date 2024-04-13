@@ -18,10 +18,11 @@ BIN = $(CP) -O binary -S
 # C sources
 C_SOURCES =  \
 src/main.c \
-src/clock/clock_config.c \
 src/stm32/system_stm32f4xx.c  \
+src/clock/app_clock_config.c \
 ../shared/src/serial_debug/serial_debug.c \
 ../shared/src/joystick_driver/joystick.c \
+../shared/src/sys_clock_config/sys_clock_config.c \
 
 
 
