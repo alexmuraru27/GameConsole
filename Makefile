@@ -4,7 +4,7 @@ BOOTLOADER_ADDR = 0x8000000
 
 APP_DIR = app
 APP_BIN = $(APP_DIR)/build/App.bin
-APP_ADDR = 0x8020000
+APP_ADDR = 0x8010000
 
 # print color utils
 GREEN='\033[0;32m'
