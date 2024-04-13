@@ -1,7 +1,8 @@
 TARGET = App
 DEBUG = 1
 OPT = -Og -O0
-BUILD_DIR = build
+BUILD_ROOT = ../build
+BUILD_DIR = $(BUILD_ROOT)/app
 LDSCRIPT = app.ld
 
 # binaries
@@ -90,7 +91,10 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
 $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
 	
-$(BUILD_DIR):
+$(BUILD_ROOT):
+	mkdir $@		
+
+$(BUILD_DIR): $(BUILD_ROOT)
 	mkdir $@		
 
 # clean up
