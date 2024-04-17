@@ -227,7 +227,6 @@ void ST7735_DrawPixel(uint16_t x, uint16_t y, uint16_t color)
 
 void ST7735_DrawString(uint16_t x, uint16_t y, const char *str, FontDef font, uint16_t color, uint16_t bgcolor)
 {
-
     while (*str)
     {
         if (x + font.width >= _width)
@@ -250,6 +249,34 @@ void ST7735_DrawString(uint16_t x, uint16_t y, const char *str, FontDef font, ui
         ST7735_WriteChar(x, y, *str, font, color, bgcolor);
         x += font.width;
         str++;
+    }
+}
+
+void ST7735_DrawNumber(uint16_t x, uint16_t y, uint32_t number, FontDef font, uint16_t color, uint16_t bgcolor)
+{
+    char buf[20U];
+    uint8_t nr_digits = 0;
+    do
+    {
+        buf[nr_digits] = '0' + (number % 10);
+        number /= 10;
+        nr_digits++;
+    } while (number != 0);
+
+    for (uint8_t idx = nr_digits; idx > 0U; idx--)
+    {
+        if (x + font.width >= _width)
+        {
+            x = 0;
+            y += font.height;
+            if (y + font.height >= _height)
+            {
+                break;
+            }
+        }
+
+        ST7735_WriteChar(x, y, buf[idx - 1U], font, color, bgcolor);
+        x += font.width;
     }
 }
 

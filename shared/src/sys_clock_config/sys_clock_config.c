@@ -1,14 +1,25 @@
 #include "shared/include/sys_clock_config/sys_clock_config.h"
 
 static volatile uint32_t timing_delay = 0U;
+static volatile uint32_t system_time = 0U;
 
 // Interrupt handler
 void SysTick_Handler(void)
 {
-    if (timing_delay != 0)
+    system_time++;
+}
+
+void delay_ms_systick(uint32_t time)
+{
+    timing_delay = system_time + time;
+    while (timing_delay > system_time)
     {
-        timing_delay--;
-    }
+    };
+}
+
+uint32_t get_sys_time()
+{
+    return system_time;
 }
 
 static void CMSIS_clock_config(void)
@@ -85,14 +96,6 @@ static void pll_clock_config(void)
     RCC->CFGR |= RCC_CFGR_SW_PLL;
 
     while (!(RCC->CFGR & RCC_CFGR_SWS))
-    {
-    };
-}
-
-void delay_ms_systick(uint32_t time)
-{
-    timing_delay = time;
-    while (timing_delay != 0)
     {
     };
 }
