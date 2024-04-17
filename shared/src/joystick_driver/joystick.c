@@ -6,6 +6,13 @@ static void joystick_adc_config(void)
     // ######## APB2 Clock ########
     // Enable clock for ADC1
     RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
+
+    // Pass clock to GPIOA
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
+    // Pass clock to DMA controller
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+
     // Prescale clock to APB2/8
     ADC123_COMMON->CCR |= ADC_CCR_ADCPRE_0 | ADC_CCR_ADCPRE_1;
 
@@ -64,6 +71,9 @@ static void joystick_adc_config(void)
 
 static void joystick_gpio_init(void)
 {
+    // Pass clock to GPIOA
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
     // switch_input
     GPIOA->MODER &= ~(GPIO_MODER_MODER2);
     GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD2);

@@ -2,10 +2,15 @@
 
 void SPI2_Init(void)
 {
+    // Enable clock for SPI2
+    RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+
+    // Pass clock for GPIOB
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+
     // PB09 AF5 - NSS
     // PB10 AF5 - CLK SPI2
     // PB15 AF5 - SDI
-
     GPIOB->MODER &= ~(GPIO_MODER_MODER9);
     GPIOB->MODER &= ~(GPIO_MODER_MODER10);
     GPIOB->MODER &= ~(GPIO_MODER_MODER15);

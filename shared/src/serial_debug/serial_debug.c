@@ -11,6 +11,9 @@ static volatile serial_debug_data_struct serial_debug_data;
 
 static void serial_gpio_init()
 {
+    // Enable GPIO clock
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+
     // PC10 - Alternate function
     GPIOC->MODER &= ~GPIO_MODER_MODER10_Msk;
     GPIOC->MODER |= GPIO_MODER_MODER10_1;
@@ -22,6 +25,9 @@ static void serial_gpio_init()
 
 void serial_init(void)
 {
+    // Enable clock for UART4
+    RCC->APB1ENR |= RCC_APB1ENR_UART4EN;
+
     // Init Gpio
     serial_gpio_init();
 
