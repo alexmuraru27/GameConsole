@@ -69,7 +69,7 @@ void SPI2_Init(void)
 
 void SPI2_SendData(uint8_t *buff, size_t buff_size)
 {
-    for (uint8_t idx = 0U; idx < buff_size; ++idx)
+    for (size_t idx = 0U; idx < buff_size; ++idx)
     {
         // Wait until TX buffer is empty
         while (!(SPI2->SR & SPI_SR_TXE))
