@@ -82,12 +82,9 @@ void ST7735_DrawNumber(uint16_t x, uint16_t y, uint32_t number, FontDef font, ui
 void ST7735_FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 void ST7735_FillScreen(uint16_t color);
 void ST7735_DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data);
-void ST7735_DrawTouchGFX(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data);
 void ST7735_InvertColors(uint8_t invert);
 void ST7735_DrawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
-void ST7735_DrawCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, uint16_t color);
 void ST7735_FillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
-void ST7735_FillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, int16_t delta, uint16_t color);
 void ST7735_DrawEllipse(int16_t x0, int16_t y0, int16_t rx, int16_t ry, uint16_t color);
 void ST7735_FillEllipse(int16_t x0, int16_t y0, int16_t rx, int16_t ry, uint16_t color);
 void ST7735_DrawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);

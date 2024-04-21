@@ -67,7 +67,7 @@ void SPI2_Init(void)
     SPI2->CR1 |= SPI_CR1_SPE;
 }
 
-void SPI2_SendData(uint8_t *buff, size_t buff_size)
+void SPI2_WriteUint8Buffer(uint8_t *buff, size_t buff_size)
 {
     for (size_t idx = 0U; idx < buff_size; ++idx)
     {
@@ -77,6 +77,34 @@ void SPI2_SendData(uint8_t *buff, size_t buff_size)
 
         // Send data
         SPI2->DR = buff[idx];
+
+        // Wait until transmission is complete
+        while (SPI2->SR & SPI_SR_BSY)
+            ;
+    }
+}
+
+void SPI2_WriteUint16ReversedBuffer(uint16_t *buff, size_t buff_size)
+{
+    for (size_t idx = 0U; idx < buff_size; ++idx)
+    {
+        // Wait until TX buffer is empty
+        while (!(SPI2->SR & SPI_SR_TXE))
+            ;
+
+        // Send data
+        SPI2->DR = (buff[idx] >> 8);
+
+        // Wait until transmission is complete
+        while (SPI2->SR & SPI_SR_BSY)
+            ;
+
+        // Wait until TX buffer is empty
+        while (!(SPI2->SR & SPI_SR_TXE))
+            ;
+
+        // Send data
+        SPI2->DR = (buff[idx] & 0xFF);
 
         // Wait until transmission is complete
         while (SPI2->SR & SPI_SR_BSY)

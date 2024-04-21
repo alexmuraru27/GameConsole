@@ -5,12 +5,15 @@
 
 static void ST7735_Reset();
 static void ST7735_WriteCommand(uint8_t cmd);
-static void ST7735_WriteData(uint8_t *buff, size_t buff_size);
+static void ST7735_WriteUint8Data(uint8_t *buff, size_t buff_size);
+static void ST7735_WriteUint16ReversedData(uint16_t *buff, size_t buff_size);
 static void ST7735_ExecuteCommandList(const uint8_t *addr);
 static void ST7735_SetAddressWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1);
 static void ST7735_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint16_t color, uint16_t bgcolor);
 static void ST7735_LCDDataCommand();
 static void ST7735_LCDControlCommand();
+static void ST7735_DrawCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, uint16_t color);
+static void ST7735_FillCircleHelper(int16_t x0, int16_t y0, int16_t r, uint8_t cornername, int16_t delta, uint16_t color);
 
 // Data or Control
 static void ST7735_LCDDataCommand()
@@ -133,13 +136,19 @@ void ST7735_Init(void)
 static void ST7735_WriteCommand(uint8_t cmd)
 {
     ST7735_LCDControlCommand();
-    SPI2_SendData(&cmd, sizeof(cmd));
+    SPI2_WriteUint8Buffer(&cmd, sizeof(cmd));
 }
 
-static void ST7735_WriteData(uint8_t *buff, size_t buff_size)
+static void ST7735_WriteUint8Data(uint8_t *buff, size_t buff_size)
 {
     ST7735_LCDDataCommand();
-    SPI2_SendData(buff, buff_size);
+    SPI2_WriteUint8Buffer(buff, buff_size);
+}
+
+static void ST7735_WriteUint16ReversedData(uint16_t *buff, size_t buff_size)
+{
+    ST7735_LCDDataCommand();
+    SPI2_WriteUint16ReversedBuffer(buff, buff_size);
 }
 
 static void ST7735_ExecuteCommandList(const uint8_t *addr)
@@ -159,7 +168,7 @@ static void ST7735_ExecuteCommandList(const uint8_t *addr)
         numArgs &= ~DELAY;
         if (numArgs)
         {
-            ST7735_WriteData((uint8_t *)addr, numArgs);
+            ST7735_WriteUint8Data((uint8_t *)addr, numArgs);
             addr += numArgs;
         }
 
@@ -178,13 +187,13 @@ static void ST7735_SetAddressWindow(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t 
     // column address set
     ST7735_WriteCommand(ST7735_CASET);
     uint8_t data[] = {0x00, x0 + _xstart, 0x00, x1 + _xstart};
-    ST7735_WriteData(data, sizeof(data));
+    ST7735_WriteUint8Data(data, sizeof(data));
 
     // row address set
     ST7735_WriteCommand(ST7735_RASET);
     data[1] = y0 + _ystart;
     data[3] = y1 + _ystart;
-    ST7735_WriteData(data, sizeof(data));
+    ST7735_WriteUint8Data(data, sizeof(data));
 
     // write to RAM
     ST7735_WriteCommand(ST7735_RAMWR);
@@ -203,13 +212,11 @@ static void ST7735_WriteChar(uint16_t x, uint16_t y, char ch, FontDef font, uint
         {
             if ((b << j) & 0x8000)
             {
-                uint8_t data[] = {color >> 8, color & 0xFF};
-                ST7735_WriteData(data, sizeof(data));
+                ST7735_WriteUint16ReversedData(&color, 1U);
             }
             else
             {
-                uint8_t data[] = {bgcolor >> 8, bgcolor & 0xFF};
-                ST7735_WriteData(data, sizeof(data));
+                ST7735_WriteUint16ReversedData(&bgcolor, 1U);
             }
         }
     }
@@ -221,8 +228,7 @@ void ST7735_DrawPixel(uint16_t x, uint16_t y, uint16_t color)
         return;
 
     ST7735_SetAddressWindow(x, y, x + 1, y + 1);
-    uint8_t data[] = {color >> 8, color & 0xFF};
-    ST7735_WriteData(data, sizeof(data));
+    ST7735_WriteUint16ReversedData(&color, 1U);
 }
 
 void ST7735_DrawString(uint16_t x, uint16_t y, const char *str, FontDef font, uint16_t color, uint16_t bgcolor)
@@ -291,14 +297,12 @@ void ST7735_FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
         h = _height - y;
 
     ST7735_SetAddressWindow(x, y, x + w - 1, y + h - 1);
-
-    uint8_t data[] = {color >> 8, color & 0xFF};
     ST7735_LCDDataCommand();
     for (y = h; y > 0; y--)
     {
         for (x = w; x > 0; x--)
         {
-            ST7735_WriteData(data, sizeof(data));
+            ST7735_WriteUint16ReversedData(&color, 1U);
         }
     }
 }
@@ -318,37 +322,11 @@ void ST7735_DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint
         return;
 
     ST7735_SetAddressWindow(x, y, x + w - 1, y + h - 1);
-    ST7735_WriteData((uint8_t *)data, sizeof(uint16_t) * w * h);
-}
-
-void ST7735_DrawTouchGFX(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data)
-{
-    if ((x >= _width) || (y >= _height))
-        return;
-    if ((x + w - 1) >= _width)
-        return;
-    if ((y + h - 1) >= _height)
-        return;
-
-    ST7735_SetAddressWindow(x, y, x + w - 1, y + h - 1);
-
-    uint32_t size = w * h;
-    uint8_t colorBytes[size][2];
-
-    for (uint32_t i = 0; i < size; i++)
-    {
-        colorBytes[i][0] = (*data & 0xFF00) >> 8;
-        colorBytes[i][1] = *data & 0x00FF;
-        data++;
-    }
-
-    ST7735_LCDDataCommand();
-    ST7735_WriteData((uint8_t *)&colorBytes, size * 2);
+    ST7735_WriteUint16ReversedData((uint16_t *)data, w * h);
 }
 
 void ST7735_InvertColors(uint8_t invert)
 {
-
     ST7735_WriteCommand(invert ? ST7735_INVON : ST7735_INVOFF);
 }
 
@@ -767,7 +745,7 @@ void ST7735_SetRotation(uint8_t m)
     case 0:
     {
         uint8_t d_r = (_data_rotation[0] | _data_rotation[1] | _data_rotation[3]);
-        ST7735_WriteData(&d_r, sizeof(d_r));
+        ST7735_WriteUint8Data(&d_r, 1U);
         _width = ST7735_WIDTH;
         _height = ST7735_HEIGHT;
         _xstart = ST7735_XSTART;
@@ -777,7 +755,7 @@ void ST7735_SetRotation(uint8_t m)
     case 1:
     {
         uint8_t d_r = (_data_rotation[1] | _data_rotation[2] | _data_rotation[3]);
-        ST7735_WriteData(&d_r, sizeof(d_r));
+        ST7735_WriteUint8Data(&d_r, 1U);
         _width = ST7735_HEIGHT;
         _height = ST7735_WIDTH;
         _xstart = ST7735_YSTART;
@@ -787,7 +765,7 @@ void ST7735_SetRotation(uint8_t m)
     case 2:
     {
         uint8_t d_r = _data_rotation[3];
-        ST7735_WriteData(&d_r, sizeof(d_r));
+        ST7735_WriteUint8Data(&d_r, sizeof(d_r));
         _width = ST7735_WIDTH;
         _height = ST7735_HEIGHT;
         _xstart = ST7735_XSTART;
@@ -797,7 +775,7 @@ void ST7735_SetRotation(uint8_t m)
     case 3:
     {
         uint8_t d_r = (_data_rotation[0] | _data_rotation[2] | _data_rotation[3]);
-        ST7735_WriteData(&d_r, sizeof(d_r));
+        ST7735_WriteUint8Data(&d_r, sizeof(d_r));
         _width = ST7735_HEIGHT;
         _height = ST7735_WIDTH;
         _xstart = ST7735_YSTART;
