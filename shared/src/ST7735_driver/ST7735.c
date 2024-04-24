@@ -1,4 +1,4 @@
-#include "shared/include/spi_lcd_driver/ST7735.h"
+#include "shared/include/ST7735_driver/ST7735.h"
 #include "shared/include/SPI.h"
 #include "shared/include/sys_clock_config/sys_clock_config.h"
 #include "stdlib.h"

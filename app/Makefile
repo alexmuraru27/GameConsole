@@ -22,11 +22,11 @@ src/main.c \
 src/stm32/system_stm32f4xx.c  \
 src/clock/app_clock_config.c \
 ../shared/src/serial_debug/serial_debug.c \
-../shared/src/joystick_driver/joystick.c \
+../shared/src/joystick/joystick.c \
 ../shared/src/sys_clock_config/sys_clock_config.c \
 ../shared/src/SPI.c \
-../shared/src/spi_lcd_driver/fonts.c \
-../shared/src/spi_lcd_driver/ST7735.c \
+../shared/src/ST7735_driver/fonts.c \
+../shared/src/ST7735_driver/ST7735.c \
 
 
 

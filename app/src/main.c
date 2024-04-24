@@ -1,9 +1,9 @@
 #include "stm32f407xx.h"
 #include "clock/app_clock_config.h"
-#include "shared/include/joystick_driver/joystick.h"
+#include "shared/include/joystick/joystick.h"
 #include "shared/include/serial_debug/serial_debug.h"
 #include "shared/include/sys_clock_config/sys_clock_config.h"
-#include "shared/include/spi_lcd_driver/ST7735.h"
+#include "shared/include/ST7735_driver/ST7735.h"
 
 #define FPS 60U
 #define MILLISECONDS_IN_SECOND 1000U
@@ -58,6 +58,7 @@ const uint16_t data_buffer[16 * 16] = {
     0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF, // 0x0100 (256) pixels
 };
 
+uint16_t data_buffer123[128 * 128] = {};
 int main(void)
 {
     __enable_irq();

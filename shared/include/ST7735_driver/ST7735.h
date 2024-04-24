@@ -2,7 +2,7 @@
 #define __ST7735_H
 
 #include "stm32f407xx.h"
-#include "shared/include/spi_lcd_driver/fonts.h"
+#include "shared/include/ST7735_driver/fonts.h"
 
 #define RGB_TO_565(r, g, b) (((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | (b >> 3))
 
