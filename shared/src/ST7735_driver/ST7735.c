@@ -110,9 +110,6 @@ static const uint8_t
 void ST7735_Init(void)
 {
     SPI2_Init();
-    // PB11 - RS(DATA/COMMAND)
-    // PB12 - RST
-    // PB13 - CS
 
     GPIOB->MODER |= (1 << GPIO_MODER_MODER11_Pos);
     GPIOB->OSPEEDR &= ~GPIO_OSPEEDR_OSPEED11;
@@ -121,10 +118,6 @@ void ST7735_Init(void)
     GPIOB->MODER |= (1 << GPIO_MODER_MODER12_Pos);
     GPIOB->OSPEEDR &= ~GPIO_OSPEEDR_OSPEED12;
     GPIOB->OSPEEDR |= (3 << GPIO_OSPEEDR_OSPEED12_Pos);
-
-    GPIOB->MODER |= (1 << GPIO_MODER_MODER13_Pos);
-    GPIOB->OSPEEDR &= ~GPIO_OSPEEDR_OSPEED13;
-    GPIOB->OSPEEDR |= (3 << GPIO_OSPEEDR_OSPEED13_Pos);
 
     ST7735_Reset();
     ST7735_ExecuteCommandList(init_cmds1);

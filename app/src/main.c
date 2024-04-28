@@ -8,20 +8,6 @@
 #define FPS 60U
 #define MILLISECONDS_IN_SECOND 1000U
 #define FRAME_TIME (MILLISECONDS_IN_SECOND / FPS)
-// Serial
-// PC10 - TX
-
-// Display
-// PB09 AF5 - CS SPI2
-// PB10 AF5 - CLK SPI2
-// PB15 AF5 - SDI SPI2
-// PB11 - RS(DATA/COMMAND)
-// PB12 - RST
-
-// Joystick
-// PA2 SW
-// PA1 VRY
-// PA0 VRX
 
 void gpio_config(void)
 {
