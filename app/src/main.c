@@ -23,6 +23,7 @@ void hw_init(void)
     joystick_init();
     serial_init();
     ST7735_Init();
+    ST7735_SetRotation(3);
 }
 
 const uint16_t data_buffer[16 * 16] = {

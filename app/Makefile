@@ -95,10 +95,10 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
 	
 $(BUILD_ROOT):
-	mkdir $@		
+	mkdir -p $@		
 
 $(BUILD_DIR): $(BUILD_ROOT)
-	mkdir $@		
+	mkdir -p $@		
 
 # clean up
 #######################################
