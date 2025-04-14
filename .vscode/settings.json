@@ -18,9 +18,14 @@
         "stm32f413xx.h": "c",
         "stm32f412vx.h": "c",
         "stm32f412rx.h": "c",
-        "main.h": "c"
+        "main.h": "c",
+        "stm32f4xx_it.h": "c",
+        "stdint.h": "c",
+        "stm32f407xx.h": "c",
+        "sysclock.h": "c"
     },
     "editor.formatOnSave": true,
     "cortex-debug.gdbPath": "C:/gcc-arm-none-eabi/bin/arm-none-eabi-gdb.exe",
-    "cortex-debug.openocdPath": "C:/openocd/bin/openocd.exe"
+    "cortex-debug.openocdPath": "C:/openocd/bin/openocd.exe",
+    "C_Cpp.errorSquiggles": "disabled"
 }

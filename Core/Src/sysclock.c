@@ -1,0 +1,169 @@
+#include "sysclock.h"
+
+static volatile uint32_t timing_delay = 0U;
+static volatile uint32_t system_time = 0U;
+
+#if !defined(HSE_VALUE)
+#define HSE_VALUE ((uint32_t)8000000) /*!< Default value of the External oscillator in Hz */
+#endif                                /* HSE_VALUE */
+
+#if !defined(HSI_VALUE)
+#define HSI_VALUE ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
+#endif                                 /* HSI_VALUE */
+
+void SysTickClockUpdate(void)
+{
+    uint32_t systemCoreClock = 16000000;
+    const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
+    uint32_t tmp = 0, pllvco = 0, pllp = 2, pllsource = 0, pllm = 2;
+
+    /* Get SYSCLK source -------------------------------------------------------*/
+    tmp = RCC->CFGR & RCC_CFGR_SWS;
+
+    switch (tmp)
+    {
+    case 0x00: /* HSI used as system clock source */
+        systemCoreClock = HSI_VALUE;
+        break;
+    case 0x04: /* HSE used as system clock source */
+        systemCoreClock = HSE_VALUE;
+        break;
+    case 0x08: /* PLL used as system clock source */
+
+        /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N
+           SYSCLK = PLL_VCO / PLL_P
+           */
+        pllsource = (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) >> 22;
+        pllm = RCC->PLLCFGR & RCC_PLLCFGR_PLLM;
+
+        if (pllsource != 0)
+        {
+            /* HSE used as PLL clock source */
+            pllvco = (HSE_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+        }
+        else
+        {
+            /* HSI used as PLL clock source */
+            pllvco = (HSI_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+        }
+
+        pllp = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLP) >> 16) + 1) * 2;
+        systemCoreClock = pllvco / pllp;
+        break;
+    default:
+        systemCoreClock = HSI_VALUE;
+        break;
+    }
+    /* Compute HCLK frequency --------------------------------------------------*/
+    /* Get HCLK prescaler */
+    tmp = AHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> 4)];
+    /* HCLK frequency */
+    systemCoreClock >>= tmp;
+
+    SysTick_Config(systemCoreClock / 1000);
+}
+
+// Interrupt handler
+void SysTick_Handler(void)
+{
+    system_time++;
+}
+
+void delay_ms_systick(uint32_t time)
+{
+    timing_delay = system_time + time;
+    while (timing_delay > system_time)
+    {
+    };
+}
+
+uint32_t get_sys_time()
+{
+    return system_time;
+}
+
+static void select_clock_source_config(void)
+{
+    // No bypass, using internal clock
+    RCC->CR &= ~RCC_CR_HSEBYP;
+
+    // Enable HSE
+    RCC->CR |= RCC_CR_HSEON;
+    while (!(RCC->CR & RCC_CR_HSERDY))
+    {
+    }; // Wait until HSE is ready
+}
+
+static void flash_memory_clock_config(void)
+{
+    FLASH->ACR |= FLASH_ACR_PRFTEN;
+    FLASH->ACR &= ~FLASH_ACR_LATENCY;
+    FLASH->ACR |= FLASH_ACR_LATENCY_5WS;
+}
+
+static void bus_clock_config(void)
+{
+    // AHB Prescaler = 1
+    RCC->CFGR &= ~RCC_CFGR_HPRE;
+
+    // APB1 - LOWSPEED = AHB SPEED/4
+    RCC->CFGR &= ~RCC_CFGR_PPRE1;
+    RCC->CFGR |= RCC_CFGR_PPRE1_DIV4;
+
+    // APB2 - HIGHSPEED = AHB SPEED/2
+    RCC->CFGR &= ~RCC_CFGR_PPRE2;
+    RCC->CFGR |= RCC_CFGR_PPRE2_DIV2;
+}
+
+static void pll_clock_config(void)
+{
+    // SET source of PLL to HSE
+    RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLSRC;
+    RCC->PLLCFGR |= RCC_PLLCFGR_PLLSRC_HSE;
+
+    // PLLM input DIVIDER to 4U -> bring it down to 2MHz for stability
+    RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLM;
+    RCC->PLLCFGR |= (4U << RCC_PLLCFGR_PLLM_Pos);
+
+    // PLLN MULTIPLIER to 168
+    RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLN;
+    RCC->PLLCFGR |= (168 << RCC_PLLCFGR_PLLN_Pos);
+
+    // PLLP output DIVIDER = 2
+    RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLP;
+
+    // PLLQ DIVIDER = 4 > 42 MHZ -  USB OTG FS, SDIO and random number generator
+    RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLQ;
+    RCC->PLLCFGR |= RCC_PLLCFGR_PLLQ_2;
+
+    // Enable PLL - 168MHz
+    RCC->CR |= RCC_CR_PLLON;
+    while (!(RCC->CR & RCC_CR_PLLRDY))
+    {
+    };
+
+    // Switch RCC source to PLL
+    RCC->CFGR &= ~RCC_CFGR_SW;
+    RCC->CFGR |= RCC_CFGR_SW_PLL;
+
+    while (!(RCC->CFGR & RCC_CFGR_SWS))
+    {
+    };
+}
+
+static void peripherals_clock_enable(void)
+{
+    // ######## AHB1 ########
+    // Pass clock to GPIOA
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+}
+
+void system_clock_config(void)
+{
+    select_clock_source_config();
+    flash_memory_clock_config();
+    bus_clock_config();
+    pll_clock_config();
+    SysTickClockUpdate();
+    peripherals_clock_enable();
+}

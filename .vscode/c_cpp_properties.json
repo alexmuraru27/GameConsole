@@ -8,7 +8,9 @@
             "intelliSenseMode": "windows-msvc-x64",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "defines": ["USE_HAL_DRIVER","STM32F407xx"]
+            "defines": [
+                "STM32F407xx"
+            ]
         }
     ],
     "version": 4
