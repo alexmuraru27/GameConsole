@@ -1,0 +1,22 @@
+
+{"terminal.integrated.profiles.windows": {
+    "msys mingw64": {
+        "path": "C:/msys64/msys2_shell.cmd",
+        "args": [
+            "-defterm",
+            "-here",
+            "-no-start",
+            "-mingw64"
+        ]
+    }
+},
+"files.associations": {
+    "stm32f4xx_hal_def.h": "c",
+    "stm32_hal_legacy.h": "c",
+    "stm32f4xx.h": "c",
+    "stm32f423xx.h": "c",
+    "stm32f413xx.h": "c",
+    "stm32f412vx.h": "c",
+    "stm32f412rx.h": "c"
+}
+}
