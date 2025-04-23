@@ -3,11 +3,11 @@
 
 void SystemInit(void)
 {
+  systemClockConfig();
 }
+
 int main(void)
 {
-  system_clock_config();
-
   // Set PA6 as output
   GPIOA->MODER &= ~(0x3 << (6 * 2));
   GPIOA->MODER |= (0x1 << (6 * 2));
@@ -23,6 +23,6 @@ int main(void)
   while (1)
   {
     GPIOA->ODR ^= GPIO_ODR_OD6;
-    delay_ms_systick(500);
+    delayMs(500);
   }
 }

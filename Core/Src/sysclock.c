@@ -12,7 +12,7 @@ static volatile uint32_t system_time = 0U;
 #define HSI_CLOCK_VALUE ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
 #endif                                       /* HSI_CLOCK_VALUE */
 
-void sys_tick_clock_update(void)
+void sysTickClockUpdate(void)
 {
     const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
     uint32_t systemCoreClock = HSI_CLOCK_VALUE;
@@ -68,7 +68,7 @@ void SysTick_Handler(void)
     system_time++;
 }
 
-void delay_ms_systick(uint32_t time)
+void delayMs(uint32_t time)
 {
     timing_delay = system_time + time;
     while (timing_delay > system_time)
@@ -76,12 +76,12 @@ void delay_ms_systick(uint32_t time)
     };
 }
 
-uint32_t get_sys_time()
+uint32_t getSysTime()
 {
     return system_time;
 }
 
-static void select_clock_source_config(void)
+static void selectClockSourceConfig(void)
 {
     // No bypass, using internal clock
     RCC->CR &= ~RCC_CR_HSEBYP;
@@ -93,14 +93,14 @@ static void select_clock_source_config(void)
     }; // Wait until HSE is ready
 }
 
-static void flash_memory_clock_config(void)
+static void flashMemoryClockConfig(void)
 {
     FLASH->ACR |= FLASH_ACR_PRFTEN;
     FLASH->ACR &= ~FLASH_ACR_LATENCY;
     FLASH->ACR |= FLASH_ACR_LATENCY_5WS;
 }
 
-static void bus_clock_config(void)
+static void busClockConfig(void)
 {
     // AHB Prescaler = 1
     RCC->CFGR &= ~RCC_CFGR_HPRE;
@@ -114,7 +114,7 @@ static void bus_clock_config(void)
     RCC->CFGR |= RCC_CFGR_PPRE2_DIV2;
 }
 
-static void pll_clock_config(void)
+static void pllClockConfig(void)
 {
     // SET source of PLL to HSE
     RCC->PLLCFGR &= ~RCC_PLLCFGR_PLLSRC;
@@ -150,19 +150,19 @@ static void pll_clock_config(void)
     };
 }
 
-static void peripherals_clock_enable(void)
+static void peripheralsClockEnable(void)
 {
     // ######## AHB1 ########
     // Pass clock to GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 }
 
-void system_clock_config(void)
+void systemClockConfig(void)
 {
-    select_clock_source_config();
-    flash_memory_clock_config();
-    bus_clock_config();
-    pll_clock_config();
-    sys_tick_clock_update();
-    peripherals_clock_enable();
+    selectClockSourceConfig();
+    flashMemoryClockConfig();
+    busClockConfig();
+    pllClockConfig();
+    sysTickClockUpdate();
+    peripheralsClockEnable();
 }
