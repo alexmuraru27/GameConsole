@@ -1,20 +1,21 @@
 #include "sysclock.h"
+#include "stm32f407xx.h"
 
 static volatile uint32_t timing_delay = 0U;
 static volatile uint32_t system_time = 0U;
 
-#if !defined(HSE_VALUE)
-#define HSE_VALUE ((uint32_t)8000000) /*!< Default value of the External oscillator in Hz */
-#endif                                /* HSE_VALUE */
+#if !defined(HSE_CLOCK_VALUE)
+#define HSE_CLOCK_VALUE ((uint32_t)8000000) /*!< Default value of the External oscillator in Hz */
+#endif                                      /* HSE_CLOCK_VALUE */
 
-#if !defined(HSI_VALUE)
-#define HSI_VALUE ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
-#endif                                 /* HSI_VALUE */
+#if !defined(HSI_CLOCK_VALUE)
+#define HSI_CLOCK_VALUE ((uint32_t)16000000) /*!< Value of the Internal oscillator in Hz*/
+#endif                                       /* HSI_CLOCK_VALUE */
 
-void SysTickClockUpdate(void)
+void sys_tick_clock_update(void)
 {
-    uint32_t systemCoreClock = 16000000;
     const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
+    uint32_t systemCoreClock = HSI_CLOCK_VALUE;
     uint32_t tmp = 0, pllvco = 0, pllp = 2, pllsource = 0, pllm = 2;
 
     /* Get SYSCLK source -------------------------------------------------------*/
@@ -22,36 +23,34 @@ void SysTickClockUpdate(void)
 
     switch (tmp)
     {
-    case 0x00: /* HSI used as system clock source */
-        systemCoreClock = HSI_VALUE;
+    case RCC_CFGR_SWS_HSI: /* HSI used as system clock source */
+        systemCoreClock = HSI_CLOCK_VALUE;
         break;
-    case 0x04: /* HSE used as system clock source */
-        systemCoreClock = HSE_VALUE;
+    case RCC_CFGR_SWS_HSE: /* HSE used as system clock source */
+        systemCoreClock = HSE_CLOCK_VALUE;
         break;
-    case 0x08: /* PLL used as system clock source */
-
-        /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N
+    case RCC_CFGR_SWS_PLL: /* PLL used as system clock source */
+        /* PLL_VCO = (HSE_CLOCK_VALUE or HSI_CLOCK_VALUE / PLL_M) * PLL_N
            SYSCLK = PLL_VCO / PLL_P
            */
         pllsource = (RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) >> 22;
         pllm = RCC->PLLCFGR & RCC_PLLCFGR_PLLM;
 
-        if (pllsource != 0)
+        if (pllsource != RCC_PLLCFGR_PLLSRC_HSI)
         {
             /* HSE used as PLL clock source */
-            pllvco = (HSE_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+            pllvco = (HSE_CLOCK_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
         }
         else
         {
             /* HSI used as PLL clock source */
-            pllvco = (HSI_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
+            pllvco = (HSI_CLOCK_VALUE / pllm) * ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> 6);
         }
 
         pllp = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLP) >> 16) + 1) * 2;
         systemCoreClock = pllvco / pllp;
         break;
     default:
-        systemCoreClock = HSI_VALUE;
         break;
     }
     /* Compute HCLK frequency --------------------------------------------------*/
@@ -164,6 +163,6 @@ void system_clock_config(void)
     flash_memory_clock_config();
     bus_clock_config();
     pll_clock_config();
-    SysTickClockUpdate();
+    sys_tick_clock_update();
     peripherals_clock_enable();
 }
