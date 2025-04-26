@@ -14,7 +14,6 @@ static volatile uint32_t system_time = 0U;
 
 void sysTickClockUpdate(void)
 {
-    const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
     uint32_t systemCoreClock = HSI_CLOCK_VALUE;
     uint32_t tmp = 0, pllvco = 0, pllp = 2, pllsource = 0, pllm = 2;
 
@@ -53,9 +52,11 @@ void sysTickClockUpdate(void)
     default:
         break;
     }
+
     /* Compute HCLK frequency --------------------------------------------------*/
     /* Get HCLK prescaler */
-    tmp = AHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> 4)];
+    const uint8_t AHBPrescTable[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
+    tmp = AHBPrescTable[((RCC->CFGR & RCC_CFGR_HPRE) >> RCC_CFGR_HPRE_Pos)];
     /* HCLK frequency */
     systemCoreClock >>= tmp;
 
