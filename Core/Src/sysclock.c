@@ -157,6 +157,29 @@ static void peripheralsClockEnable(void)
     // ######## AHB1 ########
     // Pass clock to GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+    // Pass clock to GPIOB
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    // Pass clock to GPIOC
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
+    // Pass clock to GPIOD
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
+    // Pass clock to GPIOE
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN;
+
+    // TODO Pass clock to CCMRam
+    // RCC->AHB1ENR |= RCC_AHB1ENR_CCMDATARAMEN;
+
+    // ######## AHB2 ########
+    // Pass clock to RNGEN
+    RCC->AHB2ENR |= RCC_AHB2ENR_RNGEN;
+
+    // ######## APB1 ########
+    // TODO Enable SPI
+    // TODO Enable UART
+    // TODO Enable Timers
+
+    // ######## APB2 ########
+    // TODO Enable ADC
 }
 
 void systemClockConfig(void)
