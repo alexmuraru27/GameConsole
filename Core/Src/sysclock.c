@@ -60,6 +60,7 @@ void sysTickClockUpdate(void)
     /* HCLK frequency */
     systemCoreClock >>= tmp;
 
+    // Divide sec by 1000 to get SysTick at 1ms
     SysTick_Config(systemCoreClock / 1000);
 }
 
