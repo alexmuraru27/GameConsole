@@ -23,6 +23,6 @@ int main(void)
   while (1)
   {
     GPIOA->ODR ^= GPIO_ODR_OD6;
-    delayMs(500);
+    delayMs(100);
   }
 }
