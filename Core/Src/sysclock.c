@@ -5,6 +5,10 @@
 static volatile uint32_t s_timing_delay = 0U;
 static volatile uint32_t s_system_time = 0U;
 
+#if !defined(SYS_TICK_SECOND_DIV)
+#define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
+#endif
+
 // HSE_CLOCK_VALUE ->  Default value of the External oscillator in Hz
 #if !defined(HSE_CLOCK_VALUE)
 #define HSE_CLOCK_VALUE ((uint32_t)8000000)
@@ -15,7 +19,31 @@ static volatile uint32_t s_system_time = 0U;
 #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 #endif
 
-void sysTickClockConfig(const uint32_t div_from_second)
+// Interrupt handler
+void SysTick_Handler(void)
+{
+    s_system_time++;
+}
+
+void delay(const uint32_t sys_time_delta)
+{
+    s_timing_delay = s_system_time + sys_time_delta;
+    while (s_timing_delay > s_system_time)
+    {
+    };
+}
+
+uint32_t getSysTime()
+{
+    return s_system_time;
+}
+
+uint32_t getSysTicksInSecond()
+{
+    return SYS_TICK_SECOND_DIV;
+}
+
+static void sysTickClockConfig()
 {
     uint32_t system_core_clock = HSI_CLOCK_VALUE;
     const uint32_t sys_clk_source = (RCC->CFGR & RCC_CFGR_SWS);
@@ -65,26 +93,7 @@ void sysTickClockConfig(const uint32_t div_from_second)
     system_core_clock >>= AHB_PRESC_TABLE[((RCC->CFGR & RCC_CFGR_HPRE) >> RCC_CFGR_HPRE_Pos)];
 
     // Divide sec by 1000 to get SysTick at 1ms
-    SysTick_Config(system_core_clock / div_from_second);
-}
-
-// Interrupt handler
-void SysTick_Handler(void)
-{
-    s_system_time++;
-}
-
-void delayMs(uint32_t time)
-{
-    s_timing_delay = s_system_time + time;
-    while (s_timing_delay > s_system_time)
-    {
-    };
-}
-
-uint32_t getSysTime()
-{
-    return s_system_time;
+    SysTick_Config(system_core_clock / SYS_TICK_SECOND_DIV);
 }
 
 static void flashMemoryLatencyConfig(void)
@@ -192,6 +201,6 @@ void systemClockConfig(void)
     flashMemoryLatencyConfig();
     busClockConfig();
     pllSystemClockConfig();
-    sysTickClockConfig(1000U);
+    sysTickClockConfig();
     peripheralsClockEnable();
 }

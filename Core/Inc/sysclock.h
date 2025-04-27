@@ -4,7 +4,8 @@
 #include <stm32f407xx.h>
 
 void systemClockConfig(void);
-void delayMs(uint32_t time);
+void delay(uint32_t sys_time_delta);
 uint32_t getSysTime(void);
+uint32_t getSysTicksInSecond();
 
 #endif /* __SYS_CLOCK_CONFIG_H */
