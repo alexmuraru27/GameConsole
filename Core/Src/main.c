@@ -19,7 +19,8 @@ int main(void)
     GPIOA->ODR ^= GPIO_ODR_OD6;
     usart2SendString("TestStringData \r\n");
     usart2SendInt(118932);
-    usart2SendHex(4660); // 0x1234
+    usart2SendString("\r\n");
+    usart2SendHex(0x0120340);
     delay(500U);
   }
 }
