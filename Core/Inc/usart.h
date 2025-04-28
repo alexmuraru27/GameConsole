@@ -3,8 +3,10 @@
 #include <stdint.h>
 
 void usartInit(void);
-void usart2SendChar(char c);
-void usart2SendString(const char *str);
-void usart2SendInt(uint32_t num);
-void usart2SendHex(uint32_t num);
+void debugChar(char c);
+void debugString(const char *str);
+void debugInt(uint32_t num);
+void debugHex(uint32_t num);
+
+void usart2BufferFlush(void);
 #endif /* __USART_COMM_H */
