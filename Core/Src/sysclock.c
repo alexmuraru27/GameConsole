@@ -188,8 +188,8 @@ static void peripheralsClockEnable(void)
     RCC->AHB2ENR |= RCC_AHB2ENR_RNGEN;
 
     // ######## APB1 ########
+    RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
     // TODO Enable SPI
-    // TODO Enable UART
     // TODO Enable Timers
 
     // ######## APB2 ########

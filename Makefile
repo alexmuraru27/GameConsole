@@ -40,7 +40,9 @@ C_SOURCES =  \
 Core/Src/main.c \
 Core/Src/sysclock.c \
 Core/Src/stm32f4xx_it.c \
-Core/Src/syscalls.c
+Core/Src/syscalls.c \
+Core/Src/usart.c \
+Core/Src/gpio.c
 
 # ASM sources
 ASM_SOURCES =  \
