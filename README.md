@@ -16,10 +16,10 @@
 | **Typedefs**        | PascalCase            | `typedef uint8_t Byte;`         |
 
 ## Defines:
-#define USART_BUFFER_SIZE ((uint32_t)256U)
-#define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
-#define HSE_CLOCK_VALUE ((uint32_t)8000000)
-#define HSI_CLOCK_VALUE ((uint32_t)16000000)
+- #define USART_BUFFER_SIZE ((uint32_t)256U)
+- #define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
+- #define HSE_CLOCK_VALUE ((uint32_t)8000000)
+- #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 
 ## Pinning:
 ### USART2 (Debug Interface - Baud 921600) 
