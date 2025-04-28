@@ -1,4 +1,5 @@
 #include "usart.h"
+#include <stm32f407xx.h>
 
 #if !defined(USART_BUFFER_SIZE)
 #define USART_BUFFER_SIZE ((uint32_t)512U)

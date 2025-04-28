@@ -1,7 +1,6 @@
 #ifndef __USART_COMM_H
 #define __USART_COMM_H
 #include <stdint.h>
-#include <stm32f407xx.h>
 
 void usartInit(void);
 void usart2SendChar(char c);

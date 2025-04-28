@@ -1,4 +1,5 @@
 #include "gpio.h"
+#include <stm32f407xx.h>
 
 static void initGpioUsart2()
 {

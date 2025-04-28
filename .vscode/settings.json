@@ -13,5 +13,9 @@
     "editor.formatOnSave": true,
     "cortex-debug.gdbPath": "C:/gcc-arm-none-eabi/bin/arm-none-eabi-gdb.exe",
     "cortex-debug.openocdPath": "C:/openocd/bin/openocd.exe",
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "files.associations": {
+        "stdint.h": "c",
+        "stm32f407xx.h": "c"
+    }
 }
