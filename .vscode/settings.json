@@ -16,6 +16,8 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "stdint.h": "c",
-        "stm32f407xx.h": "c"
+        "stm32f407xx.h": "c",
+        "usart.h": "c",
+        "gpio.h": "c"
     }
 }

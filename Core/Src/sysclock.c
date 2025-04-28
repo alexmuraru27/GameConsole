@@ -179,6 +179,8 @@ static void peripheralsClockEnable(void)
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
     // Pass clock to GPIOE
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOEEN;
+    // Pass clock to DMA
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
 
     // TODO Pass clock to CCMRam
     // RCC->AHB1ENR |= RCC_AHB1ENR_CCMDATARAMEN;

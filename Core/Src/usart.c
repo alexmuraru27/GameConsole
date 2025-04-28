@@ -1,4 +1,5 @@
 #include "usart.h"
+#include "dma.h"
 #include <stm32f407xx.h>
 
 #if !defined(USART_BUFFER_SIZE)
@@ -22,6 +23,9 @@ void usartInit(void)
 
 // TODO Send data via buffer
 // TODO Send data via DMA
+// DMA Channels:
+// USART2_RX: Ch4 S5
+// USART2_TX: Ch4 S6
 void usart2SendChar(char c)
 {
     while (!(USART2->SR & USART_SR_TXE))
@@ -60,5 +64,17 @@ void usart2SendInt(uint32_t num)
     for (int j = i - 1; j >= 0; j--)
     {
         usart2SendChar(buffer[j]);
+    }
+}
+
+void usart2SendHex(const uint32_t num)
+{
+    static const char hex_table[] = "0123456789ABCDEF";
+    usart2SendString("0x");
+
+    for (int i = 7U; i >= 0U; i--)
+    {
+        const uint8_t nibble = (num >> (i * 4)) & 0xF;
+        usart2SendChar(hex_table[nibble]);
     }
 }

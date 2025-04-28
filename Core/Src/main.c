@@ -2,12 +2,14 @@
 #include <stm32f407xx.h>
 #include "usart.h"
 #include "gpio.h"
+#include "dma.h"
 
 void SystemInit(void)
 {
   systemClockConfig();
   gpioInit();
   usartInit();
+  dmaInit();
 }
 
 int main(void)
@@ -17,6 +19,7 @@ int main(void)
     GPIOA->ODR ^= GPIO_ODR_OD6;
     usart2SendString("TestStringData \r\n");
     usart2SendInt(118932);
+    usart2SendHex(4660); // 0x1234
     delay(500U);
   }
 }

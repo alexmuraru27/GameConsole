@@ -42,7 +42,8 @@ Core/Src/sysclock.c \
 Core/Src/stm32f4xx_it.c \
 Core/Src/syscalls.c \
 Core/Src/usart.c \
-Core/Src/gpio.c
+Core/Src/gpio.c \
+Core/Src/dma.c
 
 # ASM sources
 ASM_SOURCES =  \
