@@ -22,6 +22,6 @@
 #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 
 ## Pinning:
-### USART2 (Debug Interface)
+### USART2 (Debug Interface - Baud 921600) 
 1. PA2 (TX)
 2. PA3 (RX)
