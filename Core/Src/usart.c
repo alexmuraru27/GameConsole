@@ -4,7 +4,7 @@
 #include <string.h>
 
 #if !defined(USART_BUFFER_SIZE)
-#define USART_BUFFER_SIZE ((uint32_t)256U)
+#define USART_BUFFER_SIZE ((uint32_t)512U)
 #endif
 
 // TODO Create memorymap section in bootloader RAM for this

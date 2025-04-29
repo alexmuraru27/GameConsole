@@ -1,0 +1,22 @@
+CONSOLE_RAM_SIZE = 0x17C00; /* 95K */
+SHARED_RAM_SIZE = 0x400; /* 1K */
+TOTAL_RAM_SIZE = 0x20000;  /* 128K */
+GAME_RAM_SIZE = TOTAL_RAM_SIZE - CONSOLE_RAM_SIZE - SHARED_RAM_SIZE; /* 32KB */
+
+MEMORY
+{
+    CONSOLE_RAM      (xrw) : ORIGIN = 0x20000000, LENGTH = CONSOLE_RAM_SIZE
+    GAME_RAM     (xrw) : ORIGIN = 0x20000000 + CONSOLE_RAM_SIZE, LENGTH = GAME_RAM_SIZE
+    SHARED_RAM  (xrw) : ORIGIN = 0x20020000 - SHARED_RAM_SIZE, LENGTH = SHARED_RAM_SIZE
+    CCMRAM      (xrw) : ORIGIN = 0x10000000, LENGTH = 64K
+    CONSOLE_FLASH     (rx) : ORIGIN = 0x8000000, LENGTH = 512K
+}
+
+SECTIONS
+{
+    /* Shared RAM section - for common data or API access */
+    .shared_ram :
+    {
+        *(.shared_ram)  /* Shared RAM data */
+    } > SHARED_RAM
+}

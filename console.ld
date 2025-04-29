@@ -48,36 +48,28 @@
 **
 *****************************************************************************
 */
-
+INCLUDE "common.ld"
 /* Entry Point */
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = ORIGIN(RAM) + LENGTH(RAM);    /* end of RAM */
-/* Generate a link error if heap and stack don't fit into RAM */
+_estack = ORIGIN(CONSOLE_RAM) + LENGTH(CONSOLE_RAM);    /* end of CONSOLE_RAM */
+/* Generate a link error if heap and stack don't fit into CONSOLE_RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
-
-/* Specify the memory areas */
-MEMORY
-{
-RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 128K
-CCMRAM (xrw)      : ORIGIN = 0x10000000, LENGTH = 64K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 512K
-}
 
 /* Define output sections */
 SECTIONS
 {
-  /* The startup code goes first into FLASH */
+  /* The startup code goes first into CONSOLE_FLASH */
   .isr_vector :
   {
     . = ALIGN(4);
     KEEP(*(.isr_vector)) /* Startup code */
     . = ALIGN(4);
-  } >FLASH
+  } >CONSOLE_FLASH
 
-  /* The program code and other data goes into FLASH */
+  /* The program code and other data goes into CONSOLE_FLASH */
   .text :
   {
     . = ALIGN(4);
@@ -92,21 +84,21 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+  } >CONSOLE_FLASH
 
-  /* Constant data goes into FLASH */
+  /* Constant data goes into CONSOLE_FLASH */
   .rodata :
   {
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >FLASH
+  } >CONSOLE_FLASH
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
-  /* Initialized data sections goes into RAM, load LMA copy after code */
+  /* Initialized data sections goes into CONSOLE_RAM, load LMA copy after code */
   .data :
   {
     . = ALIGN(4);
@@ -118,11 +110,11 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >CONSOLE_RAM AT> CONSOLE_FLASH
 
   _siccmram = LOADADDR(.ccmram);
 
-  /* CCM-RAM section
+  /* CCMRAM section
   *
   * IMPORTANT NOTE!
   * If initialized variables will be placed in this section,
@@ -137,7 +129,7 @@ SECTIONS
 
     . = ALIGN(4);
     _eccmram = .;       /* create a global symbol at ccmram end */
-  } >CCMRAM AT> FLASH
+  } >CCMRAM AT> CONSOLE_FLASH
 
 
   /* Uninitialized data section */
@@ -154,9 +146,9 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >RAM
+  } >CONSOLE_RAM
 
-  /* User_heap_stack section, used to check that there is enough RAM left */
+  /* User_heap_stack section, used to check that there is enough CONSOLE_RAM left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -165,8 +157,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
-
+  } >CONSOLE_RAM
 
 
   /* Remove information from the standard libraries */

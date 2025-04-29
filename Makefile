@@ -124,7 +124,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = STM32F407XX_FLASH.ld
+LDSCRIPT = console.ld
 
 # libraries
 LIBS = -lc -lm -lnosys 
