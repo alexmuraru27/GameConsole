@@ -44,8 +44,15 @@ int main(void)
     // drawPixel(50, 53, 0xEEEE);
     // drawPixel(50, 54, 0xEEEE);
     // drawPixel(50, 55, 0xEEEE);
-    fillScreen(color);
-    color += 10U;
+    // fillScreen(color);
+    // color += 10U;
+    // debugString("\r\n");
+    // debugBinary(0x0A, 8);
+    // debugString("\r\n");
+    // debugBinary(0x0A0A, 16);
+    // debugString("\r\n");
+    // debugBinary(0x0A0A0A0A, 32);
+    // debugString("\r\n");
     delay(1000U);
   }
 }

@@ -78,7 +78,7 @@ void debugString(const char *str)
 
 void debugInt(uint32_t num)
 {
-    char buffer[10];
+    char buffer[12];
     int i = 0;
 
     if (num == 0)
@@ -96,16 +96,25 @@ void debugInt(uint32_t num)
     }
 
     // send  reverse order
-    for (int j = i - 1; j >= 0; j--)
+    for (uint8_t j = 0U; j < i / 2U; j++)
     {
-        debugChar(buffer[j]);
+        char temp = buffer[j];
+        buffer[j] = buffer[i - 1U - j];
+        buffer[i - 1 - j] = temp;
     }
+
+    buffer[i] = '\0';
+    debugString(buffer);
 }
 
 void debugHex(const uint32_t num)
 {
     static const char hex_table[] = "0123456789ABCDEF";
-    debugString("0x");
+    char buffer[12];
+    uint8_t bufIndex = 0;
+
+    buffer[bufIndex++] = '0';
+    buffer[bufIndex++] = 'x';
 
     bool printed_non_zero = false;
     for (int idx = 8U; idx > 0U; idx--)
@@ -113,13 +122,37 @@ void debugHex(const uint32_t num)
         const uint8_t nibble = (num >> ((idx - 1) * 4)) & 0xF;
         if (nibble != 0 || printed_non_zero)
         {
-            debugChar(hex_table[nibble]);
+            buffer[bufIndex++] = hex_table[nibble];
             printed_non_zero = true;
         }
     }
 
     if (!printed_non_zero)
     {
-        debugChar('0');
+        buffer[bufIndex++] = '0';
     }
+    buffer[bufIndex] = '\0';
+    debugString(buffer);
+}
+
+void debugBinary(uint32_t num, uint8_t width)
+{
+    if (width != 8 && width != 16 && width != 32)
+        return;
+
+    char buffer[40];
+    uint8_t bufIndex = 0;
+
+    for (uint8_t i = width; i > 0; i--)
+    {
+        buffer[bufIndex++] = (num & (1U << (i - 1))) ? '1' : '0';
+
+        if ((i - 1) % 4 == 0 && (i - 1) != 0)
+        {
+            buffer[bufIndex++] = ' ';
+        }
+    }
+
+    buffer[bufIndex] = '\0'; // Null-terminate the string
+    debugString(buffer);
 }

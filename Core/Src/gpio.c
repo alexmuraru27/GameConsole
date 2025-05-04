@@ -74,8 +74,33 @@ void gpioSpi1DcHigh(void)
     GPIOC->BSRR = GPIO_BSRR_BS4;
 }
 
+static void initGpioJoystick()
+{
+    // PE7 (Right D-Pad UP)
+    // PE8 (Right D-Pad RIGHT)
+    // PE9 (Right D-Pad DOWN)
+    // PE10 (Right D-Pad LEFT)
+    // PE11 (Left D-Pad UP)
+    // PE12 (Left D-Pad RIGHT)
+    // PE13 (Left D-Pad DOWN)
+    // PE14 (Left D-Pad LEFT)
+    // PB11 (Special Button 1)
+    // PB12 (Special Button 2)
+
+    // Make pin inputs
+    GPIOE->MODER &= ~(GPIO_MODER_MODER7 | GPIO_MODER_MODER8 | GPIO_MODER_MODER9 | GPIO_MODER_MODER10 | GPIO_MODER_MODER11 | GPIO_MODER_MODER12 | GPIO_MODER_MODER13 | GPIO_MODER_MODER14);
+    GPIOB->MODER &= ~(GPIO_MODER_MODER11 | GPIO_MODER_MODER12);
+
+    // Make pullup
+    GPIOE->PUPDR &= ~(GPIO_PUPDR_PUPD7 | GPIO_PUPDR_PUPD8 | GPIO_PUPDR_PUPD9 | GPIO_PUPDR_PUPD10 | GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12 | GPIO_PUPDR_PUPD13 | GPIO_PUPDR_PUPD14);
+    GPIOE->PUPDR |= (1U << GPIO_PUPDR_PUPD7_Pos) | (1U << GPIO_PUPDR_PUPD8_Pos) | (1U << GPIO_PUPDR_PUPD9_Pos) | (1U << GPIO_PUPDR_PUPD10_Pos) | (1U << GPIO_PUPDR_PUPD11_Pos) | (1U << GPIO_PUPDR_PUPD12_Pos) | (1U << GPIO_PUPDR_PUPD13_Pos) | (1U << GPIO_PUPDR_PUPD14_Pos);
+    GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12);
+    GPIOE->PUPDR |= (1U << GPIO_PUPDR_PUPD11_Pos) | (1U << GPIO_PUPDR_PUPD12_Pos);
+}
+
 void gpioInit(void)
 {
     initGpioUsart2();
     initGpioSpi1();
+    initGpioJoystick();
 }
