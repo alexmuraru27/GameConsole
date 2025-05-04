@@ -98,9 +98,16 @@ static void initGpioJoystick()
     GPIOB->PUPDR |= (1U << GPIO_PUPDR_PUPD11_Pos) | (1U << GPIO_PUPDR_PUPD12_Pos);
 }
 
+static void initGpioAdc1()
+{
+    // configure PC0-PC3 as analog
+    GPIOC->MODER |= (GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2 | GPIO_MODER_MODER3);
+    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1 | GPIO_PUPDR_PUPD2 | GPIO_PUPDR_PUPD3);
+}
 void gpioInit(void)
 {
     initGpioUsart2();
     initGpioSpi1();
     initGpioJoystick();
+    initGpioAdc1();
 }

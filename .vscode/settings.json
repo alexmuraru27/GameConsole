@@ -23,6 +23,7 @@
         "spi.h": "c",
         "joystick.h": "c",
         "joystickapi.h": "c",
-        "ili9341.h": "c"
+        "ili9341.h": "c",
+        "adc.h": "c"
     }
 }

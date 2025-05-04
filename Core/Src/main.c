@@ -105,9 +105,10 @@ int main(void)
   peripheralsInit();
   while (1)
   {
-    // debugJoystics();
+
+    debugJoystics();
     // debugUsart2();
     // debugSpiDisplay();
-    delay(1000U);
+    delay(500U);
   }
 }
