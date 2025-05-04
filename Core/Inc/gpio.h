@@ -3,4 +3,8 @@
 #include <stdint.h>
 
 void gpioInit(void);
+void gpioSpi1RstLow(void);
+void gpioSpi1RstHigh(void);
+void gpioSpi1DcLow(void);
+void gpioSpi1DcHigh(void);
 #endif /* __GPIO_H */

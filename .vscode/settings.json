@@ -19,6 +19,7 @@
         "stm32f407xx.h": "c",
         "usart.h": "c",
         "gpio.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "spi.h": "c"
     }
 }
