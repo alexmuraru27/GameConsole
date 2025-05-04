@@ -26,13 +26,15 @@
 #define JOYSTICK_DATA_L_ANALOG_Y_MASK 0x1000U
 #define JOYSTICK_DATA_L_ANALOG_X_MASK 0x2000U
 
+#define JOYSTICK_DATA_BTN_POS 0U
 #define JOYSTICK_DATA_BTN_IDR_POS 7U
+
+#define JOYSTICK_DATA_SPECIAL_BTN_POS 8U
 #define JOYSTICK_DATA_SPECIAL_BTN_IDR_POS 11U
 // 8 buttons dpad - 8 bits
 // 2 special buttons - 2 bits
 // 4 axes = 4 bits
-// ------ total 14 bits
-// uint16 -> [0 0 L_AnalogX L_AnalogY R_AnalogX R_AnalogY Special1 Special2] [L_DLeft L_DDown L_DRight L_DUp R_DLeft R_DDown R_DRight R_DUp]
+// [0 0 L_AnalogX L_AnalogY R_AnalogX R_AnalogY Special1 Special2] [L_DLeft L_DDown L_DRight L_DUp R_DLeft R_DDown R_DRight R_DUp]
 volatile uint16_t g_joystick_data = 0U;
 
 void joystickReadData(void)
@@ -43,12 +45,12 @@ void joystickReadData(void)
     // Set dpad buttons
     // Optimised like this due to input pins being in consecutive order starting from
     // PE7 to PE14
-    g_joystick_data |= ((GPIOE->IDR & (JOYSTICK_DATA_BTN_MASK << JOYSTICK_DATA_BTN_IDR_POS)) >> JOYSTICK_DATA_BTN_IDR_POS) & JOYSTICK_DATA_BTN_MASK;
+    g_joystick_data |= (~((GPIOE->IDR >> JOYSTICK_DATA_BTN_IDR_POS) << JOYSTICK_DATA_BTN_POS) & JOYSTICK_DATA_BTN_MASK);
 
     // Set special buttons
     // Optimised like this due to input pins being in consecutive order starting from
     // PB11 to PB12
-    g_joystick_data |= ((GPIOB->IDR & (JOYSTICK_DATA_SPECIAL_BTN_MASK << JOYSTICK_DATA_SPECIAL_BTN_IDR_POS)) >> JOYSTICK_DATA_SPECIAL_BTN_IDR_POS) & JOYSTICK_DATA_SPECIAL_BTN_MASK;
+    g_joystick_data |= (~((GPIOB->IDR >> JOYSTICK_DATA_SPECIAL_BTN_IDR_POS) << JOYSTICK_DATA_SPECIAL_BTN_POS) & JOYSTICK_DATA_SPECIAL_BTN_MASK);
 }
 
 void joystickInit(void)
