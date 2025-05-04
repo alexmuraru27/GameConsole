@@ -5,6 +5,7 @@
 #include "dma.h"
 #include "ILI9341.h"
 #include "adc.h"
+#include "timer.h"
 #include "joystick.h"
 
 void SystemInit(void)
@@ -17,6 +18,7 @@ static void peripheralsInit()
   dmaInit();
   gpioInit();
   usartInit();
+  timerInit();
   ILI9341Init();
   adcInit();
   joystickInit();
