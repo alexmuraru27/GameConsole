@@ -3,17 +3,17 @@
 
 #define JOYSTICK_DATA_BTN_MASK 0x00FFU
 
-#define JOYSTICK_DATA_BTN_R_MASK 0x000FU
-#define JOYSTICK_DATA_BTN_R_DUP_MASK 0x0001U
-#define JOYSTICK_DATA_BTN_R_DRIGHT_MASK 0x0002U
-#define JOYSTICK_DATA_BTN_R_DDOWN_MASK 0x0004U
-#define JOYSTICK_DATA_BTN_R_DLEFT_MASK 0x0008U
+#define JOYSTICK_DATA_R_BTN_MASK 0x000FU
+#define JOYSTICK_DATA_R_BTN_DUP_MASK 0x0001U
+#define JOYSTICK_DATA_R_BTN_DRIGHT_MASK 0x0002U
+#define JOYSTICK_DATA_R_BTN_DDOWN_MASK 0x0004U
+#define JOYSTICK_DATA_R_BTN_DLEFT_MASK 0x0008U
 
-#define JOYSTICK_DATA_BTN_L_MASK 0x00F0U
-#define JOYSTICK_DATA_BTN_L_DUP_MASK 0x0010U
-#define JOYSTICK_DATA_BTN_L_DRIGHT_MASK 0x0020U
-#define JOYSTICK_DATA_BTN_L_DDOWN_MASK 0x0040U
-#define JOYSTICK_DATA_BTN_L_DLEFT_MASK 0x0080U
+#define JOYSTICK_DATA_L_BTN_MASK 0x00F0U
+#define JOYSTICK_DATA_L_BTN_DUP_MASK 0x0010U
+#define JOYSTICK_DATA_L_BTN_DRIGHT_MASK 0x0020U
+#define JOYSTICK_DATA_L_BTN_DDOWN_MASK 0x0040U
+#define JOYSTICK_DATA_L_BTN_DLEFT_MASK 0x0080U
 
 #define JOYSTICK_DATA_SPECIAL_BTN_MASK 0x0300U
 #define JOYSTICK_DATA_SPECIAL_BTN_1_MASK 0x0100U
@@ -55,35 +55,35 @@ void joystickInit(void)
 
 bool joystickGetRBtnUp(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_R_DUP_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_R_BTN_DUP_MASK) != 0U;
 }
 bool joystickGetRBtnRight(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_R_DRIGHT_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_R_BTN_DRIGHT_MASK) != 0U;
 }
 bool joystickGetRBtnDown(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_R_DDOWN_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_R_BTN_DDOWN_MASK) != 0U;
 }
 bool joystickGetRBtnLeft(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_R_DLEFT_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_R_BTN_DLEFT_MASK) != 0U;
 }
 bool joystickGetLBtnUp(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_L_DUP_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_L_BTN_DUP_MASK) != 0U;
 }
 bool joystickGetLBtnRight(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_L_DRIGHT_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_L_BTN_DRIGHT_MASK) != 0U;
 }
 bool joystickGetLBtnDown(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_L_DDOWN_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_L_BTN_DDOWN_MASK) != 0U;
 }
 bool joystickGetLBtnLeft(void)
 {
-    return (g_joystick_data & JOYSTICK_DATA_BTN_L_DLEFT_MASK) != 0U;
+    return (g_joystick_data & JOYSTICK_DATA_L_BTN_DLEFT_MASK) != 0U;
 }
 bool joystickGetSpecialBtn1(void)
 {
