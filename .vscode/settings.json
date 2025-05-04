@@ -20,6 +20,8 @@
         "usart.h": "c",
         "gpio.h": "c",
         "stdbool.h": "c",
-        "spi.h": "c"
+        "spi.h": "c",
+        "joystick.h": "c",
+        "joystickapi.h": "c"
     }
 }

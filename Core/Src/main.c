@@ -4,18 +4,27 @@
 #include "gpio.h"
 #include "dma.h"
 #include "ILI9341.h"
+#include "adc.h"
+#include "joystick.h"
 
 void SystemInit(void)
 {
   systemClockConfig();
 }
 
-int main(void)
+static void peripheralsInit()
 {
   dmaInit();
   gpioInit();
   usartInit();
   ILI9341Init();
+  adcInit();
+  joystickInit();
+}
+
+int main(void)
+{
+  peripheralsInit();
   uint16_t color = 0xABCD;
   while (1)
   {

@@ -45,7 +45,9 @@ Core/Src/usart.c \
 Core/Src/gpio.c \
 Core/Src/dma.c \
 Core/Src/spi.c \
-Core/Src/ILI9341.c
+Core/Src/ILI9341.c \
+Core/Src/adc.c \
+Core/Src/joystick.c
 
 # ASM sources
 ASM_SOURCES =  \
