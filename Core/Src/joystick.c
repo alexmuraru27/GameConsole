@@ -1,5 +1,6 @@
 #include "joystick.h"
 #include "adc.h"
+#include <stm32f407xx.h>
 
 #define JOYSTICK_DATA_BTN_MASK 0x00FFU
 
@@ -25,6 +26,8 @@
 #define JOYSTICK_DATA_L_ANALOG_Y_MASK 0x1000U
 #define JOYSTICK_DATA_L_ANALOG_X_MASK 0x2000U
 
+#define JOYSTICK_DATA_BTN_IDR_POS 7U
+#define JOYSTICK_DATA_SPECIAL_BTN_IDR_POS 11U
 // 8 buttons dpad - 8 bits
 // 2 special buttons - 2 bits
 // 4 axes = 4 bits
@@ -34,22 +37,23 @@ volatile uint16_t g_joystick_data = 0U;
 
 void joystickReadData(void)
 {
-    // Clear the dpad buttons
-    g_joystick_data &= ~JOYSTICK_DATA_BTN_MASK;
+    // Clear the dpad and special buttons
+    g_joystick_data &= ~(JOYSTICK_DATA_BTN_MASK | JOYSTICK_DATA_SPECIAL_BTN_MASK);
 
     // Set dpad buttons
-    // g_joystick_data |= GPIOE->IDR data;
+    // Optimised like this due to input pins being in consecutive order starting from
+    // PE7 to PE14
+    g_joystick_data |= ((GPIOE->IDR & (JOYSTICK_DATA_BTN_MASK << JOYSTICK_DATA_BTN_IDR_POS)) >> JOYSTICK_DATA_BTN_IDR_POS) & JOYSTICK_DATA_BTN_MASK;
 
-    // Clear special buttons
-    g_joystick_data &= ~JOYSTICK_DATA_SPECIAL_BTN_MASK;
     // Set special buttons
-    // g_joystick_data |= GPIOB->IDR data;
+    // Optimised like this due to input pins being in consecutive order starting from
+    // PB11 to PB12
+    g_joystick_data |= ((GPIOB->IDR & (JOYSTICK_DATA_SPECIAL_BTN_MASK << JOYSTICK_DATA_SPECIAL_BTN_IDR_POS)) >> JOYSTICK_DATA_SPECIAL_BTN_IDR_POS) & JOYSTICK_DATA_SPECIAL_BTN_MASK;
 }
 
 void joystickInit(void)
 {
     g_joystick_data = 0U;
-    // TODO Use timer to read analog inputs via interrupt
     // TODO use ADC to read the analog joysticks
 }
 
