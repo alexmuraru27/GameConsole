@@ -39,39 +39,61 @@ static void initGpioSpi1()
     GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD5 | GPIO_PUPDR_PUPD6 | GPIO_PUPDR_PUPD7);
 
     // ############### SPI additional ###################
-    // Set PC4(DC) and PC5(RST) PC6(CD) to Output
-    GPIOC->MODER &= ~(GPIO_MODER_MODER4 | GPIO_MODER_MODER5 | GPIO_MODER_MODER6);
-    GPIOC->MODER |= (1U << GPIO_MODER_MODER4_Pos) | (1U << GPIO_MODER_MODER5_Pos) | (1U << GPIO_MODER_MODER6_Pos);
+    //  PA9 (DC - Normal GPIO AF)  PC7 (RST - Normal GPIO AF) PB6 (CS - Normal GPIO AF) to Output
+    GPIOA->MODER &= ~(GPIO_MODER_MODER9);
+    GPIOA->MODER |= (1U << GPIO_MODER_MODER9_Pos);
+    GPIOA->OTYPER &= ~(GPIO_OTYPER_OT9);
+    GPIOA->OSPEEDR &= ~(GPIO_OSPEEDR_OSPEED9);
+    GPIOA->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED9_Pos);
+    GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD9);
 
-    // Set PB12/PB11 output type as push-pull (default)
-    GPIOC->OTYPER &= ~(GPIO_OTYPER_OT4 | GPIO_OTYPER_OT5 | GPIO_OTYPER_OT6);
+    GPIOC->MODER &= ~(GPIO_MODER_MODER7);
+    GPIOC->MODER |= (1U << GPIO_MODER_MODER7_Pos);
+    GPIOC->OTYPER &= ~(GPIO_OTYPER_OT7);
+    GPIOC->OSPEEDR &= ~(GPIO_OSPEEDR_OSPEED7);
+    GPIOC->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED7_Pos);
+    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD7);
 
-    // Set High speed for the gpio pins
-    GPIOC->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED4_Pos) | (3U << GPIO_OSPEEDR_OSPEED5_Pos) | (3U << GPIO_OSPEEDR_OSPEED6_Pos);
+    GPIOB->MODER &= ~(GPIO_MODER_MODER6);
+    GPIOB->MODER |= (1U << GPIO_MODER_MODER6_Pos);
+    GPIOB->OTYPER &= ~(GPIO_OTYPER_OT6);
+    GPIOB->OSPEEDR &= ~(GPIO_OSPEEDR_OSPEED6);
+    GPIOB->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED6_Pos);
+    GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD6);
 
-    // Disable pull-up/pull-down for PB12/PB11
-    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD4 | GPIO_PUPDR_PUPD5 | GPIO_PUPDR_PUPD6);
-    GPIOC->PUPDR |= (1U << GPIO_PUPDR_PUPD5_Pos);
-}
-
-void gpioSpi1RstLow(void)
-{
-    GPIOC->BSRR = GPIO_BSRR_BR5;
-}
-
-void gpioSpi1RstHigh(void)
-{
-    GPIOC->BSRR = GPIO_BSRR_BS5;
+    gpioSpi1DcLow();
+    gpioSpi1RstHigh();
+    gpioSpi1CsHigh();
 }
 
 void gpioSpi1DcLow(void)
 {
-    GPIOC->BSRR = GPIO_BSRR_BR4;
+    GPIOA->BSRR = GPIO_BSRR_BR_9;
 }
 
 void gpioSpi1DcHigh(void)
 {
-    GPIOC->BSRR = GPIO_BSRR_BS4;
+    GPIOA->BSRR = GPIO_BSRR_BS_9;
+}
+
+void gpioSpi1RstLow(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BR_7;
+}
+
+void gpioSpi1RstHigh(void)
+{
+    GPIOC->BSRR = GPIO_BSRR_BS_7;
+}
+
+void gpioSpi1CsLow(void)
+{
+    GPIOB->BSRR = GPIO_BSRR_BR_6;
+}
+
+void gpioSpi1CsHigh(void)
+{
+    GPIOB->BSRR = GPIO_BSRR_BS_6;
 }
 
 static void initGpioJoystick()

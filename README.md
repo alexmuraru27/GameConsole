@@ -30,12 +30,12 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 2. PA3 (RX - AF7)
 
 ### SPI1 (Display ILI9341) 
-1. PA5 (SCK - AF5)
-2. PA6 (MISO - AF5)
-3. PA7 (MOSI - AF5)
-4. PC4 (DC - Normal GPIO AF)
-5. PC5 (RST - Normal GPIO AF)
-6. PC6 (CS - Normal GPIO AF)
+1. PA5 (SCK - AF5)  - Yellow
+2. PA6 (MISO - AF5) - Red
+3. PA7 (MOSI - AF5) - Green
+4. PA9 (DC - Normal GPIO AF) - Blue
+5. PC7 (RST - Normal GPIO AF)- Purple
+6. PB6 (CS - Normal GPIO AF) - Gray
 
 ### ADC1 (Analog Joysticks)
 1. PC0 (ADC123_IN10 - Left Joystick X axis)

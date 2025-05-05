@@ -19,7 +19,7 @@ static void peripheralsInit()
   gpioInit();
   usartInit();
   timerInit();
-  ILI9341Init();
+  ili9341Init(3U);
   adcInit();
   joystickInit();
 }
@@ -95,12 +95,16 @@ static void debugUsart2()
 
 static void debugSpiDisplay()
 {
-  drawPixel(50, 50, 0xEEEE);
-  drawPixel(50, 51, 0xEEEE);
-  drawPixel(50, 53, 0xEEEE);
-  drawPixel(50, 54, 0xEEEE);
-  drawPixel(50, 55, 0xEEEE);
-  fillScreen(0xABCD);
+  ili9341FillRectangle(0, 0, 50, 50, ILI9341_MAGENTA);
+  delay(1500U);
+  ili9341FillScreen(0xF800);
+  delay(1500U);
+  ili9341FillScreen(0xF800);
+  delay(1500U);
+  ili9341FillScreen(0x5555);
+  delay(1500U);
+  ili9341FillScreen(0x9234);
+  delay(1500U);
 }
 int main(void)
 {
@@ -108,9 +112,9 @@ int main(void)
   while (1)
   {
 
-    debugJoystics();
+    // debugJoystics();
     // debugUsart2();
-    // debugSpiDisplay();
+    debugSpiDisplay();
     delay(500U);
   }
 }
