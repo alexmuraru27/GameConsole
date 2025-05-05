@@ -46,21 +46,29 @@ static void ili9341Reset()
     gpioSpi1RstHigh();
 }
 
-static void ili9341WriteCommand(uint8_t cmd)
+static void setDCtoCommandMode()
 {
     while (SPI1->SR & SPI_SR_BSY)
         ;
     gpioSpi1DcLow();
+}
+
+static void setDCtoDataMode()
+{
+    while (SPI1->SR & SPI_SR_BSY)
+        ;
+    gpioSpi1DcHigh();
+}
+
+static void ili9341WriteCommand(uint8_t cmd)
+{
+    setDCtoCommandMode();
     spiWrite(cmd);
 }
 
 static void ili9341WriteDataBuffer(uint8_t *buff, uint32_t buff_size)
 {
-    while (SPI1->SR & SPI_SR_BSY)
-        ;
-    gpioSpi1DcHigh();
-
-    for (uint8_t i = 0U; i < buff_size; ++i)
+    for (uint32_t i = 0U; i < buff_size; ++i)
     {
         spiWrite(buff[i]);
     }
@@ -68,9 +76,6 @@ static void ili9341WriteDataBuffer(uint8_t *buff, uint32_t buff_size)
 
 static void ili9341WriteData(uint8_t data)
 {
-    while (SPI1->SR & SPI_SR_BSY)
-        ;
-    gpioSpi1DcHigh();
     spiWrite(data);
 }
 
@@ -82,6 +87,7 @@ static void ili9341SetAddrWindow(const uint16_t x1, const uint16_t y1, const uin
 
     // set column
     ili9341WriteCommand(ILI9341_CASET);
+    setDCtoDataMode();
     ili9341WriteData(x1 >> 8U);
     ili9341WriteData(x1);
     ili9341WriteData(x2 >> 8U);
@@ -89,6 +95,7 @@ static void ili9341SetAddrWindow(const uint16_t x1, const uint16_t y1, const uin
 
     // set row
     ili9341WriteCommand(ILI9341_PASET);
+    setDCtoDataMode();
     ili9341WriteData(y1 >> 8U);
     ili9341WriteData(y1);
     ili9341WriteData(y2 >> 8U);
@@ -98,7 +105,7 @@ static void ili9341SetAddrWindow(const uint16_t x1, const uint16_t y1, const uin
     ili9341WriteCommand(ILI9341_RAMWR);
 }
 
-void ili9341SetDisplayRotation(uint8_t rotation)
+static void ili9341SetDisplayRotation(uint8_t rotation)
 {
     switch (rotation % 4)
     {
@@ -124,6 +131,7 @@ void ili9341SetDisplayRotation(uint8_t rotation)
         break;
     }
     ili9341WriteCommand(ILI9341_MADCTL);
+    setDCtoDataMode();
     ili9341WriteData(rotation);
 }
 
@@ -145,96 +153,112 @@ void ili9341Init(uint8_t rotation)
     {
         ili9341WriteCommand(ILI9341_PWCTRA);
         uint8_t data[] = {0x39, 0x2C, 0x00, 0x34, 0x02};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PWCTRB);
         uint8_t data[] = {0x00, 0xC1, 0x30};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_DRIVERTIMINGCTR_A);
         uint8_t data[] = {0x85, 0x00, 0x78};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_DRIVERTIMINGCTR_B);
         uint8_t data[] = {0x00, 0x00};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PWRON_SEQ_CTR);
         uint8_t data[] = {0x64, 0x03, 0x12, 0x81};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PUMP_RATIO);
         uint8_t data[] = {0x20};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PWCTR1);
         uint8_t data[] = {0x23};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PWCTR2);
         uint8_t data[] = {0x10};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_VMCTR1);
         uint8_t data[] = {0x3E, 0x28};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_VMCTR2);
         uint8_t data[] = {0x86};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_MADCTL);
         uint8_t data[] = {0x48};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_PIXFMT);
         uint8_t data[] = {0x55};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_FRMCTR1);
         uint8_t data[] = {0x00, 0x18};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_DFUNCTR);
         uint8_t data[] = {0x08, 0x82, 0x27};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_3G);
         uint8_t data[] = {0x00};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
     {
         ili9341WriteCommand(ILI9341_GAMMASET);
         uint8_t data[] = {0x01};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
@@ -242,6 +266,7 @@ void ili9341Init(uint8_t rotation)
         ili9341WriteCommand(ILI9341_GMCTRP1);
         uint8_t data[] = {0x0F, 0x31, 0x2B, 0x0C, 0x0E, 0x08, 0x4E, 0xF1,
                           0x37, 0x07, 0x10, 0x03, 0x0E, 0x09, 0x00};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
@@ -249,12 +274,16 @@ void ili9341Init(uint8_t rotation)
         ili9341WriteCommand(ILI9341_GMCTRN1);
         uint8_t data[] = {0x00, 0x0E, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1,
                           0x48, 0x08, 0x0F, 0x0C, 0x31, 0x36, 0x0F};
+        setDCtoDataMode();
         ili9341WriteDataBuffer(data, sizeof(data));
     }
 
+    // Delay 5ms before as per catalog
+    delay(5);
     ili9341WriteCommand(ILI9341_SLPOUT);
+    // Delay 120ms after as per catalog
+    delay(120);
     ili9341WriteCommand(ILI9341_DISPON);
-
     ili9341SetDisplayRotation(rotation);
 }
 
@@ -265,6 +294,7 @@ void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
 
     ili9341SetAddrWindow(x, y, x + 1, y + 1);
     uint8_t data[] = {color >> 8, color & 0xFF};
+    setDCtoDataMode();
     ili9341WriteDataBuffer(data, sizeof(data));
 }
 
@@ -277,8 +307,8 @@ void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
     if ((y + h - 1) >= g_height)
         h = g_height - y;
 
-    ili9341SetAddrWindow(x, y, x + w - 1, y + h - 1);
-
+    ili9341SetAddrWindow(x, y, w, h);
+    setDCtoDataMode();
     for (y = h; y > 0; y--)
     {
         for (x = w; x > 0; x--)
@@ -303,6 +333,7 @@ void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint
     if ((y + h - 1) >= g_height)
         return;
 
-    ili9341SetAddrWindow(x, y, x + w - 1, y + h - 1);
+    ili9341SetAddrWindow(x, y, x + w, y + h);
+    setDCtoDataMode();
     ili9341WriteDataBuffer((uint8_t *)data, sizeof(uint16_t) * w * h);
 }

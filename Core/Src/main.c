@@ -95,15 +95,15 @@ static void debugUsart2()
 
 static void debugSpiDisplay()
 {
-  ili9341FillRectangle(0, 0, 50, 50, ILI9341_MAGENTA);
-  delay(1500U);
-  ili9341FillScreen(0xF800);
-  delay(1500U);
-  ili9341FillScreen(0xF800);
-  delay(1500U);
-  ili9341FillScreen(0x5555);
-  delay(1500U);
-  ili9341FillScreen(0x9234);
+  ili9341FillScreen(ILI9341_GREENYELLOW);
+  ili9341FillRectangle(16, 16, 50, 50, ILI9341_MAGENTA);
+  ili9341FillRectangle(60, 60, 32, 32, ILI9341_CYAN);
+  ili9341FillRectangle(150, 120, 40, 40, ILI9341_OLIVE);
+
+  ili9341DrawPixel(180, 180, ILI9341_BLUE);
+  ili9341DrawPixel(180, 181, ILI9341_BLUE);
+  ili9341DrawPixel(181, 180, ILI9341_BLUE);
+  ili9341DrawPixel(181, 181, ILI9341_BLUE);
   delay(1500U);
 }
 int main(void)
