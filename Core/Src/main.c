@@ -109,12 +109,43 @@ static void debugSpiDisplay()
 int main(void)
 {
   peripheralsInit();
+  uint16_t x = 0U;
+  uint16_t y = 0U;
+  const uint16_t TILE_SIZE = 32U;
+  const uint16_t SPEED = 5U;
+  uint8_t framecount = 0U;
   while (1)
   {
+    joystickReadData();
+    framecount++;
+    if (framecount % 3U == 0)
+    {
+      ili9341FillScreen(ILI9341_GREENYELLOW);
+    }
 
+    if (x < 320U - TILE_SIZE - SPEED)
+    {
+      x += (uint16_t)joystickGetRBtnRight() * SPEED;
+    }
+    if (x > 0U)
+    {
+      x -= (uint16_t)joystickGetRBtnLeft() * SPEED;
+    }
+
+    if (y < 240U - TILE_SIZE - SPEED)
+    {
+      y += (uint16_t)joystickGetRBtnDown() * SPEED;
+    }
+    if (y > 0U)
+    {
+      y -= (uint16_t)joystickGetRBtnUp() * SPEED;
+    }
+
+    ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_GREEN);
+    delay(30);
     // debugJoystics();
     // debugUsart2();
-    debugSpiDisplay();
-    delay(500U);
+    // debugSpiDisplay();
+    // delay(500U);
   }
 }

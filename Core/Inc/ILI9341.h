@@ -2,6 +2,9 @@
 #define __ILI9341_H
 #include <stdint.h>
 
+#define ILI9341_WIDTH 320
+#define ILI9341_HEIGHT 240
+
 #define ILI9341_BLACK 0x0000
 #define ILI9341_NAVY 0x000F
 #define ILI9341_DARKGREEN 0x03E0

@@ -5,10 +5,8 @@
 #include "stdbool.h"
 #include "gpio.h"
 
-#define ILI9341_TFTWIDTH 320  // ILI9341 max TFT width
-#define ILI9341_TFTHEIGHT 240 // ILI9341 max TFT height
-static uint16_t g_width;      // Display width as modified by current rotation
-static uint16_t g_height;     // Display height as modified by current rotation
+static uint16_t g_width;  // Display width as modified by current rotation
+static uint16_t g_height; // Display height as modified by current rotation
 
 #define ILI9341_SLPOUT 0x11            // Sleep Out
 #define ILI9341_GAMMASET 0x26          // Gamma Set
@@ -111,23 +109,23 @@ static void ili9341SetDisplayRotation(uint8_t rotation)
     {
     case 0:
         rotation = (MADCTL_MX | MADCTL_BGR);
-        g_width = ILI9341_TFTHEIGHT;
-        g_height = ILI9341_TFTWIDTH;
+        g_width = ILI9341_HEIGHT;
+        g_height = ILI9341_WIDTH;
         break;
     case 1:
         rotation = (MADCTL_MV | MADCTL_BGR);
-        g_width = ILI9341_TFTWIDTH;
-        g_height = ILI9341_TFTHEIGHT;
+        g_width = ILI9341_WIDTH;
+        g_height = ILI9341_HEIGHT;
         break;
     case 2:
         rotation = (MADCTL_MY | MADCTL_BGR);
-        g_width = ILI9341_TFTHEIGHT;
-        g_height = ILI9341_TFTWIDTH;
+        g_width = ILI9341_HEIGHT;
+        g_height = ILI9341_WIDTH;
         break;
     case 3:
         rotation = (MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
-        g_width = ILI9341_TFTWIDTH;
-        g_height = ILI9341_TFTHEIGHT;
+        g_width = ILI9341_WIDTH;
+        g_height = ILI9341_HEIGHT;
         break;
     }
     ili9341WriteCommand(ILI9341_MADCTL);

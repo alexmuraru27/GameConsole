@@ -6,7 +6,6 @@ void SPIInit(void)
     SPI1->CR1 = 0;
     SPI1->CR1 |= SPI_CR1_MSTR;              // master mode
     SPI1->CR1 |= SPI_CR1_SSM | SPI_CR1_SSI; // software NSS management
-    SPI1->CR1 |= 1U << SPI_CR1_BR_Pos;      // baud rate = fPCLK / 4
     SPI1->CR1 |= SPI_CR1_SPE;               // enable SPI
 }
 

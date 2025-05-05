@@ -24,6 +24,7 @@
         "joystick.h": "c",
         "joystickapi.h": "c",
         "ili9341.h": "c",
-        "adc.h": "c"
+        "adc.h": "c",
+        "sysclock.h": "c"
     }
 }
