@@ -114,11 +114,12 @@ int main(void)
   const uint16_t TILE_SIZE = 32U;
   const uint16_t SPEED = 5U;
   uint8_t framecount = 0U;
+  uint32_t lastFrameTime = getSysTime();
   while (1)
   {
     joystickReadData();
     framecount++;
-    if (framecount % 3U == 0)
+    if (framecount % 100U == 0)
     {
       ili9341FillScreen(ILI9341_GREENYELLOW);
     }
@@ -142,7 +143,16 @@ int main(void)
     }
 
     ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_GREEN);
-    delay(30);
+    // Wait until 33ms have passed since last frame
+
+    // 33ms frame time
+    if (getSysTime() - lastFrameTime < 33)
+    {
+      // Busy-wait until it's time for the next frame
+      while ((getSysTime() - lastFrameTime) < 33)
+        ;
+    }
+    lastFrameTime = getSysTime(); // Keep consistent frame timing
     // debugJoystics();
     // debugUsart2();
     // debugSpiDisplay();
