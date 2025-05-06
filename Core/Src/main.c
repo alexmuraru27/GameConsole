@@ -27,48 +27,47 @@ static void peripheralsInit()
 static void debugJoystics()
 {
   debugString("\r\n");
-  joystickReadData();
   debugString("\r\n");
-  debugString("joystickGetRBtnUp= ");
+  debugString("RBtnUp= ");
   debugInt((uint8_t)joystickGetRBtnUp());
   debugString("\r\n");
-  debugString("joystickGetRBtnRight= ");
+  debugString("RBtnRight= ");
   debugInt((uint8_t)joystickGetRBtnRight());
   debugString("\r\n");
-  debugString("joystickGetRBtnDown= ");
+  debugString("RBtnDown= ");
   debugInt((uint8_t)joystickGetRBtnDown());
   debugString("\r\n");
-  debugString("joystickGetRBtnLeft= ");
+  debugString("RBtnLeft= ");
   debugInt((uint8_t)joystickGetRBtnLeft());
   debugString("\r\n");
-  debugString("joystickGetLBtnUp= ");
+  debugString("LBtnUp= ");
   debugInt((uint8_t)joystickGetLBtnUp());
   debugString("\r\n");
-  debugString("joystickGetLBtnRight= ");
+  debugString("LBtnRight= ");
   debugInt((uint8_t)joystickGetLBtnRight());
   debugString("\r\n");
-  debugString("joystickGetLBtnDown= ");
+  debugString("LBtnDown= ");
   debugInt((uint8_t)joystickGetLBtnDown());
   debugString("\r\n");
-  debugString("joystickGetLBtnLeft= ");
+  debugString("LBtnLeft= ");
   debugInt((uint8_t)joystickGetLBtnLeft());
   debugString("\r\n");
-  debugString("joystickGetSpecialBtn1= ");
+  debugString("SpecialBtn1= ");
   debugInt((uint8_t)joystickGetSpecialBtn1());
   debugString("\r\n");
-  debugString("joystickGetSpecialBtn2= ");
+  debugString("SpecialBtn2= ");
   debugInt((uint8_t)joystickGetSpecialBtn2());
   debugString("\r\n");
-  debugString("joystickGetRAnalogY= ");
+  debugString("RAnalogY= ");
   debugInt((uint8_t)joystickGetRAnalogY());
   debugString("\r\n");
-  debugString("joystickGetRAnalogX= ");
+  debugString("RAnalogX= ");
   debugInt((uint8_t)joystickGetRAnalogX());
   debugString("\r\n");
-  debugString("joystickGetLAnalogY= ");
+  debugString("LAnalogY= ");
   debugInt((uint8_t)joystickGetLAnalogY());
   debugString("\r\n");
-  debugString("joystickGetLAnalogX= ");
+  debugString("LAnalogX= ");
   debugInt((uint8_t)joystickGetLAnalogX());
   debugString("\r\n");
 }
@@ -117,7 +116,6 @@ int main(void)
   uint32_t lastFrameTime = getSysTime();
   while (1)
   {
-    joystickReadData();
     framecount++;
     if (framecount % 100U == 0)
     {
@@ -142,7 +140,7 @@ int main(void)
       y -= (uint16_t)joystickGetRBtnUp() * SPEED;
     }
 
-    ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_GREEN);
+    ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_RED);
     // Wait until 33ms have passed since last frame
 
     // 33ms frame time
@@ -153,7 +151,7 @@ int main(void)
         ;
     }
     lastFrameTime = getSysTime(); // Keep consistent frame timing
-    // debugJoystics();
+    debugJoystics();
     // debugUsart2();
     // debugSpiDisplay();
     // delay(500U);

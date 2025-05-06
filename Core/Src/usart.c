@@ -38,6 +38,8 @@ void usart2BufferFlush(void)
 
 static void usart2Send(const uint8_t *data, uint16_t size)
 {
+    // This is buggy and it does some nasty overrides at some point
+    // TODO fix!
     if (size > (USART_BUFFER_SIZE - g_usart2_active_buffer_pos))
     {
         // Buffer full! Maybe flush first or discard
