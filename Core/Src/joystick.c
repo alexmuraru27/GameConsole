@@ -71,7 +71,7 @@ void joystickReadData(void)
 {
     // Keep this as short as possible!
     // Clear the dpad and special buttons
-    s_joystick_data &= ~(JOYSTICK_DATA_BTN_MASK | JOYSTICK_DATA_SPECIAL_BTN_MASK | JOYSTICK_DATA_ANALOG_MASK);
+    s_joystick_data = 0U;
 
     // Set dpad buttons
     // Optimised like this due to input pins being in consecutive order starting from
