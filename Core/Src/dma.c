@@ -14,18 +14,12 @@
 // SDIO DMA2: Ch4 S3
 
 // ADC1 DMA2: Ch0, S0
-extern volatile uint8_t g_usart2_dma_busy;
-extern volatile uint8_t g_usart2_active_buffer_pos;
 void DMA1_Stream6_IRQHandler(void)
 {
     if (DMA1->HISR & DMA_HISR_TCIF6)
     {
         DMA1->HIFCR |= DMA_HIFCR_CTCIF6; // Clear interrupt
-        g_usart2_dma_busy = 0;
-        if (g_usart2_active_buffer_pos > 0)
-        {
-            usart2BufferFlush(); // Immediately send accumulated data
-        }
+        usart2SetDmaFree();
     }
 }
 

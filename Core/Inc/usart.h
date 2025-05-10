@@ -2,6 +2,7 @@
 #define __USART_COMM_H
 #include <stdint.h>
 
+void usart2SetDmaFree();
 void usartInit(void);
 void usart2BufferFlush(void);
 void debugChar(char c);

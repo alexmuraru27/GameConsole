@@ -7,49 +7,51 @@
 #define USART_BUFFER_SIZE ((uint32_t)512U)
 #endif
 
-// TODO Create memorymap section in bootloader RAM for this
-// TODO refactor this to use either circular buffer, either DBM
-// TODO interrupt handler is huge!
-uint8_t g_usart2_buffer_a[USART_BUFFER_SIZE] = {0U};
-uint8_t g_usart2_buffer_b[USART_BUFFER_SIZE] = {0U};
-uint8_t *g_usart2_active_buffer = g_usart2_buffer_a; // CPU writes here
-volatile uint16_t g_usart2_active_buffer_pos = 0;
-volatile uint8_t g_usart2_dma_busy = 0;
+uint8_t s_usart2_buffer_a[USART_BUFFER_SIZE] = {0U};
+uint8_t s_usart2_buffer_b[USART_BUFFER_SIZE] = {0U};
+uint8_t *s_usart2_active_buffer = s_usart2_buffer_a; // CPU writes here
+volatile uint16_t s_usart2_active_buffer_pos = 0;
+volatile uint8_t s_usart2_dma_busy = 0;
 
+void usart2SetDmaFree()
+{
+    s_usart2_dma_busy = 0U;
+}
 void usart2BufferFlush(void)
 {
-    if (g_usart2_dma_busy)
-        return; // DMA busy -> don't flush yet!
+    // if DMA is busy, don't flush
+    if (s_usart2_dma_busy)
+        return;
 
-    NVIC_DisableIRQ(DMA1_Stream6_IRQn);
+    // if the buffer is empty, there is nothing to write
+    if (s_usart2_active_buffer_pos == 0)
+    {
+        return;
+    }
+
     DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-    DMA1_Stream6->M0AR = (uint32_t)g_usart2_active_buffer;
-    DMA1_Stream6->NDTR = g_usart2_active_buffer_pos;
+    DMA1_Stream6->M0AR = (uint32_t)s_usart2_active_buffer;
+    DMA1_Stream6->NDTR = s_usart2_active_buffer_pos;
 
     // Swap active buffer
-    g_usart2_active_buffer = (g_usart2_active_buffer == g_usart2_buffer_a) ? g_usart2_buffer_b : g_usart2_buffer_a;
-    g_usart2_active_buffer_pos = 0;
+    s_usart2_active_buffer = (s_usart2_active_buffer == s_usart2_buffer_a) ? s_usart2_buffer_b : s_usart2_buffer_a;
+    s_usart2_active_buffer_pos = 0;
 
     // Start DMA transfer
-    g_usart2_dma_busy = 1;
-    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+    s_usart2_dma_busy = 1;
     DMA1_Stream6->CR |= DMA_SxCR_EN;
 }
 
 static void usart2Send(const uint8_t *data, uint16_t size)
 {
-    // This is buggy and it does some nasty overrides at some point
-    // TODO fix!
-    if (size > (USART_BUFFER_SIZE - g_usart2_active_buffer_pos))
+    // If enough place inside the buffer, fill it
+    if (size < (USART_BUFFER_SIZE - s_usart2_active_buffer_pos))
     {
-        // Buffer full! Maybe flush first or discard
-        return;
+        memcpy(&s_usart2_active_buffer[s_usart2_active_buffer_pos], data, size);
+        s_usart2_active_buffer_pos += size;
     }
 
-    memcpy(&g_usart2_active_buffer[g_usart2_active_buffer_pos], data, size);
-    g_usart2_active_buffer_pos += size;
-
-    // Optional: if DMA not busy, flush immediately
+    // Try to always trigger a flush
     usart2BufferFlush();
 }
 
