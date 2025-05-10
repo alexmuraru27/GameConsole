@@ -86,13 +86,13 @@ void joystickReadData(void)
     // Analog values
     if (s_buffer_addr)
     {
-        uint8_t val = 0U;
+        uint16_t val = 0U;
         for (uint8_t i = 0U; i < 4U; ++i)
         {
             val = s_buffer_addr[i];
             if (val < ANALOG_LOWER_THRESHOLD || val > ANALOG_HIGHER_THRESHOLD)
             {
-                s_joystick_data |= ((val < ANALOG_LOWER_THRESHOLD) ? JoystickAnalogValueLowAxis : JoystickAnalogValueHighAxis << s_axis_shift[i]) & s_axis_mask[i];
+                s_joystick_data |= (((val < ANALOG_LOWER_THRESHOLD) ? JoystickAnalogValueLowAxis : JoystickAnalogValueHighAxis) << s_axis_shift[i]) & s_axis_mask[i];
             }
         }
     }
