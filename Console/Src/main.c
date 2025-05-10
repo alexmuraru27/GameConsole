@@ -79,39 +79,6 @@ static void debugJoystics()
   debugString("\r\n");
 }
 
-static void debugUsart2()
-{
-  debugString("TestStringData \r\n");
-  debugInt(118932);
-  debugString("\r\n");
-  debugHex(0x0120340);
-  debugString("\r\n");
-  debugString("Temperature: 12345678910 12345678910 12345678910 12345678910\r\n");
-  debugString("Data: 0x00000000 0x1111111111 0x22222222 0x33333333 0x44444444\r\n");
-  debugString("Some random text I would love to write here that I hope will totally work fine\r\n");
-  debugString("But some times there is a small chance that it doesnt work as fine as I would wish\r\n");
-  debugString("\r\n");
-  debugBinary(0x0A, 8);
-  debugString("\r\n");
-  debugBinary(0x0A0A, 16);
-  debugString("\r\n");
-  debugBinary(0x0A0A0A0A, 32);
-  debugString("\r\n");
-}
-
-static void debugSpiDisplay()
-{
-  ili9341FillScreen(ILI9341_GREENYELLOW);
-  ili9341FillRectangle(16, 16, 50, 50, ILI9341_MAGENTA);
-  ili9341FillRectangle(60, 60, 32, 32, ILI9341_CYAN);
-  ili9341FillRectangle(150, 120, 40, 40, ILI9341_OLIVE);
-
-  ili9341DrawPixel(180, 180, ILI9341_BLUE);
-  ili9341DrawPixel(180, 181, ILI9341_BLUE);
-  ili9341DrawPixel(181, 180, ILI9341_BLUE);
-  ili9341DrawPixel(181, 181, ILI9341_BLUE);
-  delay(1500U);
-}
 int main(void)
 {
   consoleInit();
@@ -158,9 +125,6 @@ int main(void)
     }
     lastFrameTime = getSysTime(); // Keep consistent frame timing
     debugJoystics();
-    // debugUsart2();
-    // debugSpiDisplay();
-    // delay(500U);
     framecount++;
   }
 }
