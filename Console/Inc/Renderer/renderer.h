@@ -3,5 +3,5 @@
 #include <stdint.h>
 
 void rendererInit(void);
-
+void rendererRender(void);
 #endif /* __RENDERER_H */

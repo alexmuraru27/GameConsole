@@ -31,54 +31,6 @@ static void consoleInit()
   rendererInit();
 }
 
-static void debugJoystics()
-{
-  debugString("\r\n");
-  debugString("\r\n");
-  debugString("RBtnUp= ");
-  debugInt((uint8_t)joystickGetRBtnUp());
-  debugString("\r\n");
-  debugString("RBtnRight= ");
-  debugInt((uint8_t)joystickGetRBtnRight());
-  debugString("\r\n");
-  debugString("RBtnDown= ");
-  debugInt((uint8_t)joystickGetRBtnDown());
-  debugString("\r\n");
-  debugString("RBtnLeft= ");
-  debugInt((uint8_t)joystickGetRBtnLeft());
-  debugString("\r\n");
-  debugString("LBtnUp= ");
-  debugInt((uint8_t)joystickGetLBtnUp());
-  debugString("\r\n");
-  debugString("LBtnRight= ");
-  debugInt((uint8_t)joystickGetLBtnRight());
-  debugString("\r\n");
-  debugString("LBtnDown= ");
-  debugInt((uint8_t)joystickGetLBtnDown());
-  debugString("\r\n");
-  debugString("LBtnLeft= ");
-  debugInt((uint8_t)joystickGetLBtnLeft());
-  debugString("\r\n");
-  debugString("SpecialBtn1= ");
-  debugInt((uint8_t)joystickGetSpecialBtn1());
-  debugString("\r\n");
-  debugString("SpecialBtn2= ");
-  debugInt((uint8_t)joystickGetSpecialBtn2());
-  debugString("\r\n");
-  debugString("RAnalogY= ");
-  debugInt((uint8_t)joystickGetRAnalogY());
-  debugString("\r\n");
-  debugString("RAnalogX= ");
-  debugInt((uint8_t)joystickGetRAnalogX());
-  debugString("\r\n");
-  debugString("LAnalogY= ");
-  debugInt((uint8_t)joystickGetLAnalogY());
-  debugString("\r\n");
-  debugString("LAnalogX= ");
-  debugInt((uint8_t)joystickGetLAnalogX());
-  debugString("\r\n");
-}
-
 int main(void)
 {
   consoleInit();
@@ -97,25 +49,26 @@ int main(void)
 
     if (x < 320U - TILE_SIZE - SPEED)
     {
-      x += (uint16_t)joystickGetRBtnRight() * SPEED;
+      x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
     }
     if (x > 0U)
     {
-      x -= (uint16_t)joystickGetRBtnLeft() * SPEED;
+      x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
     }
 
     if (y < 240U - TILE_SIZE - SPEED)
     {
-      y += (uint16_t)joystickGetRBtnDown() * SPEED;
+      y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
     }
     if (y > 0U)
     {
-      y -= (uint16_t)joystickGetRBtnUp() * SPEED;
+      y -= ((joystickGetLAnalogY() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogY() == JoystickAnalogValueLowAxis)) * SPEED;
     }
 
     ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_RED);
     // Wait until 33ms have passed since last frame
 
+    rendererRender();
     // 33ms frame time
     if (getSysTime() - lastFrameTime < 33)
     {
@@ -124,7 +77,6 @@ int main(void)
         ;
     }
     lastFrameTime = getSysTime(); // Keep consistent frame timing
-    debugJoystics();
     framecount++;
   }
 }

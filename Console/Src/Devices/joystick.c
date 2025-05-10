@@ -67,6 +67,13 @@ static const uint8_t s_axis_shift[] = {
     JOYSTICK_DATA_R_ANALOG_X_POS,
     JOYSTICK_DATA_R_ANALOG_Y_POS};
 
+typedef enum RawJoystickAnalogValue
+{
+    RawJoystickAnalogValueMid = 0U,
+    RawJoystickAnalogValueLow = 1U,
+    RawJoystickAnalogValueHigh = 2U
+} RawJoystickAnalogValue;
+
 void joystickReadData(void)
 {
     // Keep this as short as possible!
@@ -92,7 +99,7 @@ void joystickReadData(void)
             val = s_buffer_addr[i];
             if (val < ANALOG_LOWER_THRESHOLD || val > ANALOG_HIGHER_THRESHOLD)
             {
-                s_joystick_data |= (((val < ANALOG_LOWER_THRESHOLD) ? JoystickAnalogValueLowAxis : JoystickAnalogValueHighAxis) << s_axis_shift[i]) & s_axis_mask[i];
+                s_joystick_data |= (((val < ANALOG_LOWER_THRESHOLD) ? RawJoystickAnalogValueLow : RawJoystickAnalogValueHigh) << s_axis_shift[i]) & s_axis_mask[i];
             }
         }
     }
@@ -146,17 +153,83 @@ bool joystickGetSpecialBtn2(void)
 }
 JoystickAnalogValue joystickGetRAnalogY(void)
 {
-    return (JoystickAnalogValue)((s_joystick_data & JOYSTICK_DATA_R_ANALOG_Y_MASK) >> JOYSTICK_DATA_R_ANALOG_Y_POS);
+    JoystickAnalogValue joyRAnalogY = JoystickAnalogValueOff;
+    switch ((s_joystick_data & JOYSTICK_DATA_R_ANALOG_Y_MASK) >> JOYSTICK_DATA_R_ANALOG_Y_POS)
+    {
+    case RawJoystickAnalogValueLow:
+    {
+        joyRAnalogY = JoystickAnalogValueLowAxis;
+        break;
+    }
+    case RawJoystickAnalogValueHigh:
+    {
+        joyRAnalogY = JoystickAnalogValueHighAxis;
+        break;
+    }
+    default:
+        break;
+    }
+    return joyRAnalogY;
 }
 JoystickAnalogValue joystickGetRAnalogX(void)
 {
-    return (JoystickAnalogValue)((s_joystick_data & JOYSTICK_DATA_R_ANALOG_X_MASK) >> JOYSTICK_DATA_R_ANALOG_X_POS);
+    JoystickAnalogValue joyRAnalogX = JoystickAnalogValueOff;
+    switch ((s_joystick_data & JOYSTICK_DATA_R_ANALOG_X_MASK) >> JOYSTICK_DATA_R_ANALOG_X_POS)
+    {
+    case RawJoystickAnalogValueLow:
+    {
+        joyRAnalogX = JoystickAnalogValueLowAxis;
+        break;
+    }
+    case RawJoystickAnalogValueHigh:
+    {
+        joyRAnalogX = JoystickAnalogValueHighAxis;
+        break;
+    }
+    default:
+        break;
+    }
+    return joyRAnalogX;
 }
 JoystickAnalogValue joystickGetLAnalogY(void)
 {
-    return (JoystickAnalogValue)((s_joystick_data & JOYSTICK_DATA_L_ANALOG_Y_MASK) >> JOYSTICK_DATA_L_ANALOG_Y_POS);
+    // Joystick is flipped so we need to also flip the axes
+    JoystickAnalogValue joyLAnalogY = JoystickAnalogValueOff;
+    switch ((s_joystick_data & JOYSTICK_DATA_L_ANALOG_Y_MASK) >> JOYSTICK_DATA_L_ANALOG_Y_POS)
+    {
+    case RawJoystickAnalogValueLow:
+    {
+        joyLAnalogY = JoystickAnalogValueHighAxis;
+        break;
+    }
+    case RawJoystickAnalogValueHigh:
+    {
+        joyLAnalogY = JoystickAnalogValueLowAxis;
+        break;
+    }
+    default:
+        break;
+    }
+    return joyLAnalogY;
 }
 JoystickAnalogValue joystickGetLAnalogX(void)
 {
-    return (JoystickAnalogValue)((s_joystick_data & JOYSTICK_DATA_L_ANALOG_X_MASK) >> JOYSTICK_DATA_L_ANALOG_X_POS);
+    // Joystick is flipped so we need to also flip the axes
+    JoystickAnalogValue joyLAnalogX = JoystickAnalogValueOff;
+    switch ((s_joystick_data & JOYSTICK_DATA_L_ANALOG_X_MASK) >> JOYSTICK_DATA_L_ANALOG_X_POS)
+    {
+    case RawJoystickAnalogValueLow:
+    {
+        joyLAnalogX = JoystickAnalogValueHighAxis;
+        break;
+    }
+    case RawJoystickAnalogValueHigh:
+    {
+        joyLAnalogX = JoystickAnalogValueLowAxis;
+        break;
+    }
+    default:
+        break;
+    }
+    return joyLAnalogX;
 }

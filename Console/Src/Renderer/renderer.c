@@ -3,3 +3,7 @@
 void rendererInit(void)
 {
 }
+
+void rendererRender(void)
+{
+}
