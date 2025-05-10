@@ -37,18 +37,18 @@ BUILD_DIR = build
 ######################################
 # C sources
 C_SOURCES =  \
-Core/Src/main.c \
-Core/Src/sysclock.c \
-Core/Src/stm32f4xx_it.c \
-Core/Src/syscalls.c \
-Core/Src/usart.c \
-Core/Src/gpio.c \
-Core/Src/dma.c \
-Core/Src/spi.c \
-Core/Src/ILI9341.c \
-Core/Src/adc.c \
-Core/Src/joystick.c \
-Core/Src/timer.c
+Console/Src/main.c \
+Console/Src/stm32f4xx_it.c \
+Console/Src/syscalls.c \
+Console/Src/Peripherals/sysclock.c \
+Console/Src/Peripherals/usart.c \
+Console/Src/Peripherals/gpio.c \
+Console/Src/Peripherals/dma.c \
+Console/Src/Peripherals/spi.c \
+Console/Src/Peripherals/timer.c \
+Console/Src/Peripherals/adc.c \
+Console/Src/Devices/ILI9341.c \
+Console/Src/Devices/joystick.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -107,7 +107,9 @@ AS_INCLUDES =
 
 # C includes
 C_INCLUDES =  \
--ICore/Inc \
+-IConsole/Inc \
+-IConsole/Inc/Peripherals \
+-IConsole/Inc/Devices \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include
 

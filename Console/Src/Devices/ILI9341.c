@@ -139,7 +139,7 @@ void ili9341Init(uint8_t rotation)
     gpioSpi1CsLow();
 
     // init SPI
-    SPIInit();
+    spiInit();
 
     // HW reset
     ili9341Reset();

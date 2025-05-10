@@ -1,7 +1,7 @@
 #include "SPI.h"
 #include "stm32f407xx.h"
 
-void SPIInit(void)
+void spiInit(void)
 {
     SPI1->CR1 = 0;
     SPI1->CR1 |= SPI_CR1_MSTR;              // master mode

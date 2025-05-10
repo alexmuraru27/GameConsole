@@ -116,7 +116,6 @@ int main(void)
   uint32_t lastFrameTime = getSysTime();
   while (1)
   {
-    framecount++;
     if (framecount % 100U == 0)
     {
       ili9341FillScreen(ILI9341_GREENYELLOW);
@@ -155,5 +154,6 @@ int main(void)
     // debugUsart2();
     // debugSpiDisplay();
     // delay(500U);
+    framecount++;
   }
 }
