@@ -48,7 +48,8 @@ Console/Src/Peripherals/spi.c \
 Console/Src/Peripherals/timer.c \
 Console/Src/Peripherals/adc.c \
 Console/Src/Devices/ILI9341.c \
-Console/Src/Devices/joystick.c
+Console/Src/Devices/joystick.c \
+Console/Src/Renderer/renderer.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -110,6 +111,7 @@ C_INCLUDES =  \
 -IConsole/Inc \
 -IConsole/Inc/Peripherals \
 -IConsole/Inc/Devices \
+-IConsole/Inc/Renderer \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include
 

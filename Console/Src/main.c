@@ -7,6 +7,7 @@
 #include "adc.h"
 #include "timer.h"
 #include "joystick.h"
+#include "renderer.h"
 
 void SystemInit(void)
 {
@@ -22,6 +23,12 @@ static void peripheralsInit()
   ili9341Init(3U);
   adcInit();
   joystickInit();
+}
+
+static void consoleInit()
+{
+  peripheralsInit();
+  rendererInit();
 }
 
 static void debugJoystics()
@@ -107,7 +114,7 @@ static void debugSpiDisplay()
 }
 int main(void)
 {
-  peripheralsInit();
+  consoleInit();
   uint16_t x = 0U;
   uint16_t y = 0U;
   const uint16_t TILE_SIZE = 32U;
@@ -116,7 +123,7 @@ int main(void)
   uint32_t lastFrameTime = getSysTime();
   while (1)
   {
-    if (framecount % 100U == 0)
+    if (framecount % 5 == 0)
     {
       ili9341FillScreen(ILI9341_GREENYELLOW);
     }
