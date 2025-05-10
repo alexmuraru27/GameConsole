@@ -13,11 +13,11 @@ uint8_t *s_usart2_active_buffer = s_usart2_buffer_a; // CPU writes here
 volatile uint16_t s_usart2_active_buffer_pos = 0;
 volatile uint8_t s_usart2_dma_busy = 0;
 
-void usart2SetDmaFree()
+void usart2SetDmaFree(void)
 {
     s_usart2_dma_busy = 0U;
 }
-void usart2BufferFlush(void)
+static void usart2BufferFlush(void)
 {
     // if DMA is busy, don't flush
     if (s_usart2_dma_busy)
@@ -55,7 +55,7 @@ static void usart2Send(const uint8_t *data, uint16_t size)
     usart2BufferFlush();
 }
 
-void usartInit(void)
+static void usart2Init(void)
 {
     // APB1 clock is 42MHz
     // Desired baud is 921600
@@ -162,4 +162,14 @@ void debugBinary(uint32_t num, uint8_t width)
     }
 
     debugBuffer(buffer, buf_index);
+}
+
+void usartInit(void)
+{
+    usart2Init();
+}
+
+void usartBufferFlush(void)
+{
+    usart2BufferFlush();
 }
