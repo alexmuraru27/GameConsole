@@ -4,4 +4,8 @@
 
 void rendererInit(void);
 void rendererRender(void);
+void rendererSetPaletteSystem(const uint16_t *rgb_565_color_buffer, const uint8_t size);
+void rendererSetPaletteSprite(uint8_t pallete_index, uint8_t color_index, uint8_t system_pallete_index);
+void rendererSetPaletteBackground(uint8_t pallete_index, uint8_t color_index, uint8_t system_pallete_index);
+void rendererTriggerCompleteRedraw(void);
 #endif /* __RENDERER_H */

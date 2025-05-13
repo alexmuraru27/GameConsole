@@ -62,3 +62,7 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 4. PC12 (CLK)
 5. PC8 (DAT0)
 6. PC9 (DAT1)
+
+
+## Default System Color Pallete
+![system_pallete](system_pallete.png)
