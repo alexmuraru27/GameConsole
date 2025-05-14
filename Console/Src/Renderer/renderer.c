@@ -2,17 +2,26 @@
 #include "string.h"
 #include "ILI9341.h"
 
-#define RENDERER_WIDTH 320U
-#define RENDERER_HEIGHT 240U
-#define RENDERER_TILE_SIZE 16U
-#define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SIZE))
-#define RENDERER_ATTRIBUTE_TABLE_SIZE (((RENDERER_WIDTH / RENDERER_TILE_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SIZE)) / 4U)
+#define RENDERER_WIDTH 256U  // 32
+#define RENDERER_HEIGHT 240U // 30
+#define RENDERER_TILE_SCREEN_SIZE 8U
+#define RENDERER_TILE_MEMORY_SIZE 16U
+
+#define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
+
+#define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 4U
+#define RENDERER_ATTRIBUTE_TABLE_SIZE (((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 
 // Tiles stored as bits for dirty flags - 0 do not render/ 1 to render
-#define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SIZE) / 8U)
+#define RENDERER_DIRTY_TILES_CLUSTERING_SIZE 8U
+#define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE) / RENDERER_DIRTY_TILES_CLUSTERING_SIZE)
+
 #define RENDERER_PATTERN_TABLE_SIZE 256U
+
 #define RENDERER_OAM_MAX_SPRITE_SIZE 128U
+
 #define RENDERER_SYSTEM_PALETTE_SIZE 64U
+
 #define RENDERER_SELECTED_PALETTE_SIZE 16U
 
 // System colors from 0x00-0x3F = 64 colors. RGB565
@@ -83,18 +92,26 @@ const uint16_t s_system_palette[RENDERER_SYSTEM_PALETTE_SIZE] = {
     RGB2COLOR(0, 0, 0)        // 63
 };
 
-// Holds texture data
-static uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_SIZE];
-// Holds texture data indexes for background. Contains indexes for pattern table
+// Holds texture data loaded from the game memory aka CHR
+static uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_MEMORY_SIZE];
+
+// Holds texture data indexes for background from pattern table
 static uint8_t s_name_table[RENDERER_NAME_TABLE_SIZE];
+
 // Holds palette data for background subdivided in 4x4 tiles
 static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
-// Object attribute memory -> X pos, tile index from s_pattern_table, sprite pallete, flip H/V, X Pos
+
+// Object attribute memory
+// Priority (0: in front of background; 1: behind background)
+// [X pos][Filp_V Flip_H Priority 0 0 0 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
 static uint32_t s_oam[RENDERER_OAM_MAX_SPRITE_SIZE];
+
 // Frame pallete for sprites. Contains indexes for SystemPalette
 static uint8_t s_frame_palette_sprite[RENDERER_SELECTED_PALETTE_SIZE];
+
 // Frame pallete for background. Contains indexes for SystemPalette
 static uint8_t s_frame_palette_bg[RENDERER_SELECTED_PALETTE_SIZE];
+
 // Background tile positions that need to be redrawn
 static uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
 
