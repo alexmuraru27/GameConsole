@@ -94,6 +94,8 @@ const uint16_t s_system_palette[RENDERER_SYSTEM_PALETTE_SIZE] = {
     RGB2COLOR(0, 0, 0)        // 63
 };
 
+// TODO place renderer in CCRAM
+
 // Holds texture data loaded from the game memory aka CHR
 static uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_MEMORY_SIZE];
 
@@ -132,20 +134,19 @@ void rendererInit(void)
 // TODO draw no transparency - >can be faster due to less overhead on spi with window setting
 static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_pallete_idx)
 {
-    if (frame_pallete_idx >= RENDERER_FRAME_PALETTE_SIZE)
+    if (frame_pallete_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
-        return;
-    }
-
-    uint8_t color_index = 0U;
-    for (uint8_t row = 0; row < 8; row++)
-    {
-        for (uint8_t col = 0; col < 8; col++)
+        uint8_t color_index = 0U;
+        for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
         {
-            color_index = (((s_pattern_table[sprite_index][row + 8U] >> (7U - col)) & 1) << 1) | ((s_pattern_table[sprite_index][row] >> (7U - col)) & 1);
-            if (color_index != 0U)
+            for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
             {
-                ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[frame_pallete_idx][color_index]);
+                color_index = (((s_pattern_table[sprite_index][row + RENDERER_TILE_SCREEN_SIZE] >> (RENDERER_TILE_SCREEN_SIZE - 1U - col)) & 1) << 1) |
+                              ((s_pattern_table[sprite_index][row] >> (RENDERER_TILE_SCREEN_SIZE - 1U - col)) & 1);
+                if (color_index != 0U)
+                {
+                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[frame_pallete_idx][color_index]);
+                }
             }
         }
     }
@@ -153,9 +154,11 @@ static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_in
 
 void rendererRender(void)
 {
+    // TODO dirty checker
+    // TODO overlap checker
     // draw the system pallete
     const uint16_t TILE_SIZE = 20U;
-    for (int i = 0; i < 64; ++i)
+    for (int i = 0; i < RENDERER_SYSTEM_PALETTE_SIZE; ++i)
     {
         int row = i / (320 / TILE_SIZE); // how many fit per row
         int col = i % (320 / TILE_SIZE);

@@ -171,9 +171,9 @@ int main(void)
   rendererPaletteSetSprite(2U, 2U, 0x26);
   rendererPaletteSetSprite(2U, 3U, 0x06);
 
-  rendererPaletteSetSprite(3U, 1U, 0x11);
-  rendererPaletteSetSprite(3U, 2U, 0x21);
-  rendererPaletteSetSprite(3U, 3U, 0x01);
+  rendererPaletteSetSprite(3U, 1U, 0x17);
+  rendererPaletteSetSprite(3U, 2U, 0x27);
+  rendererPaletteSetSprite(3U, 3U, 0x37);
 
   while (1)
   {
