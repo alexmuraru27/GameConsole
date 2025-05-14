@@ -39,6 +39,16 @@ static uint32_t lastFrameTime = 0U;
 const uint16_t TILE_SIZE = 8U;
 const uint16_t SPEED = 5U;
 
+// pixel color index = (bit[1] << 1) | (bit[0])
+// 0 transparent
+// 1 mid
+// 2 bright
+// 3 dark
+const uint8_t sprite_pacman[16U] = {
+    0b00000000, 0b00011100, 0b00010110, 0b00111110, 0b01111110, 0b01111110, 0b01010110, 0b00000000, // Plane 0
+    0b00000000, 0b00100100, 0b01000010, 0b01101010, 0b00000010, 0b00000010, 0b00000010, 0b00000000  // Plane 1
+};
+
 static void update()
 {
   if (x < 320U - TILE_SIZE - SPEED)
