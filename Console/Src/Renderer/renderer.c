@@ -105,7 +105,8 @@ static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 
 // Object attribute memory
 // Priority (0: in front of background; 1: behind background)
-// [X pos][Filp_V Flip_H Priority 0 0 0 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
+// isDirty - 1 if sprite needs to be redrawn
+// [X pos][Filp_V Flip_H Priority isDirty 0 0 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
 static uint32_t s_oam[RENDERER_OAM_MAX_SPRITE_SIZE];
 
 // Frame pallete for sprites. Contains indexes for SystemPalette
@@ -131,6 +132,11 @@ void rendererInit(void)
 // TODO draw no transparency - >can be faster due to less overhead on spi with window setting
 static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_pallete_idx)
 {
+    if (frame_pallete_idx >= RENDERER_FRAME_PALETTE_SIZE)
+    {
+        return;
+    }
+
     uint8_t color_index = 0U;
     for (uint8_t row = 0; row < 8; row++)
     {
@@ -160,9 +166,9 @@ void rendererRender(void)
         ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, s_system_palette[i]);
     }
 
-    const uint8_t FRAME_PALETTE_IDX = 0U;
+    drawSprite(80U, 90U, 0U, 2U);
 
-    drawSprite(80U, 90U, 0U, FRAME_PALETTE_IDX);
+    const uint8_t FRAME_PALETTE_IDX = 0U;
     drawSprite(100U, 100U, 2U, FRAME_PALETTE_IDX);
     drawSprite(100U + RENDERER_TILE_SCREEN_SIZE, 100U, 3U, FRAME_PALETTE_IDX);
     drawSprite(100U, 100U + RENDERER_TILE_SCREEN_SIZE, 4U, FRAME_PALETTE_IDX);
@@ -171,7 +177,7 @@ void rendererRender(void)
 
 void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_index, const uint8_t system_pallete_index)
 {
-    if (pallete_index < RENDERER_FRAME_PALETTE_SIZE && color_index < RENDERER_FRAME_SUBPALETTE_SIZE)
+    if ((pallete_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
         s_frame_palette_sprite[pallete_index][color_index] = s_system_palette[system_pallete_index];
     }
@@ -179,7 +185,7 @@ void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_i
 
 void rendererPaletteSetBackground(const uint8_t pallete_index, const uint8_t color_index, const uint8_t system_pallete_index)
 {
-    if (pallete_index < RENDERER_FRAME_PALETTE_SIZE && color_index < RENDERER_FRAME_SUBPALETTE_SIZE)
+    if ((pallete_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
         s_frame_palette_bg[pallete_index][color_index] = s_system_palette[system_pallete_index];
     }
@@ -204,4 +210,16 @@ void rendererPatternTableClear(const uint8_t system_color)
 void rendererTriggerCompleteRedraw(void)
 {
     memset(&s_dirtyTiles, 0xFFU, RENDERER_DIRTY_TILES_SIZE);
+}
+
+void rendererNameTableSetTile(uint8_t table_index, uint8_t tile_idx)
+{
+    if (table_index < RENDERER_NAME_TABLE_SIZE)
+    {
+        s_name_table[table_index] = tile_idx;
+    }
+}
+void rendererNameTableClear()
+{
+    memset(&s_name_table, 0U, sizeof(s_name_table));
 }

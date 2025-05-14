@@ -162,6 +162,19 @@ int main(void)
   rendererPaletteSetSprite(0U, 1U, 0x1C);
   rendererPaletteSetSprite(0U, 2U, 0x2C);
   rendererPaletteSetSprite(0U, 3U, 0x0C);
+
+  rendererPaletteSetSprite(1U, 1U, 0x1A);
+  rendererPaletteSetSprite(1U, 2U, 0x2A);
+  rendererPaletteSetSprite(1U, 3U, 0x0A);
+
+  rendererPaletteSetSprite(2U, 1U, 0x16);
+  rendererPaletteSetSprite(2U, 2U, 0x26);
+  rendererPaletteSetSprite(2U, 3U, 0x06);
+
+  rendererPaletteSetSprite(3U, 1U, 0x11);
+  rendererPaletteSetSprite(3U, 2U, 0x21);
+  rendererPaletteSetSprite(3U, 3U, 0x01);
+
   while (1)
   {
     update();

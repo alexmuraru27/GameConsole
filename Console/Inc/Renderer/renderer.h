@@ -14,4 +14,7 @@ void rendererPaletteSetBackground(uint8_t pallete_index, uint8_t color_index, ui
 void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, uint8_t tile_size);
 void rendererPatternTableClear(uint8_t system_color);
 
+// Name table
+void rendererNameTableSetTile(uint8_t table_index, uint8_t tile_idx);
+void rendererNameTableClear();
 #endif /* __RENDERER_H */
