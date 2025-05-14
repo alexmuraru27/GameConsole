@@ -8,7 +8,10 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
+#include "tileCreator.h"
 
+#define FPS 50
+#define FRAME_PERIOD (1000U / FPS)
 void SystemInit(void)
 {
   systemClockConfig();
@@ -35,19 +38,80 @@ static void consoleInit()
 static uint16_t x = 0U;
 static uint16_t y = 0U;
 static uint8_t framecount = 0U;
-static uint32_t lastFrameTime = 0U;
 const uint16_t TILE_SIZE = 8U;
 const uint16_t SPEED = 5U;
 
-// pixel color index = (bit[1] << 1) | (bit[0])
-// 0 transparent
-// 1 mid
-// 2 bright
-// 3 dark
-const uint8_t sprite_pacman[16U] = {
-    0b00000000, 0b00011100, 0b00010110, 0b00111110, 0b01111110, 0b01111110, 0b01010110, 0b00000000, // Plane 0
-    0b00000000, 0b00100100, 0b01000010, 0b01101010, 0b00000010, 0b00000010, 0b00000010, 0b00000000  // Plane 1
-};
+const uint8_t sprite_pacman[16U] = DEFINE_TILE(
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 2, 1, 1, 3, 0, 0,
+    0, 2, 0, 1, 0, 1, 3, 0,
+    0, 2, 3, 1, 3, 1, 3, 0,
+    0, 1, 1, 1, 1, 1, 3, 0,
+    0, 1, 1, 1, 1, 1, 3, 0,
+    0, 1, 0, 1, 0, 1, 3, 0,
+    0, 0, 0, 0, 0, 0, 0, 0);
+
+const uint8_t sprite_lines[16U] = DEFINE_TILE(
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    2, 2, 2, 2, 2, 2, 2, 2,
+    3, 3, 3, 3, 3, 3, 3, 3,
+    3, 3, 3, 3, 3, 3, 3, 3);
+
+const uint8_t sprite_pacman_big_1[16U] = DEFINE_TILE(
+    0, 0, 1, 1, 1, 1, 1, 1,
+    0, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 2, 2, 1, 1, 1, 1,
+    1, 1, 3, 2, 1, 1, 1, 1,
+    1, 1, 2, 2, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1);
+
+const uint8_t sprite_pacman_big_2[16U] = DEFINE_TILE(
+    1, 1, 1, 1, 1, 1, 0, 0,
+    1, 1, 1, 1, 1, 1, 1, 0,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 2, 2, 1, 1,
+    1, 1, 1, 1, 2, 3, 1, 1,
+    1, 1, 1, 1, 2, 2, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1);
+
+const uint8_t sprite_pacman_big_3[16U] = DEFINE_TILE(
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 0, 1, 0, 1, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 0, 1, 0, 1, 0, 1,
+    0, 0, 0, 0, 0, 0, 0, 0);
+
+const uint8_t sprite_pacman_big_4[16U] = DEFINE_TILE(
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    0, 1, 0, 1, 0, 1, 0, 1,
+    1, 1, 1, 1, 1, 1, 1, 1,
+    0, 1, 0, 1, 0, 1, 0, 1,
+    0, 0, 0, 0, 0, 0, 0, 0);
+
+static void syncFrame()
+{
+  static uint32_t lastFrameTime = 0U;
+  if (getSysTime() - lastFrameTime < FRAME_PERIOD)
+  {
+    // Busy-wait until it's time for the next frame
+    while ((getSysTime() - lastFrameTime) < FRAME_PERIOD)
+      ;
+  }
+  lastFrameTime = getSysTime(); // Keep consistent frame timing
+}
 
 static void update()
 {
@@ -74,7 +138,11 @@ static void render()
 {
   if (joystickGetSpecialBtn1())
   {
-    ili9341FillScreen(ILI9341_GREENYELLOW);
+    ili9341FillScreen(ILI9341_BLACK);
+  }
+  if (joystickGetSpecialBtn2())
+  {
+    ili9341FillScreen(ILI9341_WHITE);
   }
   rendererRender();
   ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, ILI9341_RED);
@@ -83,20 +151,23 @@ static void render()
 int main(void)
 {
   consoleInit();
-  ili9341FillScreen(ILI9341_GREENYELLOW);
+  rendererPatternTableSetTile(0U, sprite_pacman, sizeof(sprite_pacman));
+  rendererPatternTableSetTile(1U, sprite_lines, sizeof(sprite_lines));
+
+  rendererPatternTableSetTile(2U, sprite_pacman_big_1, sizeof(sprite_pacman_big_1));
+  rendererPatternTableSetTile(3U, sprite_pacman_big_2, sizeof(sprite_pacman_big_2));
+  rendererPatternTableSetTile(4U, sprite_pacman_big_3, sizeof(sprite_pacman_big_3));
+  rendererPatternTableSetTile(5U, sprite_pacman_big_4, sizeof(sprite_pacman_big_4));
+
+  rendererPaletteSetSprite(0U, 1U, 0x1C);
+  rendererPaletteSetSprite(0U, 2U, 0x2C);
+  rendererPaletteSetSprite(0U, 3U, 0x0C);
   while (1)
   {
     update();
     render();
 
-    // 33ms frame time
-    if (getSysTime() - lastFrameTime < 33U)
-    {
-      // Busy-wait until it's time for the next frame
-      while ((getSysTime() - lastFrameTime) < 33U)
-        ;
-    }
-    lastFrameTime = getSysTime(); // Keep consistent frame timing
+    syncFrame();
     framecount++;
   }
 }

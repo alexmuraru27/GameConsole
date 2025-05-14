@@ -283,6 +283,8 @@ void ili9341Init(uint8_t rotation)
     delay(120);
     ili9341WriteCommand(ILI9341_DISPON);
     ili9341SetDisplayRotation(rotation);
+
+    ili9341FillScreen(ILI9341_BLACK);
 }
 
 void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
