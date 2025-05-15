@@ -39,7 +39,6 @@ static void consoleInit()
 // TODO Remove statics :)
 static uint8_t x = 0U;
 static uint8_t y = 0U;
-const uint16_t TILE_SIZE = 8U;
 const uint16_t SPEED = 5U;
 
 const uint8_t sprite_pacman[RENDERER_TILE_MEMORY_SIZE] = DEFINE_TILE_16(
@@ -73,7 +72,7 @@ static void syncFrame()
 
 static void update()
 {
-  if (x <= RENDERER_WIDTH - TILE_SIZE - SPEED)
+  if (x <= RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE - SPEED)
   {
     x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -82,7 +81,7 @@ static void update()
     x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  if (y <= RENDERER_HEIGHT - TILE_SIZE - SPEED)
+  if (y <= RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE - SPEED)
   {
     y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
   }
