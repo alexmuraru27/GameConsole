@@ -274,6 +274,8 @@ void rendererOamSetXPos(const uint8_t oam_idx, const uint8_t x_pos)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
         s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
+
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -299,6 +301,7 @@ void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
         }
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -324,6 +327,7 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
         }
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -348,6 +352,7 @@ void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
         {
             s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS);
         }
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -390,6 +395,7 @@ void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t pallete_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS);
         s_oam[oam_idx] |= ((pallete_idx & RENDERER_OAM_PALLETE_IDX_MASK) << RENDERER_OAM_PALLETE_IDX_POS);
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -408,6 +414,7 @@ void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
 
@@ -426,5 +433,6 @@ void rendererOamSetYPos(const uint8_t oam_idx, const uint8_t y_pos)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
+        rendererOamSetIsDirty(oam_idx, true);
     }
 }
