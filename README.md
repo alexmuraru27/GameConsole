@@ -64,5 +64,20 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 6. PC9 (DAT1)
 
 
-## Default System Color Pallete
-![system_pallete](system_pallete.png)
+## Default System Color Palette
+![system_palette](docu/system_palette.png)
+
+
+## tile_creator.py
+### Deps: pygame
+
+### User inputs:
+1. Left click draw
+2. Right click clear
+3. "S" to export the tile into generated_tile.h
+
+### Usage
+Click on the 4 big squares to select the palette with which to draw (1st one is always the transparent one)
+After you selected a palette you can also change its color from the top grid containing the system palette
+
+![alt text](docu/tile_creator_docu.png)
