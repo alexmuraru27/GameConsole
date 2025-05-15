@@ -5,7 +5,8 @@
 
 #define RENDERER_WIDTH 256U  // 32
 #define RENDERER_HEIGHT 240U // 30
-#define RENDERER_TILE_SCREEN_SIZE 8U
+#define RENDERER_TILE_SCREEN_SIZE 16U
+#define RENDERER_TILE_MEMORY_SIZE 64U
 
 void rendererInit(void);
 void rendererRender(void);

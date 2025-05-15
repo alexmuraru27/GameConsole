@@ -2,7 +2,7 @@
 #include "string.h"
 #include "ILI9341.h"
 
-#define RENDERER_TILE_MEMORY_SIZE 16U
+#define RENDERER_TILE_ROW_BYTES (RENDERER_TILE_SCREEN_SIZE / 8U)
 
 #define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
 
@@ -153,7 +153,6 @@ void rendererInit(void)
 static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_pallete_idx)
 {
     // TODO remove this function in future as the rendering will be done line based + dirty flag
-
     if (frame_pallete_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
         uint8_t color_index = 0U;
@@ -161,8 +160,7 @@ static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_in
         {
             for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
             {
-                color_index = (((s_pattern_table[sprite_index][row + RENDERER_TILE_SCREEN_SIZE] >> (RENDERER_TILE_SCREEN_SIZE - 1U - col)) & 1) << 1) |
-                              ((s_pattern_table[sprite_index][row] >> (RENDERER_TILE_SCREEN_SIZE - 1U - col)) & 1);
+                color_index = (((s_pattern_table[sprite_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[sprite_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
                 if (color_index != 0U)
                 {
                     ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[frame_pallete_idx][color_index]);
