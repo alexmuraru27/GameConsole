@@ -12,13 +12,11 @@
 #define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 4U
 #define RENDERER_ATTRIBUTE_TABLE_SIZE (((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 
-// Tiles stored as bits for dirty flags - 0 do not render/ 1 to render
-#define RENDERER_DIRTY_TILES_CLUSTERING_SIZE 8U
-#define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE) / RENDERER_DIRTY_TILES_CLUSTERING_SIZE)
+#define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
 
 #define RENDERER_PATTERN_TABLE_SIZE 256U
 
-#define RENDERER_OAM_MAX_SPRITE_SIZE 128U
+#define RENDERER_OAM_SIZE 128U
 
 #define RENDERER_SYSTEM_PALETTE_SIZE 64U
 
@@ -133,7 +131,7 @@ static uint8_t s_name_table[RENDERER_NAME_TABLE_SIZE];
 static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 
 // Object attribute memory
-static uint32_t s_oam[RENDERER_OAM_MAX_SPRITE_SIZE];
+static uint32_t s_oam[RENDERER_OAM_SIZE];
 
 // Frame pallete for sprites. Contains indexes for SystemPalette
 static uint16_t s_frame_palette_sprite[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
@@ -155,9 +153,10 @@ void rendererInit(void)
     memset(&s_dirtyTiles, 0U, sizeof(s_dirtyTiles));
 }
 
-// TODO draw no transparency - >can be faster due to less overhead on spi with window setting
 static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_pallete_idx)
 {
+    // TODO remove this function in future as the rendering will be done line based + dirty flag
+
     if (frame_pallete_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
         uint8_t color_index = 0U;
@@ -181,25 +180,37 @@ void rendererRender(void)
     // TODO dirty checker
     // TODO overlap checker
     // draw the system pallete
-    const uint16_t TILE_SIZE = 20U;
-    for (int i = 0; i < RENDERER_SYSTEM_PALETTE_SIZE; ++i)
+    // const uint16_t TILE_SIZE = 20U;
+    // for (int i = 0; i < RENDERER_SYSTEM_PALETTE_SIZE; ++i)
+    // {
+    //     int row = i / (320 / TILE_SIZE); // how many fit per row
+    //     int col = i % (320 / TILE_SIZE);
+
+    //     int x = col * TILE_SIZE;
+    //     int y = row * TILE_SIZE;
+
+    //     ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, s_system_palette[i]);
+    // }
+
+    // Try OAM data
+    for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
-        int row = i / (320 / TILE_SIZE); // how many fit per row
-        int col = i % (320 / TILE_SIZE);
+        const uint8_t tile_idx = rendererOamGetTileIdx(i);
+        if (tile_idx != 0U)
+        {
+            // TODO add if condition to check if the tile is also dirty ((tile_idx != 0U) && rendererOamGetIsDirty(i))
 
-        int x = col * TILE_SIZE;
-        int y = row * TILE_SIZE;
+            const uint8_t x = rendererOamGetXPos(i);
+            const uint8_t y = rendererOamGetYPos(i);
+            const uint8_t palette = rendererOamGetPalleteIdx(i);
+            const bool is_flip_v = rendererOamGetFlipV(i);
+            const bool is_flip_h = rendererOamGetFlipH(i);
 
-        ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, s_system_palette[i]);
+            drawSprite(x, y, tile_idx, palette);
+            // TODO: after rendering of the oam, set it to not dirty
+            // rendererOamSetIsDirty(i, false);
+        }
     }
-
-    drawSprite(80U, 90U, 0U, 2U);
-
-    const uint8_t FRAME_PALETTE_IDX = 0U;
-    drawSprite(100U, 100U, 2U, FRAME_PALETTE_IDX);
-    drawSprite(100U + RENDERER_TILE_SCREEN_SIZE, 100U, 3U, FRAME_PALETTE_IDX);
-    drawSprite(100U, 100U + RENDERER_TILE_SCREEN_SIZE, 4U, FRAME_PALETTE_IDX);
-    drawSprite(100U + RENDERER_TILE_SCREEN_SIZE, 100U + RENDERER_TILE_SCREEN_SIZE, 5U, FRAME_PALETTE_IDX);
 }
 
 void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_index, const uint8_t system_pallete_index)
@@ -207,6 +218,17 @@ void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_i
     if ((pallete_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
         s_frame_palette_sprite[pallete_index][color_index] = s_system_palette[system_pallete_index];
+    }
+}
+
+void rendererPaletteSetSpriteMultiple(const uint8_t pallete_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+{
+    if (
+        (pallete_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+    {
+        s_frame_palette_sprite[pallete_idx][1U] = s_system_palette[system_pallete_idx_1];
+        s_frame_palette_sprite[pallete_idx][2U] = s_system_palette[system_pallete_idx_2];
+        s_frame_palette_sprite[pallete_idx][3U] = s_system_palette[system_pallete_idx_3];
     }
 }
 
@@ -218,9 +240,20 @@ void rendererPaletteSetBackground(const uint8_t pallete_index, const uint8_t col
     }
 }
 
+void rendererPaletteSetBackgroundMultiple(const uint8_t pallete_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+{
+    if (
+        (pallete_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+    {
+        s_frame_palette_bg[pallete_idx][1U] = s_system_palette[system_pallete_idx_1];
+        s_frame_palette_bg[pallete_idx][2U] = s_system_palette[system_pallete_idx_2];
+        s_frame_palette_bg[pallete_idx][3U] = s_system_palette[system_pallete_idx_3];
+    }
+}
+
 void rendererPatternTableSetTile(const uint8_t table_index, const uint8_t *tile_data, const uint8_t tile_size)
 {
-    if ((tile_size == RENDERER_TILE_MEMORY_SIZE) && (table_index < RENDERER_PATTERN_TABLE_SIZE))
+    if ((tile_size == RENDERER_TILE_MEMORY_SIZE) && (table_index < RENDERER_PATTERN_TABLE_SIZE) && (table_index > 0U))
     {
         for (int i = 0U; i < RENDERER_TILE_MEMORY_SIZE; ++i)
         {
@@ -251,9 +284,9 @@ void rendererNameTableClear()
     memset(&s_name_table, 0U, sizeof(s_name_table));
 }
 
-void rendererOamClearIndex(const uint8_t oam_idx)
+void rendererOamClearEntry(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         s_oam[oam_idx] = 0U;
     }
@@ -261,7 +294,7 @@ void rendererOamClearIndex(const uint8_t oam_idx)
 
 uint8_t rendererOamGetXPos(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS)) >> RENDERER_OAM_X_POS);
     }
@@ -270,7 +303,7 @@ uint8_t rendererOamGetXPos(const uint8_t oam_idx)
 
 void rendererOamSetXPos(const uint8_t oam_idx, const uint8_t x_pos)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
         s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
@@ -281,7 +314,7 @@ void rendererOamSetXPos(const uint8_t oam_idx, const uint8_t x_pos)
 
 bool rendererOamGetFlipV(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return ((s_oam[oam_idx] & (RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS)) >> RENDERER_OAM_FLIP_V_POS) != 0U;
     }
@@ -290,7 +323,7 @@ bool rendererOamGetFlipV(const uint8_t oam_idx)
 
 void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         if (is_flip_v)
         {
@@ -307,7 +340,7 @@ void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 
 bool rendererOamGetFlipH(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return ((s_oam[oam_idx] & (RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS)) >> RENDERER_OAM_FLIP_H_POS) != 0U;
     }
@@ -316,7 +349,7 @@ bool rendererOamGetFlipH(const uint8_t oam_idx)
 
 void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         if (is_flip_h)
         {
@@ -333,7 +366,7 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 
 bool rendererOamGetPriority(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return ((s_oam[oam_idx] & (RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS)) >> RENDERER_OAM_PRIORITY_POS) != 0U;
     }
@@ -342,7 +375,7 @@ bool rendererOamGetPriority(const uint8_t oam_idx)
 
 void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         if (is_priority)
         {
@@ -358,7 +391,7 @@ void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
 
 bool rendererOamGetIsDirty(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return ((s_oam[oam_idx] & (RENDERER_OAM_IS_DIRTY_MASK << RENDERER_OAM_IS_DIRTY_POS)) >> RENDERER_OAM_IS_DIRTY_POS) != 0U;
     }
@@ -367,7 +400,7 @@ bool rendererOamGetIsDirty(const uint8_t oam_idx)
 
 void rendererOamSetIsDirty(const uint8_t oam_idx, const bool is_dirty)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         if (is_dirty)
         {
@@ -382,7 +415,7 @@ void rendererOamSetIsDirty(const uint8_t oam_idx, const bool is_dirty)
 
 uint8_t rendererOamGetPalleteIdx(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS)) >> RENDERER_OAM_PALLETE_IDX_POS);
     }
@@ -391,7 +424,7 @@ uint8_t rendererOamGetPalleteIdx(const uint8_t oam_idx)
 
 void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t pallete_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS);
         s_oam[oam_idx] |= ((pallete_idx & RENDERER_OAM_PALLETE_IDX_MASK) << RENDERER_OAM_PALLETE_IDX_POS);
@@ -401,7 +434,7 @@ void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t pallete_idx)
 
 uint8_t rendererOamGetTileIdx(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS)) >> RENDERER_OAM_TILE_IDX_POS);
     }
@@ -410,7 +443,7 @@ uint8_t rendererOamGetTileIdx(const uint8_t oam_idx)
 
 void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
@@ -420,7 +453,7 @@ void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
 
 uint8_t rendererOamGetYPos(const uint8_t oam_idx)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS)) >> RENDERER_OAM_Y_POS);
     }
@@ -429,7 +462,7 @@ uint8_t rendererOamGetYPos(const uint8_t oam_idx)
 
 void rendererOamSetYPos(const uint8_t oam_idx, const uint8_t y_pos)
 {
-    if (oam_idx < RENDERER_OAM_MAX_SPRITE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
