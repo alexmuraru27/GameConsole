@@ -5,9 +5,12 @@
 #include "stdbool.h"
 #include "gpio.h"
 
-static uint16_t g_width;  // Display width as modified by current rotation
-static uint16_t g_height; // Display height as modified by current rotation
-
+static uint16_t s_screen_width;  // Display width as modified by current rotation
+static uint16_t s_screen_height; // Display height as modified by current rotation
+static uint16_t s_window_width;
+static uint16_t s_window_height;
+static uint16_t s_window_x_offset;
+static uint16_t s_window_y_offset;
 #define ILI9341_SLPOUT 0x11            // Sleep Out
 #define ILI9341_GAMMASET 0x26          // Gamma Set
 #define ILI9341_DISPON 0x29            // Display ON
@@ -103,37 +106,63 @@ static void ili9341SetAddrWindow(const uint16_t x1, const uint16_t y1, const uin
     ili9341WriteCommand(ILI9341_RAMWR);
 }
 
-static void ili9341SetDisplayRotation(uint8_t rotation)
+static void ili9341SetDisplayRotation(uint8_t rotation, uint16_t window_width, uint16_t window_height)
 {
+
     switch (rotation % 4)
     {
     case 0:
         rotation = (MADCTL_MX | MADCTL_BGR);
-        g_width = ILI9341_HEIGHT;
-        g_height = ILI9341_WIDTH;
+        s_screen_width = ILI9341_HEIGHT;
+        s_screen_height = ILI9341_WIDTH;
+        s_window_width = window_height;
+        s_window_height = window_width;
         break;
     case 1:
         rotation = (MADCTL_MV | MADCTL_BGR);
-        g_width = ILI9341_WIDTH;
-        g_height = ILI9341_HEIGHT;
+        s_screen_width = ILI9341_WIDTH;
+        s_screen_height = ILI9341_HEIGHT;
+        s_window_width = window_width;
+        s_window_height = window_height;
         break;
     case 2:
         rotation = (MADCTL_MY | MADCTL_BGR);
-        g_width = ILI9341_HEIGHT;
-        g_height = ILI9341_WIDTH;
+        s_screen_width = ILI9341_HEIGHT;
+        s_screen_height = ILI9341_WIDTH;
+        s_window_width = window_height;
+        s_window_height = window_width;
         break;
     case 3:
         rotation = (MADCTL_MX | MADCTL_MY | MADCTL_MV | MADCTL_BGR);
-        g_width = ILI9341_WIDTH;
-        g_height = ILI9341_HEIGHT;
+        s_screen_width = ILI9341_WIDTH;
+        s_screen_height = ILI9341_HEIGHT;
+        s_window_width = window_width;
+        s_window_height = window_height;
         break;
     }
     ili9341WriteCommand(ILI9341_MADCTL);
     setDCtoDataMode();
     ili9341WriteData(rotation);
+
+    s_window_x_offset = (s_screen_width - window_width) / 2;
+    s_window_y_offset = (s_screen_height - window_height) / 2;
 }
 
-void ili9341Init(uint8_t rotation)
+void ili9341FillScreen(uint16_t color)
+{
+    ili9341SetAddrWindow(0, 0, s_screen_width, s_screen_height);
+    setDCtoDataMode();
+    for (uint16_t y = s_screen_height; y > 0; y--)
+    {
+        for (uint16_t x = s_screen_width; x > 0; x--)
+        {
+            ili9341WriteData(color >> 8);
+            ili9341WriteData(color & 0xFF);
+        }
+    }
+}
+
+void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height)
 {
     // select display
     gpioSpi1CsLow();
@@ -282,32 +311,60 @@ void ili9341Init(uint8_t rotation)
     // Delay 120ms after as per catalog
     delay(120);
     ili9341WriteCommand(ILI9341_DISPON);
-    ili9341SetDisplayRotation(rotation);
+    ili9341SetDisplayRotation(rotation, window_width, window_height);
 
     ili9341FillScreen(ILI9341_BLACK);
 }
 
 void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
 {
-    if ((x >= g_width) || (y >= g_height))
+    if ((x >= s_window_width) || (y >= s_window_height))
         return;
 
-    ili9341SetAddrWindow(x, y, x + 1, y + 1);
+    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_y_offset, 1, 1);
     uint8_t data[] = {color >> 8, color & 0xFF};
     setDCtoDataMode();
     ili9341WriteDataBuffer(data, sizeof(data));
 }
 
+void ili9341FillWindow(uint16_t color)
+{
+    ili9341SetAddrWindow(s_window_x_offset, s_window_y_offset, s_window_width, s_window_height);
+    setDCtoDataMode();
+    for (uint16_t y = s_window_width; y > 0; y--)
+    {
+        for (uint16_t x = s_window_height; x > 0; x--)
+        {
+            ili9341WriteData(color >> 8);
+            ili9341WriteData(color & 0xFF);
+        }
+    }
+}
+
+void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data)
+{
+    if ((x >= s_window_width) || (y >= s_window_height))
+        return;
+    if ((x + w - 1) >= s_window_width)
+        return;
+    if ((y + h - 1) >= s_window_height)
+        return;
+
+    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_y_offset, w, h);
+    setDCtoDataMode();
+    ili9341WriteDataBuffer((uint8_t *)data, sizeof(uint16_t) * w * h);
+}
+
 void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color)
 {
-    if ((x >= g_width) || (y >= g_height))
+    if ((x >= s_window_width) || (y >= s_window_height))
         return;
-    if ((x + w - 1) >= g_width)
-        w = g_width - x;
-    if ((y + h - 1) >= g_height)
-        h = g_height - y;
+    if ((x + w - 1) >= s_window_width)
+        w = s_window_width - x;
+    if ((y + h - 1) >= s_window_height)
+        h = s_window_height - y;
 
-    ili9341SetAddrWindow(x, y, w, h);
+    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_x_offset, w, h);
     setDCtoDataMode();
     for (y = h; y > 0; y--)
     {
@@ -317,23 +374,4 @@ void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
             ili9341WriteData(color & 0xFF);
         }
     }
-}
-
-void ili9341FillScreen(uint16_t color)
-{
-    ili9341FillRectangle(0, 0, g_width, g_height, color);
-}
-
-void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data)
-{
-    if ((x >= g_width) || (y >= g_height))
-        return;
-    if ((x + w - 1) >= g_width)
-        return;
-    if ((y + h - 1) >= g_height)
-        return;
-
-    ili9341SetAddrWindow(x, y, x + w, y + h);
-    setDCtoDataMode();
-    ili9341WriteDataBuffer((uint8_t *)data, sizeof(uint16_t) * w * h);
 }

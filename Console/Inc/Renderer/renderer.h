@@ -2,6 +2,11 @@
 #define __RENDERER_H
 #include <stdint.h>
 #include "stdbool.h"
+
+#define RENDERER_WIDTH 256U  // 32
+#define RENDERER_HEIGHT 240U // 30
+#define RENDERER_TILE_SCREEN_SIZE 8U
+
 void rendererInit(void);
 void rendererRender(void);
 void rendererTriggerCompleteRedraw(void);

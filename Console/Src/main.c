@@ -25,7 +25,7 @@ static void peripheralsInit()
   gpioInit();
   usartInit();
   timerInit();
-  ili9341Init(3U);
+  ili9341Init(3U, RENDERER_WIDTH, RENDERER_HEIGHT);
   adcInit();
   joystickInit();
 }
@@ -37,8 +37,8 @@ static void consoleInit()
 }
 
 // TODO Remove statics :)
-static uint16_t x = 0U;
-static uint16_t y = 0U;
+static uint8_t x = 0U;
+static uint8_t y = 0U;
 const uint16_t TILE_SIZE = 8U;
 const uint16_t SPEED = 5U;
 
@@ -115,20 +115,20 @@ static void syncFrame()
 
 static void update()
 {
-  if (x < 320U - TILE_SIZE - SPEED)
+  if (x <= RENDERER_WIDTH - TILE_SIZE - SPEED)
   {
     x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
   }
-  if (x > 0U)
+  if (x >= 0U + SPEED)
   {
     x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  if (y < 240U - TILE_SIZE - SPEED)
+  if (y <= RENDERER_HEIGHT - TILE_SIZE - SPEED)
   {
     y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
   }
-  if (y > 0U)
+  if (y >= 0U + SPEED)
   {
     y -= ((joystickGetLAnalogY() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogY() == JoystickAnalogValueLowAxis)) * SPEED;
   }
@@ -141,11 +141,11 @@ static void render()
 {
   if (joystickGetSpecialBtn1())
   {
-    ili9341FillScreen(ILI9341_BLACK);
+    ili9341FillWindow(ILI9341_BLACK);
   }
   if (joystickGetSpecialBtn2())
   {
-    ili9341FillScreen(ILI9341_WHITE);
+    ili9341FillWindow(ILI9341_WHITE);
   }
 
   rendererRender();

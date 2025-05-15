@@ -27,9 +27,10 @@
 
 #define RGB2COLOR(r, g, b) (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3))
 
-void ili9341Init(uint8_t rotation);
-void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t colour);
-void ili9341FillScreen(uint16_t colour);
+void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height);
+void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color);
+void ili9341FillWindow(uint16_t color);
+void ili9341FillScreen(uint16_t color);
 void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data);
 #endif /* __ILI9341_H */

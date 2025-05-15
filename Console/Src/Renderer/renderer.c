@@ -2,9 +2,6 @@
 #include "string.h"
 #include "ILI9341.h"
 
-#define RENDERER_WIDTH 256U  // 32
-#define RENDERER_HEIGHT 240U // 30
-#define RENDERER_TILE_SCREEN_SIZE 8U
 #define RENDERER_TILE_MEMORY_SIZE 16U
 
 #define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
@@ -179,18 +176,6 @@ void rendererRender(void)
 {
     // TODO dirty checker
     // TODO overlap checker
-    // draw the system pallete
-    // const uint16_t TILE_SIZE = 20U;
-    // for (int i = 0; i < RENDERER_SYSTEM_PALETTE_SIZE; ++i)
-    // {
-    //     int row = i / (320 / TILE_SIZE); // how many fit per row
-    //     int col = i % (320 / TILE_SIZE);
-
-    //     int x = col * TILE_SIZE;
-    //     int y = row * TILE_SIZE;
-
-    //     ili9341FillRectangle(x, y, TILE_SIZE, TILE_SIZE, s_system_palette[i]);
-    // }
 
     // Try OAM data
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
