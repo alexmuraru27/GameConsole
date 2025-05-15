@@ -42,7 +42,7 @@ static uint8_t y = 0U;
 const uint16_t TILE_SIZE = 8U;
 const uint16_t SPEED = 5U;
 
-const uint8_t sprite_pacman[16U] = DEFINE_TILE(
+const uint8_t sprite_pacman[16U] = DEFINE_TILE_8(
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 2, 1, 1, 3, 0, 0,
     0, 2, 0, 1, 0, 1, 3, 0,
@@ -52,7 +52,7 @@ const uint8_t sprite_pacman[16U] = DEFINE_TILE(
     0, 1, 0, 1, 0, 1, 3, 0,
     0, 0, 0, 0, 0, 0, 0, 0);
 
-const uint8_t sprite_lines[16U] = DEFINE_TILE(
+const uint8_t sprite_lines[16U] = DEFINE_TILE_8(
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     1, 1, 1, 1, 1, 1, 1, 1,
@@ -62,7 +62,7 @@ const uint8_t sprite_lines[16U] = DEFINE_TILE(
     3, 3, 3, 3, 3, 3, 3, 3,
     3, 3, 3, 3, 3, 3, 3, 3);
 
-const uint8_t sprite_pacman_big_1[16U] = DEFINE_TILE(
+const uint8_t sprite_pacman_big_1[16U] = DEFINE_TILE_8(
     0, 0, 1, 1, 1, 1, 1, 1,
     0, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1,
@@ -72,7 +72,7 @@ const uint8_t sprite_pacman_big_1[16U] = DEFINE_TILE(
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1);
 
-const uint8_t sprite_pacman_big_2[16U] = DEFINE_TILE(
+const uint8_t sprite_pacman_big_2[16U] = DEFINE_TILE_8(
     1, 1, 1, 1, 1, 1, 0, 0,
     1, 1, 1, 1, 1, 1, 1, 0,
     1, 1, 1, 1, 1, 1, 1, 1,
@@ -82,7 +82,7 @@ const uint8_t sprite_pacman_big_2[16U] = DEFINE_TILE(
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1);
 
-const uint8_t sprite_pacman_big_3[16U] = DEFINE_TILE(
+const uint8_t sprite_pacman_big_3[16U] = DEFINE_TILE_8(
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1,
@@ -92,7 +92,7 @@ const uint8_t sprite_pacman_big_3[16U] = DEFINE_TILE(
     1, 1, 0, 1, 0, 1, 0, 1,
     0, 0, 0, 0, 0, 0, 0, 0);
 
-const uint8_t sprite_pacman_big_4[16U] = DEFINE_TILE(
+const uint8_t sprite_pacman_big_4[16U] = DEFINE_TILE_8(
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1,
