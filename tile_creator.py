@@ -1,0 +1,234 @@
+import pygame
+import sys
+
+TILE_SIZE = 16
+PIXEL_SIZE = 20
+NES_COLS = 16
+NES_PALLETE_ROWS = 4
+NES_PALETTE_COLOR_SIZE = 20
+PALETTE_HEIGHT = NES_PALLETE_ROWS * NES_PALETTE_COLOR_SIZE + 70
+WINDOW_WIDTH = TILE_SIZE * PIXEL_SIZE
+WINDOW_HEIGHT = TILE_SIZE * PIXEL_SIZE + PALETTE_HEIGHT
+BG_COLOR = (255, 255, 255)
+
+EXPORT_ARRAY_BEGINNING = "DEFINE_TILE_16(\n\t"
+EXPORT_ARRAY_ENDING = ");\n"
+NES_PALETTE = [
+    (98, 98, 98),
+    (0, 46, 152),
+    (12, 17, 194),
+    (59, 0, 194),
+    (101, 0, 152),
+    (125, 0, 78),
+    (125, 0, 0),
+    (101, 25, 0),
+    (59, 54, 0),
+    (12, 79, 0),
+    (0, 91, 0),
+    (0, 89, 0),
+    (0, 73, 78),
+    (0, 0, 0),
+    (0, 0, 0),
+    (0, 0, 0),
+    (171, 171, 171),
+    (0, 100, 243),
+    (53, 60, 255),
+    (118, 27, 255),
+    (174, 10, 243),
+    (206, 13, 143),
+    (206, 35, 28),
+    (174, 71, 0),
+    (118, 111, 0),
+    (53, 114, 0),
+    (0, 161, 0),
+    (0, 158, 28),
+    (0, 136, 143),
+    (0, 0, 0),
+    (0, 0, 0),
+    (0, 0, 0),
+    (255, 255, 255),
+    (76, 181, 255),
+    (133, 140, 255),
+    (200, 107, 255),
+    (255, 89, 255),
+    (255, 92, 225),
+    (255, 115, 107),
+    (255, 152, 5),
+    (200, 192, 0),
+    (133, 226, 0),
+    (76, 244, 5),
+    (43, 241, 107),
+    (43, 218, 225),
+    (78, 78, 78),
+    (0, 0, 0),
+    (0, 0, 0),
+    (255, 255, 255),
+    (184, 255, 255),
+    (206, 209, 255),
+    (232, 196, 255),
+    (255, 189, 255),
+    (255, 190, 243),
+    (255, 199, 196),
+    (255, 214, 156),
+    (232, 230, 132),
+    (206, 243, 132),
+    (184, 250, 156),
+    (171, 249, 196),
+    (171, 240, 243),
+    (184, 184, 184),
+    (0, 0, 0),
+    (0, 0, 0),
+]
+
+pygame.init()
+screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+pygame.display.set_caption("NES Tile")
+clock = pygame.time.Clock()
+
+# Drawing grid: no empty pixels, default to first selected color index 0
+grid = [[0 for _ in range(TILE_SIZE)] for _ in range(TILE_SIZE)]
+
+selected_colors_idx = [0, 10, 5, 2]
+active_color_slot = 0
+
+
+def draw_grid():
+    for y in range(TILE_SIZE):
+        for x in range(TILE_SIZE):
+            color_idx = grid[y][x]
+            color = NES_PALETTE[selected_colors_idx[color_idx]]
+            pygame.draw.rect(
+                screen,
+                color,
+                (
+                    x * PIXEL_SIZE,
+                    y * PIXEL_SIZE + PALETTE_HEIGHT,
+                    PIXEL_SIZE,
+                    PIXEL_SIZE,
+                ),
+            )
+            pygame.draw.rect(
+                screen,
+                (200, 200, 200),
+                (
+                    x * PIXEL_SIZE,
+                    y * PIXEL_SIZE + PALETTE_HEIGHT,
+                    PIXEL_SIZE,
+                    PIXEL_SIZE,
+                ),
+                1,
+            )
+
+
+def draw_nes_palette():
+    for i, color in enumerate(NES_PALETTE):
+        col = i % NES_COLS
+        row = i // NES_COLS
+        rect = pygame.Rect(
+            col * NES_PALETTE_COLOR_SIZE,
+            row * NES_PALETTE_COLOR_SIZE,
+            NES_PALETTE_COLOR_SIZE,
+            NES_PALETTE_COLOR_SIZE,
+        )
+        pygame.draw.rect(screen, color, rect)
+        pygame.draw.rect(screen, (0, 0, 0), rect, 1)
+
+
+def draw_selected_colors():
+    box_size = 50
+    margin = 10
+    y = NES_PALLETE_ROWS * NES_PALETTE_COLOR_SIZE + 10
+    for i, idx in enumerate(selected_colors_idx):
+        rect = pygame.Rect(margin + i * (box_size + margin), y, box_size, box_size)
+        pygame.draw.rect(screen, NES_PALETTE[idx], rect)
+        pygame.draw.rect(screen, (0, 0, 0), rect, 2)
+        if i == active_color_slot:
+            pygame.draw.rect(screen, (255, 255, 0), rect, 4)
+
+
+def handle_nes_palette_click(pos):
+    for i in range(len(NES_PALETTE)):
+        col = i % NES_COLS
+        row = i // NES_COLS
+        rect = pygame.Rect(
+            col * NES_PALETTE_COLOR_SIZE,
+            row * NES_PALETTE_COLOR_SIZE,
+            NES_PALETTE_COLOR_SIZE,
+            NES_PALETTE_COLOR_SIZE,
+        )
+        if rect.collidepoint(pos):
+            return i
+    return None
+
+
+def handle_selected_colors_click(pos):
+    box_size = 50
+    margin = 10
+    y = NES_PALLETE_ROWS * NES_PALETTE_COLOR_SIZE + 10
+    for i in range(4):
+        rect = pygame.Rect(margin + i * (box_size + margin), y, box_size, box_size)
+        if rect.collidepoint(pos):
+            return i
+    return None
+
+
+def export_as_array(filename="generated_tile.h"):
+    with open(filename, "w") as f:
+        f.write(EXPORT_ARRAY_BEGINNING)
+        flat_list = []
+        for row in grid:
+            flat_list.extend(row)
+        for i, val in enumerate(flat_list):
+            f.write(f"{val}")
+            if i < len(flat_list) - 1:
+                f.write(", ")
+                if (i + 1) % 16 == 0:
+                    f.write("\n\t")
+        f.write(EXPORT_ARRAY_ENDING)
+    print(f"Saved tile to {filename}")
+
+
+running = True
+while running:
+    screen.fill(BG_COLOR)
+    draw_nes_palette()
+    draw_selected_colors()
+    draw_grid()
+    pygame.display.flip()
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+
+            if y < NES_PALLETE_ROWS * NES_PALETTE_COLOR_SIZE:
+                sel = handle_nes_palette_click((x, y))
+                if sel is not None:
+                    selected_colors_idx[active_color_slot] = sel
+                    print(f"Set slot {active_color_slot} to NES color index {sel}")
+
+            elif NES_PALLETE_ROWS * NES_PALETTE_COLOR_SIZE <= y < PALETTE_HEIGHT:
+                sel = handle_selected_colors_click((x, y))
+                if sel is not None:
+                    active_color_slot = sel
+                    print(f"Active drawing slot set to {active_color_slot}")
+
+            else:
+                grid_x = x // PIXEL_SIZE
+                grid_y = (y - PALETTE_HEIGHT) // PIXEL_SIZE
+                if 0 <= grid_x < TILE_SIZE and 0 <= grid_y < TILE_SIZE:
+                    if event.button == 1:  # left click draws
+                        grid[grid_y][grid_x] = active_color_slot
+                    elif event.button == 3:  # right click erases to slot 0 color
+                        grid[grid_y][grid_x] = 0
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_s:
+                export_as_array()
+ 
+    clock.tick(60)
+
+pygame.quit()
+sys.exit()

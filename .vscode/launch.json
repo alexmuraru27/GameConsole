@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "externalTerminal"
+        },
+        {
             "cwd": "${workspaceRoot}",
             "executable": "./build/GameConsole.elf",
             "name": "Debug with OpenOCD",
