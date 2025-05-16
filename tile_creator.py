@@ -20,7 +20,7 @@ MAGIC_FILENAME_REPLACE_PATTERN = "^!!!^"
 C_HEADER = f"#ifndef __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#define __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#include \"tileCreator.h\"\n"
 EXPORT_ARRAY_BEGINNING = f"{C_HEADER}const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_data[64U] = DEFINE_TILE_16(\n\t"
 EXPORT_ARRAY_ENDING = ");\n"
-EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette [4U]= {{"
+EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette[4U] = {{"
 EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};\n#endif"
 
 NES_PALETTE = [
@@ -235,15 +235,17 @@ def load_from_file(filename):
             tile_start = restored_content.find(export_array_prologue) + len(export_array_prologue)
             tile_end = restored_content.find(EXPORT_ARRAY_ENDING, tile_start)
             tile_raw = restored_content[tile_start:tile_end].replace('\n', '').replace('\t', '').replace(' ', '')
-            tile_list = [int(x) for x in tile_raw.split(',') if x != '']
+            cleaned_tile_raw = re.sub(r'[^a-zA-Z0-9,]', '', tile_raw)
+            tile_list = [int(x) for x in cleaned_tile_raw.split(',') if x != '']
 
             # Extract the palette array
             palette_content =restored_content[tile_end:].replace(EXPORT_ARRAY_ENDING, "")
             export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
-            palette_start = palette_content.find(export_array_system_palette_prologue) + len(export_array_system_palette_prologue) +1
+            palette_start = palette_content.find(export_array_system_palette_prologue) + len(export_array_system_palette_prologue)
             palette_end = palette_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start)
             palette_raw = palette_content[palette_start:palette_end].replace('\n', '').replace(' ', '')
-            palette_list = [int(x, 16) for x in palette_raw.split(',') if x != '']
+            cleaned_palette_raw = re.sub(r'[^a-zA-Z0-9,]', '', palette_raw)
+            palette_list = [int(x, 16) for x in cleaned_palette_raw.split(',') if x != '']
 
             for idx, pix in enumerate(tile_list):
                 if idx < len(tile_list)-NES_PALETTE_ROWS:
