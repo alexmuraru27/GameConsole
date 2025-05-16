@@ -52,6 +52,18 @@ SECTIONS
     _edata = .;        /* define a global symbol at data end */
   } >GAME_RAM AT> GAME_FLASH
 
+  /* GAME_CCMRAM section uninitialized */
+  .ccmram (NOLOAD):
+  {
+    . = ALIGN(4);
+    _sccmram = .;       /* create a global symbol at ccmram start */
+    *(.ccmram)
+    *(.ccmram*)
+
+    . = ALIGN(4);
+    _eccmram = .;       /* create a global symbol at ccmram end */
+  } >GAME_CCMRAM
+
   /* Uninitialized data section */
   . = ALIGN(4);
   .bss :
