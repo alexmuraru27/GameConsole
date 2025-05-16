@@ -91,7 +91,7 @@ NES_PALETTE = [
 ]
 
 pygame.init()
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+screen = pygame.display.set_mode((2*WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("NES Tile")
 font = pygame.font.SysFont(None, FONT_SIZE)
 clock = pygame.time.Clock()
@@ -110,13 +110,15 @@ save_button = pygame.Rect(210, WINDOW_HEIGHT - 40, 60, 30)
 load_button = pygame.Rect(260, WINDOW_HEIGHT - 40, 60, 30)
 
 def draw_grid():
+    offset_x = TILE_SIZE * PIXEL_SIZE 
     for y in range(TILE_SIZE):
         for x in range(TILE_SIZE):
-            color_idx = grid[y][x]
-            color = NES_PALETTE[selected_colors_idx[color_idx]]
-            rect = (x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE)
-            pygame.draw.rect(screen, color, rect)
-            pygame.draw.rect(screen, (200, 200, 200), rect, 1)
+            color = NES_PALETTE[selected_colors_idx[grid[y][x]]]
+            rect_border = pygame.Rect(x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE)
+            rect_no_border = pygame.Rect(offset_x + x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE)
+            pygame.draw.rect(screen, color, rect_border)
+            pygame.draw.rect(screen, (50, 50, 50), rect_border, 1)
+            pygame.draw.rect(screen, color, rect_no_border)
 
 
 def draw_nes_palette():
