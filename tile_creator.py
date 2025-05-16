@@ -258,6 +258,7 @@ def load_from_file(filename):
 
 
 running = True
+mouse_down = False
 load_from_file(DEFAULT_H_FILENAME)
 while running:
     screen.fill(BG_COLOR)
@@ -272,6 +273,7 @@ while running:
             running = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_down = True
             x, y = pygame.mouse.get_pos()
             if input_box.collidepoint((x, y)):
                 text_active = True
@@ -300,6 +302,18 @@ while running:
                     elif event.button == 3:
                         grid[grid_y][grid_x] = 0
 
+        elif event.type == pygame.MOUSEBUTTONUP:
+            mouse_down = False
+        elif event.type == pygame.MOUSEMOTION and mouse_down:
+            x, y = event.pos
+            grid_x = x // PIXEL_SIZE
+            grid_y = (y - PALETTE_HEIGHT) // PIXEL_SIZE
+            if 0 <= grid_x < TILE_SIZE and 0 <= grid_y < TILE_SIZE:
+                if pygame.mouse.get_pressed()[0]: 
+                    grid[grid_y][grid_x] = active_color_slot
+                elif pygame.mouse.get_pressed()[2]:
+                    grid[grid_y][grid_x] = 0
+
         elif event.type == pygame.KEYDOWN:
             if text_active:
                 if event.key == pygame.K_BACKSPACE:
@@ -308,8 +322,6 @@ while running:
                     text_active = False
                 else:
                     input_text += event.unicode
-            elif event.key == pygame.K_s:
-                export_as_array(input_text)
 
     clock.tick(60)
 
