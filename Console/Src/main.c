@@ -12,6 +12,7 @@
 #include "pacman2.h"
 #include "pacman3.h"
 #include "pacman4.h"
+
 #define FPS 50
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
