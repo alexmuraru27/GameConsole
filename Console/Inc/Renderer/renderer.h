@@ -49,4 +49,8 @@ uint8_t rendererOamGetPaletteIdx(uint8_t oam_idx);
 uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
 
+// AttributeTable
+void rendererAttributeTableSetPalette(uint8_t tile_idx, uint8_t palette);
+uint8_t rendererAttributeTableGetPalette(uint8_t tile_idx);
+
 #endif /* __RENDERER_H */
