@@ -320,6 +320,25 @@ def clear_screen():
 running = True
 mouse_down = False
 load_from_file(DEFAULT_H_FILENAME)
+
+def draw_prompt(question):
+    screen.fill((0, 0, 0))
+    text = font.render(f"{question} (Y/N)", True, (255, 255, 255))
+    screen.blit(text, (40, 80))
+    pygame.display.flip()
+
+def ask_yes_no(question):
+    draw_prompt(question)
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_y:
+                    return True
+                elif event.key == pygame.K_n:
+                    return False
 while running:
     screen.fill(BG_COLOR)
     draw_nes_palette()
@@ -378,16 +397,18 @@ while running:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_LCTRL:
-                export_as_array(input_text)
+                if ask_yes_no(f"Save \"{input_text}\"?"):
+                    export_as_array(input_text)
             elif event.key == pygame.K_l and pygame.key.get_mods() & pygame.KMOD_LCTRL:
-                load_from_file(input_text)
+                if ask_yes_no(f"Load \"{input_text}\"?"):
+                    load_from_file(input_text)
             if text_active:
                 if event.key == pygame.K_BACKSPACE:
                     input_text = input_text[:-1]
                 elif event.key == pygame.K_RETURN:
                     text_active = False
                 else:
-                    if event.unicode.isalnum():
+                    if event.unicode.isalnum() or event.unicode == '_':
                         input_text += event.unicode
     clock.tick(60)
 

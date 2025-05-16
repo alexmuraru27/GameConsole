@@ -31,7 +31,7 @@
         "string.h": "c",
         "dma.h": "c",
         "tilecreator.h": "c",
-        "pacman1.h": "c",
+        "pacman_ghost.h": "c",
         "pacman3.h": "c",
         "pacman2.h": "c"
     }

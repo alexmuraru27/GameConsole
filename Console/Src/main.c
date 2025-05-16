@@ -8,10 +8,7 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
-#include "pacman1.h"
-#include "pacman2.h"
-#include "pacman3.h"
-#include "pacman4.h"
+#include "pacman_ghost.h"
 
 #define FPS 50
 #define FRAME_PERIOD (1000U / FPS)
@@ -77,15 +74,6 @@ static void update()
 
   rendererOamSetXPos(0U, x);
   rendererOamSetYPos(0U, y);
-
-  rendererOamSetXPos(1U, x + rendererGetSizeTileScreen());
-  rendererOamSetYPos(1U, y);
-
-  rendererOamSetXPos(2U, x);
-  rendererOamSetYPos(2U, y + rendererGetSizeTileScreen());
-
-  rendererOamSetXPos(3U, x + rendererGetSizeTileScreen());
-  rendererOamSetYPos(3U, y + rendererGetSizeTileScreen());
 }
 
 static void render()
@@ -104,23 +92,10 @@ static void render()
 
 static void screenInit()
 {
-  rendererPatternTableSetTile(1U, pacman1_data, sizeof(pacman1_data));
-  rendererPatternTableSetTile(2U, pacman2_data, sizeof(pacman2_data));
-  rendererPatternTableSetTile(3U, pacman3_data, sizeof(pacman3_data));
-  rendererPatternTableSetTile(4U, pacman4_data, sizeof(pacman4_data));
-  rendererFramePaletteSetSpriteMultiple(0U, pacman1_palette[1U], pacman1_palette[2U], pacman1_palette[3U]);
-  rendererFramePaletteSetSpriteMultiple(1U, pacman2_palette[1U], pacman2_palette[2U], pacman2_palette[3U]);
-  rendererFramePaletteSetSpriteMultiple(2U, pacman3_palette[1U], pacman3_palette[2U], pacman3_palette[3U]);
-  rendererFramePaletteSetSpriteMultiple(3U, pacman4_palette[1U], pacman4_palette[2U], pacman4_palette[3U]);
-
+  rendererPatternTableSetTile(1U, pacman_ghost_data, sizeof(pacman_ghost_data));
+  rendererFramePaletteSetSpriteMultiple(0U, pacman_ghost_palette[1U], pacman_ghost_palette[2U], pacman_ghost_palette[3U]);
   rendererOamSetTileIdx(0U, 1U);
-  rendererOamSetTileIdx(1U, 2U);
-  rendererOamSetTileIdx(2U, 3U);
-  rendererOamSetTileIdx(3U, 4U);
   rendererOamSetPaletteIdx(0U, 0U);
-  rendererOamSetPaletteIdx(1U, 1U);
-  rendererOamSetPaletteIdx(2U, 2U);
-  rendererOamSetPaletteIdx(3U, 3U);
 }
 int main(void)
 {
