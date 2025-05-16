@@ -33,4 +33,6 @@ void ili9341FillWindow(uint16_t color);
 void ili9341FillScreen(uint16_t color);
 void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data);
+void ili9341SetAddrWindow(const uint16_t x, const uint16_t y, const uint16_t w, const uint16_t h);
+void ili9341SendPixel(uint16_t color);
 #endif /* __ILI9341_H */

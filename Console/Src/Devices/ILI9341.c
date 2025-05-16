@@ -80,8 +80,8 @@ static void ili9341WriteData(uint8_t data)
     spiWrite(data);
 }
 
-static void ili9341SetAddrWindow(const uint16_t x1, const uint16_t y1, const uint16_t w,
-                                 const uint16_t h)
+static void ili9341SetAddrWindowScreen(const uint16_t x1, const uint16_t y1, const uint16_t w,
+                                       const uint16_t h)
 {
     const uint16_t x2 = (x1 + w - 1);
     const uint16_t y2 = (y1 + h - 1);
@@ -150,7 +150,7 @@ static void ili9341SetDisplayRotation(uint8_t rotation, uint16_t window_width, u
 
 void ili9341FillScreen(uint16_t color)
 {
-    ili9341SetAddrWindow(0, 0, s_screen_width, s_screen_height);
+    ili9341SetAddrWindowScreen(0, 0, s_screen_width, s_screen_height);
     setDCtoDataMode();
     for (uint16_t y = s_screen_height; y > 0; y--)
     {
@@ -321,15 +321,27 @@ void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
     if ((x >= s_window_width) || (y >= s_window_height))
         return;
 
-    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_y_offset, 1, 1);
+    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, 1, 1);
     uint8_t data[] = {color >> 8, color & 0xFF};
     setDCtoDataMode();
     ili9341WriteDataBuffer(data, sizeof(data));
 }
 
+void ili9341SetAddrWindow(const uint16_t x, const uint16_t y, const uint16_t w, const uint16_t h)
+{
+    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
+}
+
+void ili9341SendPixel(uint16_t color)
+{
+    setDCtoDataMode();
+    uint8_t data[] = {color >> 8, color & 0xFF};
+    ili9341WriteDataBuffer(data, sizeof(data));
+}
+
 void ili9341FillWindow(uint16_t color)
 {
-    ili9341SetAddrWindow(s_window_x_offset, s_window_y_offset, s_window_width, s_window_height);
+    ili9341SetAddrWindowScreen(s_window_x_offset, s_window_y_offset, s_window_width, s_window_height);
     setDCtoDataMode();
     for (uint16_t y = s_window_width; y > 0; y--)
     {
@@ -350,7 +362,7 @@ void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint
     if ((y + h - 1) >= s_window_height)
         return;
 
-    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_y_offset, w, h);
+    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
     setDCtoDataMode();
     ili9341WriteDataBuffer((uint8_t *)data, sizeof(uint16_t) * w * h);
 }
@@ -364,7 +376,7 @@ void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16
     if ((y + h - 1) >= s_window_height)
         h = s_window_height - y;
 
-    ili9341SetAddrWindow(x + s_window_x_offset, y + s_window_x_offset, w, h);
+    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_x_offset, w, h);
     setDCtoDataMode();
     for (y = h; y > 0; y--)
     {

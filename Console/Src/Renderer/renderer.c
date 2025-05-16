@@ -162,11 +162,12 @@ void rendererInit(void)
     memset(&s_dirtyTiles, 0U, sizeof(s_dirtyTiles));
 }
 
-static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t sprite_frame_palette_idx)
+static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx)
 {
     // TODO remove this function in future as the rendering will be done line based + dirty flag
-    if (sprite_frame_palette_idx < RENDERER_FRAME_PALETTE_SIZE)
+    if (palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
+        // ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
         uint8_t color_index = 0U;
         for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
         {
@@ -175,18 +176,22 @@ static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t pattern_i
                 color_index = (((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
                 if (color_index != 0U)
                 {
-                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[sprite_frame_palette_idx][color_index]);
+                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[palette_idx][color_index]);
+                    // TODO precompute line data, save into array and send by lines when more than 1 adiacent pixel is not transparent
+                    // ili9341SendPixel(s_frame_palette_sprite[palette_idx][color_index]);
                 }
             }
         }
     }
 }
 
-static void drawBg(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t bg_frame_palette_idx)
+static void drawBg(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx)
 {
     // TODO remove this function in future as the rendering will be done line based + dirty flag
-    if (bg_frame_palette_idx < RENDERER_FRAME_PALETTE_SIZE)
+
+    if (palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
+        // ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
         uint8_t color_index = 0U;
         for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
         {
@@ -195,7 +200,9 @@ static void drawBg(const uint8_t x, const uint8_t y, const uint8_t pattern_index
                 color_index = (((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
                 if (color_index != 0U)
                 {
-                    ili9341DrawPixel(x + col, y + row, s_frame_palette_bg[bg_frame_palette_idx][color_index]);
+                    ili9341DrawPixel(x + col, y + row, s_frame_palette_bg[palette_idx][color_index]);
+                    // TODO precompute line data, save into array and send by lines when more than 1 adiacent pixel is not transparent
+                    // ili9341SendPixel(s_frame_palette_bg[palette_idx][color_index]);
                 }
             }
         }
