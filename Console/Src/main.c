@@ -8,8 +8,10 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
-#include "tileCreator.h"
-
+#include "pacman1.h"
+#include "pacman2.h"
+#include "pacman3.h"
+#include "pacman4.h"
 #define FPS 50
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
@@ -40,24 +42,6 @@ static void consoleInit()
 static uint8_t x = 0U;
 static uint8_t y = 0U;
 const uint16_t SPEED = 5U;
-
-const uint8_t sprite_pacman[RENDERER_TILE_MEMORY_SIZE] = DEFINE_TILE_16(
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 2, 2, 1, 1, 1, 1, 3, 3, 0, 0, 0, 0,
-    0, 0, 0, 0, 2, 2, 1, 1, 1, 1, 3, 3, 0, 0, 0, 0,
-    0, 0, 2, 2, 0, 0, 1, 1, 0, 0, 1, 1, 3, 3, 0, 0,
-    0, 0, 2, 2, 0, 0, 1, 1, 0, 0, 1, 1, 3, 3, 0, 0,
-    0, 0, 2, 2, 3, 3, 1, 1, 3, 3, 1, 1, 3, 3, 0, 0,
-    0, 0, 2, 2, 3, 3, 1, 1, 3, 3, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 3, 3, 0, 0,
-    0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 3, 3, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
 static void syncFrame()
 {
@@ -92,6 +76,15 @@ static void update()
 
   rendererOamSetXPos(0U, x);
   rendererOamSetYPos(0U, y);
+
+  rendererOamSetXPos(1U, x + RENDERER_TILE_SCREEN_SIZE);
+  rendererOamSetYPos(1U, y);
+
+  rendererOamSetXPos(2U, x);
+  rendererOamSetYPos(2U, y + RENDERER_TILE_SCREEN_SIZE);
+
+  rendererOamSetXPos(3U, x + RENDERER_TILE_SCREEN_SIZE);
+  rendererOamSetYPos(3U, y + RENDERER_TILE_SCREEN_SIZE);
 }
 
 static void render()
@@ -110,15 +103,23 @@ static void render()
 
 static void screenInit()
 {
-  rendererPatternTableSetTile(1U, sprite_pacman, sizeof(sprite_pacman));
-
-  rendererPaletteSetSpriteMultiple(0U, 0x1C, 0x2C, 0x0C);
-  rendererPaletteSetSpriteMultiple(1U, 0x1A, 0x2A, 0x0A);
-  rendererPaletteSetSpriteMultiple(2U, 0x16, 0x26, 0x06);
-  rendererPaletteSetSpriteMultiple(3U, 0x17, 0x27, 0x07);
+  rendererPatternTableSetTile(1U, pacman1_data, sizeof(pacman1_data));
+  rendererPatternTableSetTile(2U, pacman2_data, sizeof(pacman2_data));
+  rendererPatternTableSetTile(3U, pacman3_data, sizeof(pacman3_data));
+  rendererPatternTableSetTile(4U, pacman4_data, sizeof(pacman4_data));
+  rendererPaletteSetSpriteMultiple(0U, pacman1_palette[1U], pacman1_palette[2U], pacman1_palette[3U]);
+  rendererPaletteSetSpriteMultiple(1U, pacman2_palette[1U], pacman2_palette[2U], pacman2_palette[3U]);
+  rendererPaletteSetSpriteMultiple(2U, pacman3_palette[1U], pacman3_palette[2U], pacman3_palette[3U]);
+  rendererPaletteSetSpriteMultiple(3U, pacman4_palette[1U], pacman4_palette[2U], pacman4_palette[3U]);
 
   rendererOamSetTileIdx(0U, 1U);
-  rendererOamSetPalleteIdx(0U, 2U);
+  rendererOamSetTileIdx(1U, 2U);
+  rendererOamSetTileIdx(2U, 3U);
+  rendererOamSetTileIdx(3U, 4U);
+  rendererOamSetPalleteIdx(0U, 0U);
+  rendererOamSetPalleteIdx(1U, 1U);
+  rendererOamSetPalleteIdx(2U, 2U);
+  rendererOamSetPalleteIdx(3U, 3U);
 }
 int main(void)
 {

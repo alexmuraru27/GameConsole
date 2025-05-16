@@ -113,6 +113,7 @@ C_INCLUDES =  \
 -IConsole/Inc/Devices \
 -IConsole/Inc/Renderer \
 -IConsole/Inc/TileUtils \
+-IGeneratedTiles \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include
 

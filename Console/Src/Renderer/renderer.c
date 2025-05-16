@@ -6,7 +6,8 @@
 
 #define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
 
-#define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 4U
+// Attribute table needs 4bits for each tile since we are using 16 frame palettes for bg
+#define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 2U
 #define RENDERER_ATTRIBUTE_TABLE_SIZE (((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 
 #define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
@@ -17,13 +18,15 @@
 
 #define RENDERER_SYSTEM_PALETTE_SIZE 64U
 
-#define RENDERER_FRAME_PALETTE_SIZE 4U
+#define RENDERER_FRAME_PALETTE_SIZE 16U
 
 #define RENDERER_FRAME_SUBPALETTE_SIZE 4U
 
 // Priority (0: in front of background; 1: behind background)
 // isDirty - 1 if sprite needs to be redrawn
-// [X pos][Filp_V Flip_H Priority isDirty 0 0 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
+// as bits 2-4 were not used inside byte 3, we will use them to extend the palette information to 4 bits = max 16 sprite palettes per frame
+// also we will add a dirty flag
+// [X pos][Filp_V Flip_H Priority isDirty IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
 #define RENDERER_OAM_X_POS 24U
 #define RENDERER_OAM_X_MASK 0xFFU
 
@@ -40,7 +43,7 @@
 #define RENDERER_OAM_IS_DIRTY_MASK 0x01U
 
 #define RENDERER_OAM_PALLETE_IDX_POS 16U
-#define RENDERER_OAM_PALLETE_IDX_MASK 0x03U
+#define RENDERER_OAM_PALLETE_IDX_MASK 0x0FU
 
 #define RENDERER_OAM_TILE_IDX_POS 8U
 #define RENDERER_OAM_TILE_IDX_MASK 0xFFU
@@ -124,7 +127,7 @@ static uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_MEMORY
 // Holds texture data indexes for background from pattern table
 static uint8_t s_name_table[RENDERER_NAME_TABLE_SIZE];
 
-// Holds palette data for background subdivided in 4x4 tiles
+// Holds palette data for background - each tile has its own palette
 static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 
 // Object attribute memory
@@ -204,14 +207,14 @@ void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_i
     }
 }
 
-void rendererPaletteSetSpriteMultiple(const uint8_t pallete_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+void rendererPaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
 {
     if (
-        (pallete_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
     {
-        s_frame_palette_sprite[pallete_idx][1U] = s_system_palette[system_pallete_idx_1];
-        s_frame_palette_sprite[pallete_idx][2U] = s_system_palette[system_pallete_idx_2];
-        s_frame_palette_sprite[pallete_idx][3U] = s_system_palette[system_pallete_idx_3];
+        s_frame_palette_sprite[palette_idx][1U] = s_system_palette[system_pallete_idx_1];
+        s_frame_palette_sprite[palette_idx][2U] = s_system_palette[system_pallete_idx_2];
+        s_frame_palette_sprite[palette_idx][3U] = s_system_palette[system_pallete_idx_3];
     }
 }
 
@@ -223,14 +226,14 @@ void rendererPaletteSetBackground(const uint8_t pallete_index, const uint8_t col
     }
 }
 
-void rendererPaletteSetBackgroundMultiple(const uint8_t pallete_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+void rendererPaletteSetBackgroundMultiple(const uint8_t palette_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
 {
     if (
-        (pallete_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
     {
-        s_frame_palette_bg[pallete_idx][1U] = s_system_palette[system_pallete_idx_1];
-        s_frame_palette_bg[pallete_idx][2U] = s_system_palette[system_pallete_idx_2];
-        s_frame_palette_bg[pallete_idx][3U] = s_system_palette[system_pallete_idx_3];
+        s_frame_palette_bg[palette_idx][1U] = s_system_palette[system_pallete_idx_1];
+        s_frame_palette_bg[palette_idx][2U] = s_system_palette[system_pallete_idx_2];
+        s_frame_palette_bg[palette_idx][3U] = s_system_palette[system_pallete_idx_3];
     }
 }
 
@@ -405,12 +408,12 @@ uint8_t rendererOamGetPalleteIdx(const uint8_t oam_idx)
     return 0U;
 }
 
-void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t pallete_idx)
+void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS);
-        s_oam[oam_idx] |= ((pallete_idx & RENDERER_OAM_PALLETE_IDX_MASK) << RENDERER_OAM_PALLETE_IDX_POS);
+        s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALLETE_IDX_MASK) << RENDERER_OAM_PALLETE_IDX_POS);
         rendererOamSetIsDirty(oam_idx, true);
     }
 }

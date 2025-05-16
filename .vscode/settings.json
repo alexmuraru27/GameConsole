@@ -28,6 +28,8 @@
         "sysclock.h": "c",
         "renderer.h": "c",
         "stdio.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "dma.h": "c",
+        "tilecreator.h": "c"
     }
 }

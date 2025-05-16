@@ -3,7 +3,7 @@ import pygame
 import sys
 import os
 
-OUTPUT_FILES_DIR = "generated_tiles"
+OUTPUT_FILES_DIR = "GeneratedTiles"
 DEFAULT_H_FILENAME = "tile"
 TILE_SIZE = 16
 PIXEL_SIZE = 20
@@ -16,10 +16,12 @@ WINDOW_HEIGHT = TILE_SIZE * PIXEL_SIZE + PALETTE_HEIGHT + 50  # Extra space for 
 BG_COLOR = (255, 255, 255)
 FONT_SIZE = 20
 
-EXPORT_ARRAY_BEGINNING = "DEFINE_TILE_16(\n\t"
+MAGIC_FILENAME_REPLACE_PATTERN = "^!!!^"
+C_HEADER = f"#ifndef __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#define __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#include \"tileCreator.h\"\n"
+EXPORT_ARRAY_BEGINNING = f"{C_HEADER}const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_data[64U] = DEFINE_TILE_16(\n\t"
 EXPORT_ARRAY_ENDING = ");\n"
-EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = "const uint8_t[] palette = {"
-EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};"
+EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette [4U]= {{"
+EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};\n#endif"
 
 NES_PALETTE = [
     (98, 98, 98),
@@ -187,6 +189,7 @@ def handle_selected_colors_click(pos):
 
 
 def export_as_array(filename):
+    raw_filename = filename
     if not filename.endswith(".h"):
         filename += ".h"
     if not os.path.exists(OUTPUT_FILES_DIR):
@@ -194,7 +197,8 @@ def export_as_array(filename):
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
     with open(full_path, "w") as f:
         # save tile data
-        f.write(EXPORT_ARRAY_BEGINNING)
+        export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+        f.write(export_array_prologue)
         flat_list = [val for row in grid for val in row]
         for i, val in enumerate(flat_list):
             f.write(f"{val}")
@@ -205,7 +209,8 @@ def export_as_array(filename):
         f.write(EXPORT_ARRAY_ENDING)
 
         # save system pallete color
-        f.write(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING)
+        export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+        f.write(export_array_system_palette_prologue)
         for i, val in enumerate(selected_colors_idx):
             f.write(f"{hex(val)}")
             if i < len(selected_colors_idx) - 1:
@@ -215,6 +220,7 @@ def export_as_array(filename):
 
 
 def load_from_file(filename):
+    raw_filename = filename
     if not filename.endswith(".h"):
         filename += ".h"
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
@@ -225,15 +231,18 @@ def load_from_file(filename):
         with open(full_path, "r") as f:
             restored_content = f.read()
             
-            tile_start = restored_content.find(EXPORT_ARRAY_BEGINNING) + len(EXPORT_ARRAY_BEGINNING)
+            export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+            tile_start = restored_content.find(export_array_prologue) + len(export_array_prologue)
             tile_end = restored_content.find(EXPORT_ARRAY_ENDING, tile_start)
             tile_raw = restored_content[tile_start:tile_end].replace('\n', '').replace('\t', '').replace(' ', '')
             tile_list = [int(x) for x in tile_raw.split(',') if x != '']
 
             # Extract the palette array
-            palette_start = restored_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING) + len(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING)
-            palette_end = restored_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start)
-            palette_raw = restored_content[palette_start:palette_end].replace('\n', '').replace(' ', '')
+            palette_content =restored_content[tile_end:].replace(EXPORT_ARRAY_ENDING, "")
+            export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+            palette_start = palette_content.find(export_array_system_palette_prologue) + len(export_array_system_palette_prologue) +1
+            palette_end = palette_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start)
+            palette_raw = palette_content[palette_start:palette_end].replace('\n', '').replace(' ', '')
             palette_list = [int(x, 16) for x in palette_raw.split(',') if x != '']
 
             for idx, pix in enumerate(tile_list):
