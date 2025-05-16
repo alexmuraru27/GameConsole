@@ -248,7 +248,7 @@ def load_from_file(filename):
             palette_list = [int(x, 16) for x in cleaned_palette_raw.split(',') if x != '']
 
             for idx, pix in enumerate(tile_list):
-                if idx < len(tile_list)-NES_PALETTE_ROWS:
+                if idx < len(tile_list):
                     grid[idx // TILE_SIZE][idx % TILE_SIZE] = pix
             for idx, palette_data in  enumerate(palette_list):
                 selected_colors_idx[idx] = palette_data
