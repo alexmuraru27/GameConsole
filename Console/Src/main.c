@@ -9,6 +9,11 @@
 #include "joystick.h"
 #include "renderer.h"
 #include "pacman_ghost.h"
+#include "bricks1.h"
+#include "bricks2.h"
+#include "bricks3.h"
+#include "bricks4.h"
+#include "bricks5.h"
 
 #define FPS 50
 #define FRAME_PERIOD (1000U / FPS)
@@ -96,6 +101,42 @@ static void screenInit()
   rendererFramePaletteSetSpriteMultiple(0U, pacman_ghost_palette[1U], pacman_ghost_palette[2U], pacman_ghost_palette[3U]);
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
+
+  // backgrounds
+  rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));
+  rendererPatternTableSetTile(3U, bricks2_data, sizeof(bricks2_data));
+  rendererPatternTableSetTile(4U, bricks3_data, sizeof(bricks3_data));
+  rendererPatternTableSetTile(5U, bricks4_data, sizeof(bricks4_data));
+  rendererPatternTableSetTile(6U, bricks5_data, sizeof(bricks5_data));
+
+  // background frame palette
+  const uint8_t brick_pallete_idx = 0U;
+  rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx, bricks1_palette[1U], bricks1_palette[2U], bricks1_palette[3U]);
+
+  // background set attribute table
+  rendererAttributeTableSetPalette(2U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(3U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(4U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(5U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(6U, brick_pallete_idx);
+
+  // background set nametable
+  rendererNameTableSetTile(5U, 5U, 2U);
+  rendererNameTableSetTile(5U, 5U + 1U, 3U);
+  rendererNameTableSetTile(5U, 5U + 2U, 4U);
+  rendererNameTableSetTile(5U, 5U + 3U, 5U);
+  rendererNameTableSetTile(5U, 5U + 4U, 6U);
+
+  for (uint8_t i = 0; i < rendererGetMaxTilesInColumn(); i++)
+  {
+    rendererNameTableSetTile(0U, i, 4U);
+    rendererNameTableSetTile(rendererGetMaxTilesInRow() - 1, i, 4U);
+  }
+  for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
+  {
+    rendererNameTableSetTile(i, 0U, 6U);
+    rendererNameTableSetTile(i, rendererGetMaxTilesInColumn() - 1, 6U);
+  }
 }
 int main(void)
 {

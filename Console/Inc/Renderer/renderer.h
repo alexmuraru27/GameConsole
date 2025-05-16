@@ -16,6 +16,8 @@ uint16_t rendererGetSizeFramePalette();
 uint16_t rendererGetSizePatternTable();
 uint16_t rendererGetSizeNameTable();
 uint16_t rendererGetSizeOam();
+uint16_t rendererGetMaxTilesInRow();
+uint16_t rendererGetMaxTilesInColumn();
 
 // Frame Palette
 void rendererFramePaletteSetSprite(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
@@ -28,7 +30,7 @@ void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, 
 void rendererPatternTableClear(uint8_t system_color);
 
 // Name table
-void rendererNameTableSetTile(uint8_t table_index, uint8_t tile_idx);
+void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx);
 void rendererNameTableClearTile(uint8_t table_index);
 
 // Oam
