@@ -9,7 +9,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "tile_creator.py",
-            "console": "externalTerminal"
+            "console": "internalConsole"
         },
         {
             "name": "OpenOCD Debug",
