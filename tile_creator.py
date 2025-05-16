@@ -387,7 +387,8 @@ while running:
                 elif event.key == pygame.K_RETURN:
                     text_active = False
                 else:
-                    input_text += event.unicode
+                    if event.unicode.isalnum():
+                        input_text += event.unicode
     clock.tick(60)
 
 pygame.quit()
