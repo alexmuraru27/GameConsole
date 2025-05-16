@@ -2,6 +2,8 @@
 #include "string.h"
 #include "ILI9341.h"
 
+#define CCMRAM __attribute__((section(".ccmram")))
+
 #define RENDERER_TILE_ROW_BYTES (RENDERER_TILE_SCREEN_SIZE / 8U)
 
 #define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
@@ -119,28 +121,26 @@ const uint16_t s_system_palette[RENDERER_SYSTEM_PALETTE_SIZE] = {
     RGB2COLOR(0, 0, 0)        // 63
 };
 
-// TODO place renderer in CCRAM
-
 // Holds texture data loaded from the game memory aka CHR
-static uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_MEMORY_SIZE];
+static CCMRAM uint8_t s_pattern_table[RENDERER_PATTERN_TABLE_SIZE][RENDERER_TILE_MEMORY_SIZE];
 
 // Holds texture data indexes for background from pattern table
-static uint8_t s_name_table[RENDERER_NAME_TABLE_SIZE];
+static CCMRAM uint8_t s_name_table[RENDERER_NAME_TABLE_SIZE];
 
 // Holds palette data for background - each tile has its own palette
-static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
+static CCMRAM uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 
 // Object attribute memory
-static uint32_t s_oam[RENDERER_OAM_SIZE];
+static CCMRAM uint32_t s_oam[RENDERER_OAM_SIZE];
 
 // Frame palette for sprites. Contains indexes for SystemPalette
-static uint16_t s_frame_palette_sprite[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
+static CCMRAM uint16_t s_frame_palette_sprite[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
 
 // Frame palette for background. Contains indexes for SystemPalette
-static uint16_t s_frame_palette_bg[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
+static CCMRAM uint16_t s_frame_palette_bg[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
 
 // Background tile positions that need to be redrawn
-static uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
+static CCMRAM uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
 
 void rendererInit(void)
 {

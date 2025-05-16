@@ -115,7 +115,7 @@ SECTIONS
   _siccmram = LOADADDR(.ccmram);
 
   /* CCMRAM section 0 initialized like bss */
-  .ccmram :
+  .ccmram (NOLOAD):
   {
     . = ALIGN(4);
     _sccmram = .;       /* create a global symbol at ccmram start */
