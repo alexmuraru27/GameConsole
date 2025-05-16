@@ -162,49 +162,120 @@ void rendererInit(void)
     memset(&s_dirtyTiles, 0U, sizeof(s_dirtyTiles));
 }
 
-static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx)
+static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx)
 {
-    // TODO remove this function in future as the rendering will be done line based + dirty flag
-    if (palette_idx < RENDERER_FRAME_PALETTE_SIZE)
+    if (palette_idx >= RENDERER_FRAME_PALETTE_SIZE || pattern_index >= RENDERER_PATTERN_TABLE_SIZE)
     {
-        // ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
-        uint8_t color_index = 0U;
-        for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
+        return;
+    }
+
+    const uint16_t *palette = is_bg ? s_frame_palette_bg[palette_idx] : s_frame_palette_sprite[palette_idx];
+
+    // tile fully opaque -> all pixels  color_index != 0
+    bool tile_fully_opaque = true;
+    for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
+    {
+        uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1U];
+        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row * RENDERER_TILE_ROW_BYTES + 1U];
+        if (((byte0_low | byte1_low) != 0xFF) || ((byte0_high | byte1_high) != 0xFF))
         {
-            for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
-            {
-                color_index = (((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
-                if (color_index != 0U)
-                {
-                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[palette_idx][color_index]);
-                    // TODO precompute line data, save into array and send by lines when more than 1 adiacent pixel is not transparent
-                    // ili9341SendPixel(s_frame_palette_sprite[palette_idx][color_index]);
-                }
-            }
+            tile_fully_opaque = false;
+            break;
         }
     }
-}
 
-static void drawBg(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx)
-{
-    // TODO remove this function in future as the rendering will be done line based + dirty flag
-
-    if (palette_idx < RENDERER_FRAME_PALETTE_SIZE)
+    // if fully opaque, send it in one burst
+    if (tile_fully_opaque)
     {
-        // ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
-        uint8_t color_index = 0U;
+        ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
         for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
         {
-            for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
+            uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
+            uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1];
+            uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES];
+            uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES + 1];
+            for (uint8_t col = 0U; col < 8U; col++)
             {
-                color_index = (((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[pattern_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
-                if (color_index != 0U)
+                uint8_t color_index = (((byte1_low >> (7U - col)) & 1U) << 1U) | ((byte0_low >> (7U - col)) & 1U);
+                ili9341SendPixel(palette[color_index]);
+            }
+            for (uint8_t col = 0U; col < 8U; col++)
+            {
+                uint8_t color_index = (((byte1_high >> (7U - col)) & 1U) << 1U) | ((byte0_high >> (7U - col)) & 1U);
+                ili9341SendPixel(palette[color_index]);
+            }
+        }
+        return;
+    }
+
+    // if not fully opaque, send each row individually
+    for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
+    {
+        uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1U];
+        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES + 1U];
+
+        // skip fully transparent rows
+        if ((byte0_low == 0U && byte1_low == 0U) && (byte0_high == 0U && byte1_high == 0U))
+        {
+            continue;
+        }
+
+        // compute colors and transparency for the row
+        uint16_t row_colors[RENDERER_TILE_SCREEN_SIZE];
+        bool is_transparent[RENDERER_TILE_SCREEN_SIZE];
+        for (uint8_t col = 0U; col < 8U; col++)
+        {
+            uint8_t bit_pos = 7U - col;
+            uint8_t color_index = (((byte1_low >> bit_pos) & 1U) << 1U) | ((byte0_low >> bit_pos) & 1U);
+            row_colors[col] = palette[color_index];
+            is_transparent[col] = (color_index == 0U);
+        }
+        for (uint8_t col = 0U; col < 8U; col++)
+        {
+            uint8_t bit_pos = 7U - col;
+            uint8_t color_index = (((byte1_high >> bit_pos) & 1U) << 1U) | ((byte0_high >> bit_pos) & 1U);
+            row_colors[8U + col] = palette[color_index];
+            is_transparent[8U + col] = (color_index == 0U);
+        }
+
+        // send bursts of opaque pixels
+        // basically we just parse the whole row
+        uint8_t col_idx = 0;
+        while (col_idx < RENDERER_TILE_SCREEN_SIZE)
+        {
+            // for transparent pixels, we skip them
+            if (is_transparent[col_idx])
+            {
+                col_idx++;
+                continue;
+            }
+
+            // if we have multiple un-transparent pixels, we group them up
+            uint8_t burst_start_idx = col_idx;
+            uint8_t burst_length = 1;
+            while ((col_idx + burst_length) < RENDERER_TILE_SCREEN_SIZE && !is_transparent[col_idx + burst_length])
+            {
+                burst_length++;
+            }
+
+            if (burst_length == 1)
+            {
+                ili9341DrawPixel(x + burst_start_idx, y + row, row_colors[burst_start_idx]);
+            }
+            else
+            {
+                ili9341SetAddrWindow(x + burst_start_idx, y + row, burst_length, 1);
+                for (uint8_t i = 0; i < burst_length; i++)
                 {
-                    ili9341DrawPixel(x + col, y + row, s_frame_palette_bg[palette_idx][color_index]);
-                    // TODO precompute line data, save into array and send by lines when more than 1 adiacent pixel is not transparent
-                    // ili9341SendPixel(s_frame_palette_bg[palette_idx][color_index]);
+                    ili9341SendPixel(row_colors[burst_start_idx + i]);
                 }
             }
+
+            col_idx += burst_length;
         }
     }
 }
@@ -217,7 +288,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawBg(((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), ((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), s_name_table[i], rendererAttributeTableGetPalette(i));
+            drawTile(((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), ((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), true, s_name_table[i], rendererAttributeTableGetPalette(i));
         }
     }
 
@@ -235,7 +306,7 @@ void rendererRender(void)
             const bool is_flip_v = rendererOamGetFlipV(i);
             const bool is_flip_h = rendererOamGetFlipH(i);
 
-            drawSprite(x, y, tile_idx, palette);
+            drawTile(x, y, false, tile_idx, palette);
             // TODO: after rendering of the oam, set it to not dirty
             // rendererOamSetIsDirty(i, false);
         }
