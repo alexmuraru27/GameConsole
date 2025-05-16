@@ -1,30 +1,48 @@
-# GameConsole
+- [GameConsole](#gameconsole)
+	- [Development Board](#development-board)
+	- [Naming Conventions](#naming-conventions)
+	- [Defines](#defines)
+	- [Pinning](#pinning)
+		- [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
+		- [SPI1 (Display ILI9341)](#spi1-display-ili9341)
+		- [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
+		- [GPIO (Button Joysticks)](#gpio-button-joysticks)
+		- [SD-CARD (Builtin)](#sd-card-builtin)
+	- [Tile Creator](#tile-creator)
+		- [Script](#script)
+		- [Deps](#deps)
+		- [User inputs:](#user-inputs)
+		- [Usage](#usage)
+	- [Renderer Engine](#renderer-engine)
+		- [System Palette](#system-palette)
 
-## Board type
+
+# GameConsole
+## Development Board
 https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 
-## Name Conventions 
+## Naming Conventions 
 
-| Element             | Suggested Case        | Example                         |
-|---------------------|-----------------------|---------------------------------|
-| **Macros/Defines**  | UPPER_SNAKE_CASE      | `#define MAX_BUFFER_SIZE 256`   |
-| **Constants**       | UPPER_SNAKE_CASE      | `const int DEFAULT_TIMEOUT`     |
-| **Global variables**| g_snake_case          | `g_system_initialized`          |
-| **Static globals**  | s_snake_case          | `s_buffer_index`                |
-| **Local variables** | snake_case            | `temp_value`                    |
-| **Functions**       | snake_case or camelCase | `init_peripherals()` or `initPeripherals()` |
-| **Struct types**    | PascalCase            | `typedef struct SensorData`     |
-| **Enum types**      | PascalCase            | `typedef enum PowerState`       |
-| **Struct members**  | snake_case            | `uint16_t adc_value;`           |
-| **Typedefs**        | PascalCase            | `typedef uint8_t Byte;`         |
+| Element              | Suggested Case          | Example                                     |
+| -------------------- | ----------------------- | ------------------------------------------- |
+| **Macros/Defines**   | UPPER_SNAKE_CASE        | `#define MAX_BUFFER_SIZE 256`               |
+| **Constants**        | UPPER_SNAKE_CASE        | `const int DEFAULT_TIMEOUT`                 |
+| **Global variables** | g_snake_case            | `g_system_initialized`                      |
+| **Static globals**   | s_snake_case            | `s_buffer_index`                            |
+| **Local variables**  | snake_case              | `temp_value`                                |
+| **Functions**        | snake_case or camelCase | `init_peripherals()` or `initPeripherals()` |
+| **Struct types**     | PascalCase              | `typedef struct SensorData`                 |
+| **Enum types**       | PascalCase              | `typedef enum PowerState`                   |
+| **Struct members**   | snake_case              | `uint16_t adc_value;`                       |
+| **Typedefs**         | PascalCase              | `typedef uint8_t Byte;`                     |
 
-## Defines:
+## Defines
 - #define USART_BUFFER_SIZE ((uint32_t)512U)
 - #define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
 - #define HSE_CLOCK_VALUE ((uint32_t)8000000)
 - #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 
-## Pinning:
+## Pinning
 ### USART2 (Debug Interface - Baud 921600) 
 1. PA2 (TX - AF7)
 2. PA3 (RX - AF7)
@@ -64,17 +82,17 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 6. PC9 (DAT1)
 
 
-## Default System Color Palette
-![system_palette](docu/system_palette.png)
+## Tile Creator
 
+### Script
+tile_creator.py
 
-## tile_creator.py
-### Deps: pygame
+### Deps
+pygame
 
 ### User inputs:
 1. Left click draw
 2. Right click clear
-3. "S" to export the tile into generated_tile.h
 
 ### Usage
 Click on the 4 big squares to select the palette with which to draw (1st one is always the transparent one)
@@ -111,3 +129,7 @@ const uint8_t pacman1_palette[4U] = {0x20, 0x1c, 0x2c, 0xc};
 #endif
 
 ```
+
+## Renderer Engine
+### System Palette
+![system_palette](docu/system_palette.png)
