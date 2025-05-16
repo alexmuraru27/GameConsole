@@ -18,6 +18,8 @@ FONT_SIZE = 20
 
 EXPORT_ARRAY_BEGINNING = "DEFINE_TILE_16(\n\t"
 EXPORT_ARRAY_ENDING = ");\n"
+EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = "const uint8_t[] palette ={"
+EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};"
 
 NES_PALETTE = [
     (98, 98, 98),
@@ -191,6 +193,7 @@ def export_as_array(filename):
         os.mkdir(OUTPUT_FILES_DIR)
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
     with open(full_path, "w") as f:
+        # save tile data
         f.write(EXPORT_ARRAY_BEGINNING)
         flat_list = [val for row in grid for val in row]
         for i, val in enumerate(flat_list):
@@ -200,6 +203,14 @@ def export_as_array(filename):
                 if (i + 1) % TILE_SIZE == 0:
                     f.write("\n\t")
         f.write(EXPORT_ARRAY_ENDING)
+
+        # save system pallete color
+        f.write(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING)
+        for i, val in enumerate(selected_colors_idx):
+            f.write(f"{hex(val)}")
+            if i < len(selected_colors_idx) - 1:
+                f.write(", ")
+        f.write(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING)
     print(f"Saved tile to {full_path}")
 
 
@@ -213,11 +224,23 @@ def load_from_file(filename):
     try:
         with open(full_path, "r") as f:
             restored_content = f.read()
-            restored_content = restored_content.replace(EXPORT_ARRAY_BEGINNING, "")
-            restored_content = restored_content.replace(EXPORT_ARRAY_ENDING, "")
-            restored_tile_data = list(map(int, re.findall(r"\d+", restored_content)))
-            for idx, pix in enumerate(restored_tile_data):
-                grid[idx // TILE_SIZE][idx % TILE_SIZE] = pix
+            
+            tile_start = restored_content.find(EXPORT_ARRAY_BEGINNING) + len(EXPORT_ARRAY_BEGINNING)
+            tile_end = restored_content.find(EXPORT_ARRAY_ENDING, tile_start)
+            tile_raw = restored_content[tile_start:tile_end].replace('\n', '').replace('\t', '').replace(' ', '')
+            tile_list = [int(x) for x in tile_raw.split(',') if x != '']
+
+            # Extract the palette array
+            palette_start = restored_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING) + len(EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING)
+            palette_end = restored_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start)
+            palette_raw = restored_content[palette_start:palette_end].replace('\n', '').replace(' ', '')
+            palette_list = [int(x, 16) for x in palette_raw.split(',') if x != '']
+
+            for idx, pix in enumerate(tile_list):
+                if idx < len(tile_list)-NES_PALETTE_ROWS:
+                    grid[idx // TILE_SIZE][idx % TILE_SIZE] = pix
+            for idx, palette_data in  enumerate(palette_list):
+                selected_colors_idx[idx] = palette_data
         print(f"Loaded tile from {full_path}")
     except Exception as e:
         print("Failed to load:", e)
