@@ -208,7 +208,7 @@ def export_as_array(filename):
                     f.write("\n\t")
         f.write(EXPORT_ARRAY_ENDING)
 
-        # save system pallete color
+        # save system palette color
         export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
         f.write(export_array_system_palette_prologue)
         for i, val in enumerate(selected_colors_idx):

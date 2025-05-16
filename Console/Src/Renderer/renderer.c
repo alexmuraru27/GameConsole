@@ -42,8 +42,8 @@
 #define RENDERER_OAM_IS_DIRTY_POS 20U
 #define RENDERER_OAM_IS_DIRTY_MASK 0x01U
 
-#define RENDERER_OAM_PALLETE_IDX_POS 16U
-#define RENDERER_OAM_PALLETE_IDX_MASK 0x0FU
+#define RENDERER_OAM_PALETTE_IDX_POS 16U
+#define RENDERER_OAM_PALETTE_IDX_MASK 0x0FU
 
 #define RENDERER_OAM_TILE_IDX_POS 8U
 #define RENDERER_OAM_TILE_IDX_MASK 0xFFU
@@ -133,10 +133,10 @@ static uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 // Object attribute memory
 static uint32_t s_oam[RENDERER_OAM_SIZE];
 
-// Frame pallete for sprites. Contains indexes for SystemPalette
+// Frame palette for sprites. Contains indexes for SystemPalette
 static uint16_t s_frame_palette_sprite[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
 
-// Frame pallete for background. Contains indexes for SystemPalette
+// Frame palette for background. Contains indexes for SystemPalette
 static uint16_t s_frame_palette_bg[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
 
 // Background tile positions that need to be redrawn
@@ -153,10 +153,10 @@ void rendererInit(void)
     memset(&s_dirtyTiles, 0U, sizeof(s_dirtyTiles));
 }
 
-static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_pallete_idx)
+static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_index, const uint8_t frame_palette_idx)
 {
     // TODO remove this function in future as the rendering will be done line based + dirty flag
-    if (frame_pallete_idx < RENDERER_FRAME_PALETTE_SIZE)
+    if (frame_palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
         uint8_t color_index = 0U;
         for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
@@ -166,7 +166,7 @@ static void drawSprite(const uint8_t x, const uint8_t y, const uint8_t sprite_in
                 color_index = (((s_pattern_table[sprite_index][(row * RENDERER_TILE_ROW_BYTES) + RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + (col / 8U)] >> (7U - (col % 8U))) & 1U) << 1U) | ((s_pattern_table[sprite_index][(row * RENDERER_TILE_ROW_BYTES) + (col / 8U)] >> (7U - (col % 8U))) & 1U);
                 if (color_index != 0U)
                 {
-                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[frame_pallete_idx][color_index]);
+                    ili9341DrawPixel(x + col, y + row, s_frame_palette_sprite[frame_palette_idx][color_index]);
                 }
             }
         }
@@ -188,7 +188,7 @@ void rendererRender(void)
 
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
-            const uint8_t palette = rendererOamGetPalleteIdx(i);
+            const uint8_t palette = rendererOamGetPaletteIdx(i);
             const bool is_flip_v = rendererOamGetFlipV(i);
             const bool is_flip_h = rendererOamGetFlipH(i);
 
@@ -199,41 +199,41 @@ void rendererRender(void)
     }
 }
 
-void rendererPaletteSetSprite(const uint8_t pallete_index, const uint8_t color_index, const uint8_t system_pallete_index)
+void rendererPaletteSetSprite(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
 {
-    if ((pallete_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
+    if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
-        s_frame_palette_sprite[pallete_index][color_index] = s_system_palette[system_pallete_index];
+        s_frame_palette_sprite[palette_index][color_index] = s_system_palette[system_palette_index];
     }
 }
 
-void rendererPaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+void rendererPaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
 {
     if (
-        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_palette_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
     {
-        s_frame_palette_sprite[palette_idx][1U] = s_system_palette[system_pallete_idx_1];
-        s_frame_palette_sprite[palette_idx][2U] = s_system_palette[system_pallete_idx_2];
-        s_frame_palette_sprite[palette_idx][3U] = s_system_palette[system_pallete_idx_3];
+        s_frame_palette_sprite[palette_idx][1U] = s_system_palette[system_palette_idx_1];
+        s_frame_palette_sprite[palette_idx][2U] = s_system_palette[system_palette_idx_2];
+        s_frame_palette_sprite[palette_idx][3U] = s_system_palette[system_palette_idx_3];
     }
 }
 
-void rendererPaletteSetBackground(const uint8_t pallete_index, const uint8_t color_index, const uint8_t system_pallete_index)
+void rendererPaletteSetBackground(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
 {
-    if ((pallete_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
+    if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
-        s_frame_palette_bg[pallete_index][color_index] = s_system_palette[system_pallete_index];
+        s_frame_palette_bg[palette_index][color_index] = s_system_palette[system_palette_index];
     }
 }
 
-void rendererPaletteSetBackgroundMultiple(const uint8_t palette_idx, const uint8_t system_pallete_idx_1, const uint8_t system_pallete_idx_2, const uint8_t system_pallete_idx_3)
+void rendererPaletteSetBackgroundMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
 {
     if (
-        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_pallete_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_pallete_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
+        (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_palette_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
     {
-        s_frame_palette_bg[palette_idx][1U] = s_system_palette[system_pallete_idx_1];
-        s_frame_palette_bg[palette_idx][2U] = s_system_palette[system_pallete_idx_2];
-        s_frame_palette_bg[palette_idx][3U] = s_system_palette[system_pallete_idx_3];
+        s_frame_palette_bg[palette_idx][1U] = s_system_palette[system_palette_idx_1];
+        s_frame_palette_bg[palette_idx][2U] = s_system_palette[system_palette_idx_2];
+        s_frame_palette_bg[palette_idx][3U] = s_system_palette[system_palette_idx_3];
     }
 }
 
@@ -399,21 +399,21 @@ void rendererOamSetIsDirty(const uint8_t oam_idx, const bool is_dirty)
     }
 }
 
-uint8_t rendererOamGetPalleteIdx(const uint8_t oam_idx)
+uint8_t rendererOamGetPaletteIdx(const uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
     {
-        return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS)) >> RENDERER_OAM_PALLETE_IDX_POS);
+        return (uint8_t)((s_oam[oam_idx] & (RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS)) >> RENDERER_OAM_PALETTE_IDX_POS);
     }
     return 0U;
 }
 
-void rendererOamSetPalleteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
+void rendererOamSetPaletteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
-        s_oam[oam_idx] &= ~(RENDERER_OAM_PALLETE_IDX_MASK << RENDERER_OAM_PALLETE_IDX_POS);
-        s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALLETE_IDX_MASK) << RENDERER_OAM_PALLETE_IDX_POS);
+        s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
+        s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
         rendererOamSetIsDirty(oam_idx, true);
     }
 }

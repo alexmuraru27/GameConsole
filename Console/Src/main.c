@@ -116,10 +116,10 @@ static void screenInit()
   rendererOamSetTileIdx(1U, 2U);
   rendererOamSetTileIdx(2U, 3U);
   rendererOamSetTileIdx(3U, 4U);
-  rendererOamSetPalleteIdx(0U, 0U);
-  rendererOamSetPalleteIdx(1U, 1U);
-  rendererOamSetPalleteIdx(2U, 2U);
-  rendererOamSetPalleteIdx(3U, 3U);
+  rendererOamSetPaletteIdx(0U, 0U);
+  rendererOamSetPaletteIdx(1U, 1U);
+  rendererOamSetPaletteIdx(2U, 2U);
+  rendererOamSetPaletteIdx(3U, 3U);
 }
 int main(void)
 {

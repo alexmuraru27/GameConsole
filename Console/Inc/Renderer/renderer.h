@@ -13,10 +13,10 @@ void rendererRender(void);
 void rendererTriggerCompleteRedraw(void);
 
 // Frame Palette
-void rendererPaletteSetSprite(uint8_t pallete_index, uint8_t color_index, uint8_t system_pallete_index);
-void rendererPaletteSetSpriteMultiple(uint8_t palette_idx, uint8_t system_pallete_idx_1, uint8_t system_pallete_idx_2, uint8_t system_pallete_idx_3);
-void rendererPaletteSetBackground(uint8_t pallete_index, uint8_t color_index, uint8_t system_pallete_index);
-void rendererPaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t system_pallete_idx_1, uint8_t system_pallete_idx_2, uint8_t system_pallete_idx_3);
+void rendererPaletteSetSprite(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererPaletteSetSpriteMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
+void rendererPaletteSetBackground(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererPaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
 
 // Pattern table
 void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, uint8_t tile_size);
@@ -35,7 +35,7 @@ void rendererOamSetFlipV(uint8_t oam_idx, bool is_flip_v);
 void rendererOamSetFlipH(uint8_t oam_idx, bool is_flip_h);
 void rendererOamSetPriority(uint8_t oam_idx, bool is_priority);
 void rendererOamSetIsDirty(uint8_t oam_idx, bool is_dirty);
-void rendererOamSetPalleteIdx(uint8_t oam_idx, uint8_t palette_idx);
+void rendererOamSetPaletteIdx(uint8_t oam_idx, uint8_t palette_idx);
 void rendererOamSetTileIdx(uint8_t oam_idx, uint8_t tile_idx);
 void rendererOamSetYPos(uint8_t oam_idx, uint8_t y_pos);
 
@@ -45,7 +45,7 @@ bool rendererOamGetFlipV(uint8_t oam_idx);
 bool rendererOamGetFlipH(uint8_t oam_idx);
 bool rendererOamGetPriority(uint8_t oam_idx);
 bool rendererOamGetIsDirty(uint8_t oam_idx);
-uint8_t rendererOamGetPalleteIdx(uint8_t oam_idx);
+uint8_t rendererOamGetPaletteIdx(uint8_t oam_idx);
 uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
 
