@@ -11,16 +11,18 @@ NES_COLS = 16
 NES_PALETTE_ROWS = 4
 NES_PALETTE_COLOR_SIZE = 20
 PALETTE_HEIGHT = NES_PALETTE_ROWS * NES_PALETTE_COLOR_SIZE + 70
-WINDOW_WIDTH = TILE_SIZE * PIXEL_SIZE
+WINDOW_WIDTH = TILE_SIZE * PIXEL_SIZE * 2
 WINDOW_HEIGHT = TILE_SIZE * PIXEL_SIZE + PALETTE_HEIGHT + 50  # Extra space for controls
 BG_COLOR = (255, 255, 255)
 FONT_SIZE = 20
 
 MAGIC_FILENAME_REPLACE_PATTERN = "^!!!^"
-C_HEADER = f"#ifndef __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#define __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#include \"tileCreator.h\"\n"
+C_HEADER = f'#ifndef __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#define __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#include "tileCreator.h"\n'
 EXPORT_ARRAY_BEGINNING = f"{C_HEADER}const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_data[64U] = DEFINE_TILE_16(\n\t"
 EXPORT_ARRAY_ENDING = ");\n"
-EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette[4U] = {{"
+EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = (
+    f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette[4U] = {{"
+)
 EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};\n#endif"
 
 NES_PALETTE = [
@@ -91,7 +93,7 @@ NES_PALETTE = [
 ]
 
 pygame.init()
-screen = pygame.display.set_mode((2*WINDOW_WIDTH, WINDOW_HEIGHT))
+screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("NES Tile")
 font = pygame.font.SysFont(None, FONT_SIZE)
 clock = pygame.time.Clock()
@@ -106,16 +108,29 @@ input_box = pygame.Rect(10, WINDOW_HEIGHT - 40, 200, 30)
 input_text = DEFAULT_H_FILENAME
 text_active = False
 
-save_button = pygame.Rect(210, WINDOW_HEIGHT - 40, 60, 30)
-load_button = pygame.Rect(260, WINDOW_HEIGHT - 40, 60, 30)
+BUTTON_WIDTH = 60
+BUTTON_HEIGHT = 30
+save_button = pygame.Rect(210, WINDOW_HEIGHT - 40, BUTTON_WIDTH, BUTTON_HEIGHT)
+load_button = pygame.Rect(260, WINDOW_HEIGHT - 40, BUTTON_WIDTH, BUTTON_HEIGHT)
+clear_button = pygame.Rect(
+    WINDOW_WIDTH - BUTTON_WIDTH, WINDOW_HEIGHT - 40, BUTTON_WIDTH, BUTTON_HEIGHT
+)
+
 
 def draw_grid():
-    offset_x = TILE_SIZE * PIXEL_SIZE 
+    offset_x = TILE_SIZE * PIXEL_SIZE
     for y in range(TILE_SIZE):
         for x in range(TILE_SIZE):
             color = NES_PALETTE[selected_colors_idx[grid[y][x]]]
-            rect_border = pygame.Rect(x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE)
-            rect_no_border = pygame.Rect(offset_x + x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE)
+            rect_border = pygame.Rect(
+                x * PIXEL_SIZE, y * PIXEL_SIZE + PALETTE_HEIGHT, PIXEL_SIZE, PIXEL_SIZE
+            )
+            rect_no_border = pygame.Rect(
+                offset_x + x * PIXEL_SIZE,
+                y * PIXEL_SIZE + PALETTE_HEIGHT,
+                PIXEL_SIZE,
+                PIXEL_SIZE,
+            )
             pygame.draw.rect(screen, color, rect_border)
             pygame.draw.rect(screen, (50, 50, 50), rect_border, 1)
             pygame.draw.rect(screen, color, rect_no_border)
@@ -148,7 +163,7 @@ def draw_selected_colors():
 
 
 def draw_file_controls():
-    #text
+    # text
     pygame.draw.rect(screen, (255, 255, 255), input_box)
     pygame.draw.rect(screen, (0, 0, 0), input_box, 2)
     txt_surf = font.render(input_text, True, (0, 0, 0))
@@ -159,10 +174,16 @@ def draw_file_controls():
     save_txt = font.render("Save", True, (0, 0, 0))
     screen.blit(save_txt, (save_button.x + 5, save_button.y + 5))
 
-    #load
+    # load
     pygame.draw.rect(screen, (180, 180, 255), load_button)
     load_txt = font.render("Load", True, (0, 0, 0))
     screen.blit(load_txt, (load_button.x + 5, load_button.y + 5))
+
+    # clear
+    pygame.draw.rect(screen, (255, 180, 180), clear_button)
+    clear_txt = font.render("Clear", True, (0, 0, 0))
+    screen.blit(clear_txt, (clear_button.x + 5, clear_button.y + 5))
+
 
 def handle_nes_palette_click(pos):
     for i in range(len(NES_PALETTE)):
@@ -199,7 +220,9 @@ def export_as_array(filename):
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
     with open(full_path, "w") as f:
         # save tile data
-        export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+        export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(
+            MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+        )
         f.write(export_array_prologue)
         flat_list = [val for row in grid for val in row]
         for i, val in enumerate(flat_list):
@@ -211,7 +234,11 @@ def export_as_array(filename):
         f.write(EXPORT_ARRAY_ENDING)
 
         # save system palette color
-        export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
+        export_array_system_palette_prologue = (
+            EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(
+                MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+            )
+        )
         f.write(export_array_system_palette_prologue)
         for i, val in enumerate(selected_colors_idx):
             f.write(f"{hex(val)}")
@@ -232,31 +259,62 @@ def load_from_file(filename):
     try:
         with open(full_path, "r") as f:
             restored_content = f.read()
-            
-            export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
-            tile_start = restored_content.find(export_array_prologue) + len(export_array_prologue)
+
+            export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(
+                MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+            )
+            tile_start = restored_content.find(export_array_prologue) + len(
+                export_array_prologue
+            )
             tile_end = restored_content.find(EXPORT_ARRAY_ENDING, tile_start)
-            tile_raw = restored_content[tile_start:tile_end].replace('\n', '').replace('\t', '').replace(' ', '')
-            cleaned_tile_raw = re.sub(r'[^a-zA-Z0-9,]', '', tile_raw)
-            tile_list = [int(x) for x in cleaned_tile_raw.split(',') if x != '']
+            tile_raw = (
+                restored_content[tile_start:tile_end]
+                .replace("\n", "")
+                .replace("\t", "")
+                .replace(" ", "")
+            )
+            cleaned_tile_raw = re.sub(r"[^a-zA-Z0-9,]", "", tile_raw)
+            tile_list = [int(x) for x in cleaned_tile_raw.split(",") if x != ""]
 
             # Extract the palette array
-            palette_content =restored_content[tile_end:].replace(EXPORT_ARRAY_ENDING, "")
-            export_array_system_palette_prologue = EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(MAGIC_FILENAME_REPLACE_PATTERN, raw_filename)
-            palette_start = palette_content.find(export_array_system_palette_prologue) + len(export_array_system_palette_prologue)
-            palette_end = palette_content.find(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start)
-            palette_raw = palette_content[palette_start:palette_end].replace('\n', '').replace(' ', '')
-            cleaned_palette_raw = re.sub(r'[^a-zA-Z0-9,]', '', palette_raw)
-            palette_list = [int(x, 16) for x in cleaned_palette_raw.split(',') if x != '']
+            palette_content = restored_content[tile_end:].replace(
+                EXPORT_ARRAY_ENDING, ""
+            )
+            export_array_system_palette_prologue = (
+                EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(
+                    MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+                )
+            )
+            palette_start = palette_content.find(
+                export_array_system_palette_prologue
+            ) + len(export_array_system_palette_prologue)
+            palette_end = palette_content.find(
+                EXPORT_ARRAY_SYSTEM_PALETTE_ENDING, palette_start
+            )
+            palette_raw = (
+                palette_content[palette_start:palette_end]
+                .replace("\n", "")
+                .replace(" ", "")
+            )
+            cleaned_palette_raw = re.sub(r"[^a-zA-Z0-9,]", "", palette_raw)
+            palette_list = [
+                int(x, 16) for x in cleaned_palette_raw.split(",") if x != ""
+            ]
 
             for idx, pix in enumerate(tile_list):
                 if idx < len(tile_list):
                     grid[idx // TILE_SIZE][idx % TILE_SIZE] = pix
-            for idx, palette_data in  enumerate(palette_list):
+            for idx, palette_data in enumerate(palette_list):
                 selected_colors_idx[idx] = palette_data
         print(f"Loaded tile from {full_path}")
     except Exception as e:
         print("Failed to load:", e)
+
+
+def clear_screen():
+    for i in range(TILE_SIZE):
+        for j in range(TILE_SIZE):
+            grid[i][j] = 0
 
 
 running = True
@@ -285,6 +343,8 @@ while running:
                 export_as_array(input_text)
             elif load_button.collidepoint((x, y)):
                 load_from_file(input_text)
+            elif clear_button.collidepoint((x, y)):
+                clear_screen()
             elif y < NES_PALETTE_ROWS * NES_PALETTE_COLOR_SIZE:
                 sel = handle_nes_palette_click((x, y))
                 if sel is not None:
@@ -311,12 +371,16 @@ while running:
             grid_x = x // PIXEL_SIZE
             grid_y = (y - PALETTE_HEIGHT) // PIXEL_SIZE
             if 0 <= grid_x < TILE_SIZE and 0 <= grid_y < TILE_SIZE:
-                if pygame.mouse.get_pressed()[0]: 
+                if pygame.mouse.get_pressed()[0]:
                     grid[grid_y][grid_x] = active_color_slot
                 elif pygame.mouse.get_pressed()[2]:
                     grid[grid_y][grid_x] = 0
 
         elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_LCTRL:
+                export_as_array(input_text)
+            elif event.key == pygame.K_l and pygame.key.get_mods() & pygame.KMOD_LCTRL:
+                load_from_file(input_text)
             if text_active:
                 if event.key == pygame.K_BACKSPACE:
                     input_text = input_text[:-1]
@@ -324,7 +388,6 @@ while running:
                     text_active = False
                 else:
                     input_text += event.unicode
-
     clock.tick(60)
 
 pygame.quit()
