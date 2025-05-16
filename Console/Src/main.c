@@ -28,7 +28,7 @@ static void peripheralsInit()
   gpioInit();
   usartInit();
   timerInit();
-  ili9341Init(3U, RENDERER_WIDTH, RENDERER_HEIGHT);
+  ili9341Init(3U, rendererGetSizeWidth(), rendererGetSizeHeight());
   adcInit();
   joystickInit();
 }
@@ -57,7 +57,7 @@ static void syncFrame()
 
 static void update()
 {
-  if (x <= RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE - SPEED)
+  if (x <= rendererGetSizeWidth() - rendererGetSizeTileScreen() - SPEED)
   {
     x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -66,7 +66,7 @@ static void update()
     x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  if (y <= RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE - SPEED)
+  if (y <= rendererGetSizeHeight() - rendererGetSizeTileScreen() - SPEED)
   {
     y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -78,14 +78,14 @@ static void update()
   rendererOamSetXPos(0U, x);
   rendererOamSetYPos(0U, y);
 
-  rendererOamSetXPos(1U, x + RENDERER_TILE_SCREEN_SIZE);
+  rendererOamSetXPos(1U, x + rendererGetSizeTileScreen());
   rendererOamSetYPos(1U, y);
 
   rendererOamSetXPos(2U, x);
-  rendererOamSetYPos(2U, y + RENDERER_TILE_SCREEN_SIZE);
+  rendererOamSetYPos(2U, y + rendererGetSizeTileScreen());
 
-  rendererOamSetXPos(3U, x + RENDERER_TILE_SCREEN_SIZE);
-  rendererOamSetYPos(3U, y + RENDERER_TILE_SCREEN_SIZE);
+  rendererOamSetXPos(3U, x + rendererGetSizeTileScreen());
+  rendererOamSetYPos(3U, y + rendererGetSizeTileScreen());
 }
 
 static void render()
@@ -108,10 +108,10 @@ static void screenInit()
   rendererPatternTableSetTile(2U, pacman2_data, sizeof(pacman2_data));
   rendererPatternTableSetTile(3U, pacman3_data, sizeof(pacman3_data));
   rendererPatternTableSetTile(4U, pacman4_data, sizeof(pacman4_data));
-  rendererPaletteSetSpriteMultiple(0U, pacman1_palette[1U], pacman1_palette[2U], pacman1_palette[3U]);
-  rendererPaletteSetSpriteMultiple(1U, pacman2_palette[1U], pacman2_palette[2U], pacman2_palette[3U]);
-  rendererPaletteSetSpriteMultiple(2U, pacman3_palette[1U], pacman3_palette[2U], pacman3_palette[3U]);
-  rendererPaletteSetSpriteMultiple(3U, pacman4_palette[1U], pacman4_palette[2U], pacman4_palette[3U]);
+  rendererFramePaletteSetSpriteMultiple(0U, pacman1_palette[1U], pacman1_palette[2U], pacman1_palette[3U]);
+  rendererFramePaletteSetSpriteMultiple(1U, pacman2_palette[1U], pacman2_palette[2U], pacman2_palette[3U]);
+  rendererFramePaletteSetSpriteMultiple(2U, pacman3_palette[1U], pacman3_palette[2U], pacman3_palette[3U]);
+  rendererFramePaletteSetSpriteMultiple(3U, pacman4_palette[1U], pacman4_palette[2U], pacman4_palette[3U]);
 
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetTileIdx(1U, 2U);

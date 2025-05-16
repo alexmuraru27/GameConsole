@@ -3,20 +3,25 @@
 #include <stdint.h>
 #include "stdbool.h"
 
-#define RENDERER_WIDTH 256U  // 32
-#define RENDERER_HEIGHT 240U // 30
-#define RENDERER_TILE_SCREEN_SIZE 16U
-#define RENDERER_TILE_MEMORY_SIZE 64U
-
 void rendererInit(void);
 void rendererRender(void);
 void rendererTriggerCompleteRedraw(void);
 
+// Renderer sizes
+uint16_t rendererGetSizeWidth();
+uint16_t rendererGetSizeHeight();
+uint16_t rendererGetSizeTileScreen();
+uint16_t rendererGetSizeTileMemory();
+uint16_t rendererGetSizeFramePalette();
+uint16_t rendererGetSizePatternTable();
+uint16_t rendererGetSizeNameTable();
+uint16_t rendererGetSizeOam();
+
 // Frame Palette
-void rendererPaletteSetSprite(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
-void rendererPaletteSetSpriteMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
-void rendererPaletteSetBackground(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
-void rendererPaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
+void rendererFramePaletteSetSprite(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererFramePaletteSetSpriteMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
+void rendererFramePaletteSetBackground(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererFramePaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
 
 // Pattern table
 void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, uint8_t tile_size);
@@ -24,7 +29,7 @@ void rendererPatternTableClear(uint8_t system_color);
 
 // Name table
 void rendererNameTableSetTile(uint8_t table_index, uint8_t tile_idx);
-void rendererNameTableClear();
+void rendererNameTableClearTile(uint8_t table_index);
 
 // Oam
 void rendererOamClearEntry(uint8_t oam_idx);
@@ -50,7 +55,7 @@ uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
 
 // AttributeTable
-void rendererAttributeTableSetPalette(uint8_t tile_idx, uint8_t palette);
-uint8_t rendererAttributeTableGetPalette(uint8_t tile_idx);
+void rendererAttributeTableSetPalette(uint8_t nametable_idx, uint8_t palette);
+uint8_t rendererAttributeTableGetPalette(uint8_t nametable_idx);
 
 #endif /* __RENDERER_H */

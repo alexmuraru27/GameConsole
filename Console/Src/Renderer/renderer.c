@@ -4,6 +4,11 @@
 
 #define CCMRAM __attribute__((section(".ccmram")))
 
+#define RENDERER_WIDTH 256U  // 32
+#define RENDERER_HEIGHT 240U // 30
+#define RENDERER_TILE_SCREEN_SIZE 16U
+#define RENDERER_TILE_MEMORY_SIZE 64U
+
 #define RENDERER_TILE_ROW_BYTES (RENDERER_TILE_SCREEN_SIZE / 8U)
 
 #define RENDERER_NAME_TABLE_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
@@ -12,7 +17,7 @@
 #define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 2U
 #define RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS (8U / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 #define RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK ((1 << RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS) - 1U)
-#define RENDERER_ATTRIBUTE_TABLE_SIZE (((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
+#define RENDERER_ATTRIBUTE_TABLE_SIZE ((RENDERER_NAME_TABLE_SIZE) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 
 #define RENDERER_DIRTY_TILES_SIZE ((RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE) * (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE))
 
@@ -201,7 +206,7 @@ void rendererRender(void)
     }
 }
 
-void rendererPaletteSetSprite(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
+void rendererFramePaletteSetSprite(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
 {
     if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
@@ -209,7 +214,7 @@ void rendererPaletteSetSprite(const uint8_t palette_index, const uint8_t color_i
     }
 }
 
-void rendererPaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
+void rendererFramePaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
 {
     if (
         (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_palette_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
@@ -220,7 +225,7 @@ void rendererPaletteSetSpriteMultiple(const uint8_t palette_idx, const uint8_t s
     }
 }
 
-void rendererPaletteSetBackground(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
+void rendererFramePaletteSetBackground(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
 {
     if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
     {
@@ -228,7 +233,7 @@ void rendererPaletteSetBackground(const uint8_t palette_index, const uint8_t col
     }
 }
 
-void rendererPaletteSetBackgroundMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
+void rendererFramePaletteSetBackgroundMultiple(const uint8_t palette_idx, const uint8_t system_palette_idx_1, const uint8_t system_palette_idx_2, const uint8_t system_palette_idx_3)
 {
     if (
         (palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (system_palette_idx_1 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_2 < RENDERER_SYSTEM_PALETTE_SIZE) && (system_palette_idx_3 < RENDERER_SYSTEM_PALETTE_SIZE))
@@ -267,9 +272,13 @@ void rendererNameTableSetTile(uint8_t table_index, uint8_t tile_idx)
         s_name_table[table_index] = tile_idx;
     }
 }
-void rendererNameTableClear()
+
+void rendererNameTableClearTile(uint8_t table_index)
 {
-    memset(&s_name_table, 0U, sizeof(s_name_table));
+    if (table_index < RENDERER_NAME_TABLE_SIZE)
+    {
+        s_name_table[table_index] = 0U;
+    }
 }
 
 void rendererOamClearEntry(const uint8_t oam_idx)
@@ -458,19 +467,63 @@ void rendererOamSetYPos(const uint8_t oam_idx, const uint8_t y_pos)
     }
 }
 
-void rendererAttributeTableSetPalette(const uint8_t tile_idx, const uint8_t palette)
+void rendererAttributeTableSetPalette(const uint8_t nametable_idx, const uint8_t palette)
 {
-    if ((tile_idx <= (RENDERER_ATTRIBUTE_TABLE_SIZE / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
+    if ((nametable_idx < (RENDERER_NAME_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
     {
-        s_attribute_table[tile_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] &= ~(RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (tile_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)));
-        s_attribute_table[tile_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] |= (palette & RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK) << (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (tile_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE));
+        const uint8_t cluster_shift_count = (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (nametable_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE));
+        s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] &= ~(RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << cluster_shift_count);
+        s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] |= ((palette & RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK) << cluster_shift_count);
     }
 }
 
-uint8_t rendererAttributeTableGetPalette(const uint8_t tile_idx)
+uint8_t rendererAttributeTableGetPalette(const uint8_t nametable_idx)
 {
-    if (tile_idx <= (RENDERER_ATTRIBUTE_TABLE_SIZE / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE))
+    if (nametable_idx < (RENDERER_NAME_TABLE_SIZE))
     {
-        return ((s_attribute_table[tile_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] & (RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (tile_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)))) >> (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (tile_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)));
+        const uint8_t cluster_shift_count = (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (nametable_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE));
+        return ((s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] & (RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << cluster_shift_count)) >> cluster_shift_count);
     }
+
+    return 0U;
+}
+
+uint16_t rendererGetSizeWidth()
+{
+    return RENDERER_WIDTH;
+}
+
+uint16_t rendererGetSizeHeight()
+{
+    return RENDERER_HEIGHT;
+}
+
+uint16_t rendererGetSizeTileScreen()
+{
+    return RENDERER_TILE_SCREEN_SIZE;
+}
+
+uint16_t rendererGetSizeTileMemory()
+{
+    return RENDERER_TILE_MEMORY_SIZE;
+}
+
+uint16_t rendererGetSizeFramePalette()
+{
+    return RENDERER_FRAME_PALETTE_SIZE;
+}
+
+uint16_t rendererGetSizePatternTable()
+{
+    return RENDERER_PATTERN_TABLE_SIZE;
+}
+
+uint16_t rendererGetSizeNameTable()
+{
+    return RENDERER_NAME_TABLE_SIZE;
+}
+
+uint16_t rendererGetSizeOam()
+{
+    return RENDERER_OAM_SIZE;
 }
