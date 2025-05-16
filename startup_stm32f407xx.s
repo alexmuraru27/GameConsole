@@ -94,6 +94,20 @@ LoopFillZerobss:
   cmp r2, r4
   bcc FillZerobss
 
+/* Zero fill the ccmram segment */
+  ldr r2, =_sccmram
+  ldr r4, =_eccmram
+  movs r3, #0
+  b LoopFillZeroCCMRAM
+
+FillZeroCCMRAM:
+  str  r3, [r2]
+  adds r2, r2, #4
+
+LoopFillZeroCCMRAM:
+  cmp r2, r4
+  bcc FillZeroCCMRAM
+  
 /* Call static constructors */
     bl __libc_init_array
 /* Call the application's entry point.*/

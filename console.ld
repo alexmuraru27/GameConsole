@@ -114,12 +114,7 @@ SECTIONS
 
   _siccmram = LOADADDR(.ccmram);
 
-  /* CCMRAM section
-  *
-  * IMPORTANT NOTE!
-  * If initialized variables will be placed in this section,
-  * the startup code needs to be modified to copy the init-values.
-  */
+  /* CCMRAM section 0 initialized like bss */
   .ccmram :
   {
     . = ALIGN(4);
@@ -129,7 +124,7 @@ SECTIONS
 
     . = ALIGN(4);
     _eccmram = .;       /* create a global symbol at ccmram end */
-  } >CCMRAM AT> CONSOLE_FLASH
+  } >CCMRAM
 
 
   /* Uninitialized data section */
