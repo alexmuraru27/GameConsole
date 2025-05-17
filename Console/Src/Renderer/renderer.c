@@ -13,7 +13,7 @@
 
 #define RENDERER_TILE_ROW_BYTES (RENDERER_TILE_SCREEN_SIZE / 8U)
 
-#define RENDERER_NAME_TABLE_SIZE (RENDERER_TILES_IN_ROW * (RENDERER_TILES_IN_COLUMN + 1))
+#define RENDERER_NAME_TABLE_SIZE (RENDERER_TILES_IN_ROW * RENDERER_TILES_IN_COLUMN)
 
 // Attribute table needs 4bits for each tile since we are using 16 frame palettes for bg
 #define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 2U
@@ -299,7 +299,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawTile(((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), ((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
         }
     }
 
@@ -373,9 +373,9 @@ void rendererPatternTableSetTile(const uint8_t table_index, const uint8_t *tile_
     }
 }
 
-void rendererPatternTableClear(const uint8_t system_color)
+void rendererPatternTableClear()
 {
-    memset(&s_pattern_table, system_color, sizeof(s_pattern_table));
+    memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
 }
 
 void rendererTriggerCompleteRedraw(void)
@@ -385,9 +385,9 @@ void rendererTriggerCompleteRedraw(void)
 
 void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx)
 {
-    if ((x * RENDERER_TILES_IN_ROW + y) < RENDERER_NAME_TABLE_SIZE)
+    if ((y * RENDERER_TILES_IN_ROW + x) < RENDERER_NAME_TABLE_SIZE)
     {
-        s_name_table[x * RENDERER_TILES_IN_ROW + y] = tile_idx;
+        s_name_table[y * RENDERER_TILES_IN_ROW + x] = tile_idx;
     }
 }
 

@@ -27,7 +27,7 @@ void rendererFramePaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t syst
 
 // Pattern table
 void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, uint8_t tile_size);
-void rendererPatternTableClear(uint8_t system_color);
+void rendererPatternTableClear();
 
 // Name table
 void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx);
