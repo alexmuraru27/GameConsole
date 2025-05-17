@@ -54,6 +54,8 @@ static void syncFrame()
     while ((getSysTime() - s_last_frame_time) < FRAME_PERIOD)
       ;
   }
+  debugInt(1000 / (getSysTime() - s_last_frame_time));
+  debugString("\r\n");
   s_last_frame_time = getSysTime(); // Keep consistent frame timing
 }
 
@@ -101,6 +103,7 @@ static void screenInit()
   rendererFramePaletteSetSpriteMultiple(0U, pacman_ghost_palette[1U], pacman_ghost_palette[2U], pacman_ghost_palette[3U]);
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
+  rendererOamSetFlipH(0U, true);
 
   // backgrounds
   rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));

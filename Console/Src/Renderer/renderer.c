@@ -162,7 +162,7 @@ void rendererInit(void)
     memset(&s_dirtyTiles, 0U, sizeof(s_dirtyTiles));
 }
 
-static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx)
+static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
 {
     if (palette_idx >= RENDERER_FRAME_PALETTE_SIZE || pattern_index >= RENDERER_PATTERN_TABLE_SIZE)
     {
@@ -175,10 +175,12 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
     bool tile_fully_opaque = true;
     for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
     {
-        uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
-        uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1U];
-        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row * RENDERER_TILE_ROW_BYTES];
-        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row * RENDERER_TILE_ROW_BYTES + 1U];
+        // Use flipped row index for vertical flip
+        uint8_t row_idx = is_flip_v ? (RENDERER_TILE_SCREEN_SIZE - 1 - row) : row;
+        uint8_t byte0_low = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte0_high = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES + 1U];
+        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_ROW_BYTES * RENDERER_TILE_SCREEN_SIZE + row_idx * RENDERER_TILE_ROW_BYTES + 1U];
         if (((byte0_low | byte1_low) != 0xFF) || ((byte0_high | byte1_high) != 0xFF))
         {
             tile_fully_opaque = false;
@@ -192,18 +194,25 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
         ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
         for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
         {
-            uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
-            uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1];
-            uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES];
-            uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES + 1];
-            for (uint8_t col = 0U; col < 8U; col++)
+            // use flipped row index for vertical flip
+            uint8_t row_idx = is_flip_v ? (RENDERER_TILE_SCREEN_SIZE - 1 - row) : row;
+            uint8_t byte0_low = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES];
+            uint8_t byte0_high = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES + 1];
+            uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES];
+            uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES + 1];
+
+            // process all 16 pixels, reversing order for horizontal flip
+            for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
             {
-                uint8_t color_index = (((byte1_low >> (7U - col)) & 1U) << 1U) | ((byte0_low >> (7U - col)) & 1U);
-                ili9341SendPixel(palette[color_index]);
-            }
-            for (uint8_t col = 0U; col < 8U; col++)
-            {
-                uint8_t color_index = (((byte1_high >> (7U - col)) & 1U) << 1U) | ((byte0_high >> (7U - col)) & 1U);
+                // map column: 0->15, 1->14, ..., 15->0 when flipped
+                uint8_t col_idx = is_flip_h ? (RENDERER_TILE_SCREEN_SIZE - 1 - col) : col;
+                // determine which byte and bit (0-7 for low, 8-15 for high)
+                uint8_t byte_idx = col_idx / 8U;
+                uint8_t bit_pos = 7U - (col_idx % 8U);
+                // select correct byte for each bitplane
+                uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
+                uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
+                uint8_t color_index = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
                 ili9341SendPixel(palette[color_index]);
             }
         }
@@ -213,10 +222,12 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
     // if not fully opaque, send each row individually
     for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
     {
-        uint8_t byte0_low = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES];
-        uint8_t byte0_high = s_pattern_table[pattern_index][row * RENDERER_TILE_ROW_BYTES + 1U];
-        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES];
-        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row * RENDERER_TILE_ROW_BYTES + 1U];
+        // use flipped row index for vertical flip
+        uint8_t row_idx = is_flip_v ? (RENDERER_TILE_SCREEN_SIZE - 1 - row) : row;
+        uint8_t byte0_low = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte0_high = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES + 1U];
+        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES + 1U];
 
         // skip fully transparent rows
         if ((byte0_low == 0U && byte1_low == 0U) && (byte0_high == 0U && byte1_high == 0U))
@@ -227,19 +238,19 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
         // compute colors and transparency for the row
         uint16_t row_colors[RENDERER_TILE_SCREEN_SIZE];
         bool is_transparent[RENDERER_TILE_SCREEN_SIZE];
-        for (uint8_t col = 0U; col < 8U; col++)
+        for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
         {
-            uint8_t bit_pos = 7U - col;
-            uint8_t color_index = (((byte1_low >> bit_pos) & 1U) << 1U) | ((byte0_low >> bit_pos) & 1U);
+            // map column: 0->15, 1->14, ..., 15->0 when flipped
+            uint8_t col_idx = is_flip_h ? (RENDERER_TILE_SCREEN_SIZE - 1 - col) : col;
+            // determine which byte and bit
+            uint8_t byte_idx = col_idx / 8U;
+            uint8_t bit_pos = 7U - (col_idx % 8U);
+            // select correct byte for each bitplane
+            uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
+            uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
+            uint8_t color_index = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
             row_colors[col] = palette[color_index];
             is_transparent[col] = (color_index == 0U);
-        }
-        for (uint8_t col = 0U; col < 8U; col++)
-        {
-            uint8_t bit_pos = 7U - col;
-            uint8_t color_index = (((byte1_high >> bit_pos) & 1U) << 1U) | ((byte0_high >> bit_pos) & 1U);
-            row_colors[8U + col] = palette[color_index];
-            is_transparent[8U + col] = (color_index == 0U);
         }
 
         // send bursts of opaque pixels
@@ -288,7 +299,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawTile(((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), ((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), true, s_name_table[i], rendererAttributeTableGetPalette(i));
+            drawTile(((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), ((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
         }
     }
 
@@ -306,7 +317,7 @@ void rendererRender(void)
             const bool is_flip_v = rendererOamGetFlipV(i);
             const bool is_flip_h = rendererOamGetFlipH(i);
 
-            drawTile(x, y, false, tile_idx, palette);
+            drawTile(x, y, false, tile_idx, palette, is_flip_h, is_flip_v);
             // TODO: after rendering of the oam, set it to not dirty
             // rendererOamSetIsDirty(i, false);
         }
