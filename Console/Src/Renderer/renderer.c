@@ -307,10 +307,10 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if (tile_idx != 0U)
+        if ((tile_idx != 0U) && rendererOamGetIsDirty(i))
         {
             // TODO add if condition to check if the tile is also dirty ((tile_idx != 0U) && rendererOamGetIsDirty(i))
-
+            rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
             const uint8_t palette = rendererOamGetPaletteIdx(i);
@@ -418,7 +418,7 @@ uint8_t rendererOamGetXPos(const uint8_t oam_idx)
 
 void rendererOamSetXPos(const uint8_t oam_idx, const uint8_t x_pos)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (x_pos != rendererOamGetXPos(oam_idx)))
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
         s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
@@ -438,7 +438,7 @@ bool rendererOamGetFlipV(const uint8_t oam_idx)
 
 void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (is_flip_v != rendererOamGetFlipV(oam_idx)))
     {
         if (is_flip_v)
         {
@@ -464,7 +464,7 @@ bool rendererOamGetFlipH(const uint8_t oam_idx)
 
 void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (is_flip_h != rendererOamGetFlipH(oam_idx)))
     {
         if (is_flip_h)
         {
@@ -490,7 +490,7 @@ bool rendererOamGetPriority(const uint8_t oam_idx)
 
 void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (is_priority != rendererOamGetPriority(oam_idx)))
     {
         if (is_priority)
         {
@@ -539,7 +539,7 @@ uint8_t rendererOamGetPaletteIdx(const uint8_t oam_idx)
 
 void rendererOamSetPaletteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE && (palette_idx != rendererOamGetPaletteIdx(oam_idx)))
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
         s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
@@ -558,7 +558,7 @@ uint8_t rendererOamGetTileIdx(const uint8_t oam_idx)
 
 void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (tile_idx != rendererOamGetTileIdx(oam_idx)))
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
@@ -577,7 +577,7 @@ uint8_t rendererOamGetYPos(const uint8_t oam_idx)
 
 void rendererOamSetYPos(const uint8_t oam_idx, const uint8_t y_pos)
 {
-    if (oam_idx < RENDERER_OAM_SIZE)
+    if (oam_idx < RENDERER_OAM_SIZE && (y_pos != rendererOamGetYPos(oam_idx)))
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
