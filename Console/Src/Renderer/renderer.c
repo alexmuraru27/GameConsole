@@ -295,21 +295,13 @@ void rendererRender(void)
 {
     // TODO dirty checker
     // TODO overlap checker
-    for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
-    {
-        if (s_name_table[i] != 0U)
-        {
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
-        }
-    }
 
-    // Try OAM data
+    // 1. render OAM with priority=1 -> back of BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && rendererOamGetIsDirty(i))
+        if ((tile_idx != 0U) && rendererOamGetPriority(i))
         {
-            // TODO add if condition to check if the tile is also dirty ((tile_idx != 0U) && rendererOamGetIsDirty(i))
             rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
@@ -318,8 +310,32 @@ void rendererRender(void)
             const bool is_flip_h = rendererOamGetFlipH(i);
 
             drawTile(x, y, false, tile_idx, palette, is_flip_h, is_flip_v);
-            // TODO: after rendering of the oam, set it to not dirty
-            // rendererOamSetIsDirty(i, false);
+        }
+    }
+
+    // 2. render BG
+    for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
+    {
+        if (s_name_table[i] != 0U)
+        {
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
+        }
+    }
+
+    // 3. render OAM with priority=0 -> front of BG
+    for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
+    {
+        const uint8_t tile_idx = rendererOamGetTileIdx(i);
+        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)))
+        {
+            rendererOamSetIsDirty(i, false);
+            const uint8_t x = rendererOamGetXPos(i);
+            const uint8_t y = rendererOamGetYPos(i);
+            const uint8_t palette = rendererOamGetPaletteIdx(i);
+            const bool is_flip_v = rendererOamGetFlipV(i);
+            const bool is_flip_h = rendererOamGetFlipH(i);
+
+            drawTile(x, y, false, tile_idx, palette, is_flip_h, is_flip_v);
         }
     }
 }
