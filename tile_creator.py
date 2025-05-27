@@ -359,11 +359,14 @@ while running:
             else:
                 text_active = False
             if save_button.collidepoint((x, y)):
-                export_as_array(input_text)
+                if ask_yes_no(f"Save \"{input_text}\"?"):
+                    export_as_array(input_text)
             elif load_button.collidepoint((x, y)):
-                load_from_file(input_text)
+                if ask_yes_no(f"Load \"{input_text}\"?"):
+                    load_from_file(input_text)
             elif clear_button.collidepoint((x, y)):
-                clear_screen()
+                if ask_yes_no(f"Clear \"{input_text}\"?"):
+                    clear_screen()
             elif y < NES_PALETTE_ROWS * NES_PALETTE_COLOR_SIZE:
                 sel = handle_nes_palette_click((x, y))
                 if sel is not None:
