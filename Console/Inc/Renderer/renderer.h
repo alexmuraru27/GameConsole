@@ -56,10 +56,20 @@ uint8_t rendererOamGetPaletteIdx(uint8_t oam_idx);
 uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
 
-// AttributeTable
-void rendererAttributeTableSetPalette(uint8_t nametable_idx, uint8_t palette);
-uint8_t rendererAttributeTableGetPalette(uint8_t nametable_idx);
+// AttributeTable attr_table_idx addresing
+void rendererAttributeTableSetPalette(uint8_t attr_table_idx, uint8_t palette);
+uint8_t rendererAttributeTableGetPalette(uint8_t attr_table_idx);
+void rendererAttributeTableSetFlipV(uint8_t attr_table_idx, bool isFlipV);
+bool rendererAttributeTableGetFlipV(uint8_t attr_table_idx);
+void rendererAttributeTableSetFlipH(uint8_t attr_table_idx, bool isFlipH);
+bool rendererAttributeTableGetFlipH(uint8_t attr_table_idx);
+
+// AttributeTable XY Coords addressing
 void rendererAttributeTableSetPaletteXYCoords(uint8_t x, uint8_t y, uint8_t palette);
 uint8_t rendererAttributeTableGetPaletteXYCoords(uint8_t x, uint8_t y);
+void rendererAttributeTableSetFlipVXYCoords(uint8_t x, uint8_t y, bool isFlipV);
+bool rendererAttributeTableGetFlipVXYCoords(uint8_t x, uint8_t y);
+void rendererAttributeTableSetFlipHXYCoords(uint8_t x, uint8_t y, bool isFlipH);
+bool rendererAttributeTableGetFlipHXYCoords(uint8_t x, uint8_t y);
 
 #endif /* __RENDERER_H */

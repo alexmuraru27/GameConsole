@@ -16,10 +16,16 @@
 #define RENDERER_NAME_TABLE_SIZE (RENDERER_TILES_IN_ROW * RENDERER_TILES_IN_COLUMN)
 
 // Attribute table needs 4bits for each tile since we are using 16 frame palettes for bg
-#define RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE 2U
-#define RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS (8U / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
-#define RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK ((1 << RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS) - 1U)
-#define RENDERER_ATTRIBUTE_TABLE_SIZE ((RENDERER_NAME_TABLE_SIZE) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
+// [0 0 Filp_V Flip_H IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0]
+#define RENDERER_ATTRIBUTE_TABLE_PALETTE_POS 0U
+#define RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK 0x0FU
+
+#define RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS 4U
+#define RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK 0x01U
+
+#define RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS 5U
+#define RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK 0x01U
+#define RENDERER_ATTRIBUTE_TABLE_SIZE RENDERER_NAME_TABLE_SIZE
 
 #define RENDERER_DIRTY_TILES_SIZE RENDERER_NAME_TABLE_SIZE
 
@@ -322,7 +328,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), false, false);
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), rendererAttributeTableGetFlipH(i), rendererAttributeTableGetFlipV(i));
         }
     }
 
@@ -606,25 +612,64 @@ void rendererOamSetYPos(const uint8_t oam_idx, const uint8_t y_pos)
     }
 }
 
-void rendererAttributeTableSetPalette(const uint8_t nametable_idx, const uint8_t palette)
+void rendererAttributeTableSetPalette(const uint8_t attr_table_idx, const uint8_t palette)
 {
-    if ((nametable_idx < (RENDERER_NAME_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
+    if ((attr_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
     {
-        const uint8_t cluster_shift_count = (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (nametable_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE));
-        s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] &= ~(RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << cluster_shift_count);
-        s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] |= ((palette & RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK) << cluster_shift_count);
+        s_attribute_table[attr_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
+        s_attribute_table[attr_table_idx] |= ((palette & RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK) << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
     }
 }
 
-uint8_t rendererAttributeTableGetPalette(const uint8_t nametable_idx)
+uint8_t rendererAttributeTableGetPalette(const uint8_t attr_table_idx)
 {
-    if (nametable_idx < (RENDERER_NAME_TABLE_SIZE))
+    if (attr_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
-        const uint8_t cluster_shift_count = (RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS * (nametable_idx % RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE));
-        return ((s_attribute_table[nametable_idx / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE] & (RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK << cluster_shift_count)) >> cluster_shift_count);
+        return ((s_attribute_table[attr_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS)) >> RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
     }
-
     return 0U;
+}
+
+void rendererAttributeTableSetFlipV(uint8_t attr_table_idx, bool isFlipV)
+{
+    if (attr_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        s_attribute_table[attr_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
+        if (isFlipV)
+        {
+            s_attribute_table[attr_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
+        }
+    }
+}
+
+bool rendererAttributeTableGetFlipV(uint8_t attr_table_idx)
+{
+    if (attr_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        return ((s_attribute_table[attr_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS)) != 0U);
+    }
+    return false;
+}
+
+void rendererAttributeTableSetFlipH(uint8_t attr_table_idx, bool isFlipH)
+{
+    if (attr_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        s_attribute_table[attr_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
+        if (isFlipH)
+        {
+            s_attribute_table[attr_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
+        }
+    }
+}
+
+bool rendererAttributeTableGetFlipH(uint8_t attr_table_idx)
+{
+    if (attr_table_idx < (RENDERER_NAME_TABLE_SIZE))
+    {
+        return ((s_attribute_table[attr_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS)) != 0U);
+    }
+    return false;
 }
 
 void rendererAttributeTableSetPaletteXYCoords(const uint8_t x, const uint8_t y, const uint8_t palette)
@@ -634,6 +679,23 @@ void rendererAttributeTableSetPaletteXYCoords(const uint8_t x, const uint8_t y, 
 uint8_t rendererAttributeTableGetPaletteXYCoords(const uint8_t x, const uint8_t y)
 {
     return rendererAttributeTableGetPalette(y * RENDERER_TILES_IN_ROW + x);
+}
+
+void rendererAttributeTableSetFlipVXYCoords(uint8_t x, uint8_t y, bool isFlipV)
+{
+    rendererAttributeTableSetFlipV(y * RENDERER_TILES_IN_ROW + x, isFlipV);
+}
+bool rendererAttributeTableGetFlipVXYCoords(uint8_t x, uint8_t y)
+{
+    return rendererAttributeTableGetFlipV(y * RENDERER_TILES_IN_ROW + x);
+}
+void rendererAttributeTableSetFlipHXYCoords(uint8_t x, uint8_t y, bool isFlipH)
+{
+    rendererAttributeTableSetFlipH(y * RENDERER_TILES_IN_ROW + x, isFlipH);
+}
+bool rendererAttributeTableGetFlipHXYCoords(uint8_t x, uint8_t y)
+{
+    return rendererAttributeTableGetFlipH(y * RENDERER_TILES_IN_ROW + x);
 }
 
 uint16_t rendererGetSizeWidth()

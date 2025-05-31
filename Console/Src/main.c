@@ -123,6 +123,9 @@ static void screenInit()
   rendererAttributeTableSetPalette(5U, brick_pallete_idx);
   rendererAttributeTableSetPalette(6U, brick_pallete_idx);
 
+  rendererAttributeTableSetFlipHXYCoords(2U, 0U, true);
+  rendererAttributeTableSetFlipVXYCoords(2U, 0U, true);
+
   // background set nametable
   rendererNameTableSetTile(5U, 5U, 2U);
   rendererNameTableSetTile(5U, 5U + 1U, 3U);
