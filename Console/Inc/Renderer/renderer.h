@@ -60,4 +60,7 @@ bool rendererAttributeTableGetFlipV(uint8_t tile_x, uint8_t tile_y);
 void rendererAttributeTableSetFlipH(uint8_t tile_x, uint8_t tile_y, bool isFlipH);
 bool rendererAttributeTableGetFlipH(uint8_t tile_x, uint8_t tile_y);
 
+void rendererAttributeTableSetPriority(uint8_t tile_x, uint8_t tile_y, bool priority);
+bool rendererAttributeTableGetPriority(uint8_t tile_x, uint8_t tile_y);
+
 #endif /* __RENDERER_H */

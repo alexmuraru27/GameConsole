@@ -137,8 +137,12 @@ static void screenInit()
   {
     rendererNameTableSetTile(0U, i, 4U);
     rendererNameTableSetTile(rendererGetMaxTilesInRow() - 1, i, 4U);
+
     rendererAttributeTableSetPalette(0U, i, brick_pallete_idx);
     rendererAttributeTableSetPalette(rendererGetMaxTilesInRow() - 1, i, brick_pallete_idx);
+
+    rendererAttributeTableSetPriority(0U, i, true);
+    rendererAttributeTableSetPriority(rendererGetMaxTilesInRow() - 1, i, true);
   }
   for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
   {
@@ -147,6 +151,9 @@ static void screenInit()
 
     rendererAttributeTableSetPalette(i, 0U, brick_pallete_idx);
     rendererAttributeTableSetPalette(i, rendererGetMaxTilesInColumn() - 1, brick_pallete_idx);
+
+    rendererAttributeTableSetPriority(i, 0U, true);
+    rendererAttributeTableSetPriority(i, rendererGetMaxTilesInColumn() - 1, true);
   }
 }
 int main(void)

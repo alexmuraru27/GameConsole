@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "string.h"
 #include "ILI9341.h"
+#include "tileCreator.h"
 #define CCMRAM __attribute__((section(".ccmram")))
 
 #define RENDERER_WIDTH 256U  // 32
@@ -20,7 +21,7 @@
 #define RENDERER_NAME_TABLE_SIZE (RENDERER_TILES_IN_ROW * RENDERER_TILES_IN_COLUMN)
 
 // Attribute table needs 4bits for each tile since we are using 16 frame palettes for bg
-// [0 0 Filp_V Flip_H IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0]
+// [0 Priority Filp_V Flip_H IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0]
 #define RENDERER_ATTRIBUTE_TABLE_PALETTE_POS 0U
 #define RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK 0x0FU
 
@@ -29,6 +30,9 @@
 
 #define RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS 5U
 #define RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK 0x01U
+
+#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS 6U
+#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK 0x01U
 #define RENDERER_ATTRIBUTE_TABLE_SIZE RENDERER_NAME_TABLE_SIZE
 
 #define RENDERER_DIRTY_TILES_SIZE RENDERER_NAME_TABLE_SIZE
@@ -164,6 +168,24 @@ static CCMRAM uint16_t s_frame_palette_bg[RENDERER_FRAME_PALETTE_SIZE][RENDERER_
 // Background tile positions that need to be redrawn
 static CCMRAM uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
 
+const uint8_t bg_data[64U] = DEFINE_TILE_16(
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+
 void rendererInit(void)
 {
     memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
@@ -173,6 +195,19 @@ void rendererInit(void)
     memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
     memset(&s_frame_palette_bg, 0U, sizeof(s_frame_palette_bg));
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_CLEAR, sizeof(s_dirtyTiles));
+
+    // TODO make this to work with tileid 0
+    rendererPatternTableSetTile(RENDERER_NAME_TABLE_SIZE - 1U, bg_data, sizeof(bg_data));
+    rendererFramePaletteSetSpriteMultiple(15U, 0U, 0U, 0U);
+    for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
+    {
+        for (uint8_t j = 0; j < rendererGetMaxTilesInColumn(); j++)
+        {
+            rendererNameTableSetTile(i, j, RENDERER_NAME_TABLE_SIZE - 1U);
+
+            rendererAttributeTableSetPalette(i, j, 15U);
+        }
+    }
 }
 
 static void rendererDirtyOamSet(uint8_t oam_idx)
@@ -321,6 +356,27 @@ static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
     return false;
 }
 
+void rendererAttributeTableSetPriorityIdx(const uint8_t name_table_idx, bool priority)
+{
+    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS);
+        if (priority)
+        {
+            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS);
+        }
+        rendererSetDirtyBgTiles(name_table_idx);
+    }
+}
+bool rendererAttributeTableGetPriorityIdx(const uint8_t name_table_idx)
+{
+    if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
+    {
+        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS)) != 0U);
+    }
+    return false;
+}
+
 static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
 {
     if (pattern_index >= RENDERER_PATTERN_TABLE_SIZE || palette_idx >= RENDERER_FRAME_PALETTE_SIZE)
@@ -451,6 +507,16 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
 
 void rendererRender(void)
 {
+    // 0 Render the bottom most bg
+    for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
+    {
+        if (s_dirtyTiles[i] != 0U && (!rendererAttributeTableGetPriorityIdx(i)))
+        {
+            s_dirtyTiles[i]--;
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
+        }
+    }
+
     // 1. render OAM with priority=1 -> back of BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
@@ -471,7 +537,7 @@ void rendererRender(void)
     // TODO render only the dirty ones
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_dirtyTiles[i] != 0U)
+        if (s_dirtyTiles[i] != 0U && rendererAttributeTableGetPriorityIdx(i))
         {
             s_dirtyTiles[i]--;
             drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
@@ -765,7 +831,14 @@ bool rendererAttributeTableGetFlipH(const uint8_t tile_x, const uint8_t tile_y)
 {
     return rendererAttributeTableGetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
-
+void rendererAttributeTableSetPriority(uint8_t tile_x, uint8_t tile_y, bool priority)
+{
+    rendererAttributeTableSetPriorityIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), priority);
+}
+bool rendererAttributeTableGetPriority(uint8_t tile_x, uint8_t tile_y)
+{
+    return rendererAttributeTableGetPriorityIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+}
 uint16_t rendererGetSizeWidth()
 {
     return RENDERER_WIDTH;
