@@ -114,16 +114,18 @@ static void screenInit()
   // background frame palette
   const uint8_t brick_pallete_idx = 0U;
   rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx, bricks1_palette[1U], bricks1_palette[2U], bricks1_palette[3U]);
+  rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx + 1, 5, 6, 7);
+  rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx + 2, 10, 11, 12);
 
   // background set attribute table
-  rendererAttributeTableSetPalette(2U, brick_pallete_idx);
-  rendererAttributeTableSetPalette(3U, brick_pallete_idx);
-  rendererAttributeTableSetPalette(4U, brick_pallete_idx);
-  rendererAttributeTableSetPalette(5U, brick_pallete_idx);
-  rendererAttributeTableSetPalette(6U, brick_pallete_idx);
+  // All the rest go to the default palette at brick_pallete_idx = 0
+  rendererAttributeTableSetPalette(2U, 0U, brick_pallete_idx + 1);
+  rendererAttributeTableSetPalette(3U, 0U, brick_pallete_idx + 1);
+  rendererAttributeTableSetPalette(4U, 0U, brick_pallete_idx + 2);
+  rendererAttributeTableSetPalette(5U, 0U, brick_pallete_idx + 2);
 
-  rendererAttributeTableSetFlipHXYCoords(2U, 0U, true);
-  rendererAttributeTableSetFlipVXYCoords(2U, 0U, true);
+  rendererAttributeTableSetFlipH(2U, 0U, true);
+  rendererAttributeTableSetFlipV(2U, 0U, true);
 
   // background set nametable
   rendererNameTableSetTile(5U, 5U, 2U);

@@ -7,9 +7,9 @@
 #define RENDERER_HEIGHT 240U // 30
 #define RENDERER_TILE_SCREEN_SIZE 16U
 #define RENDERER_TILE_MEMORY_SIZE 64U
-
 #define RENDERER_TILES_IN_ROW (RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE)
 #define RENDERER_TILES_IN_COLUMN (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)
+#define RENDERER_HELPER_TILE_COORD_TO_INDEX(x, y) ((y) * RENDERER_TILES_IN_ROW + (x))
 
 #define RENDERER_TILE_ROW_BYTES (RENDERER_TILE_SCREEN_SIZE / 8U)
 
@@ -184,12 +184,12 @@ static uint8_t xyCoordsToTileIndexMap(const uint8_t screen_x, const uint8_t scre
         if (tile_y >= RENDERER_TILES_IN_COLUMN)
             tile_y = RENDERER_TILES_IN_COLUMN - 1;
 
-        return tile_y * RENDERER_TILES_IN_ROW + tile_x;
+        return RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y);
     }
     return 0U;
 }
 
-static void rendererSetDirtyBgTilesTouchedBySpriteXY(const uint8_t sprite_x, const uint8_t sprite_y)
+static void rendererSetDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const uint8_t sprite_y)
 {
     if ((sprite_x < (RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE)) && (sprite_y < (RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE)))
     {
@@ -233,12 +233,67 @@ static void rendererSetDirtyBgTiles(const uint8_t nametable_idx)
     }
 }
 
-static void rendererSetDirtyBgTilesXYCoords(const uint8_t tile_x, const uint8_t tile_y)
+static void rendererAttributeTableSetPaletteIdx(const uint8_t name_table_idx, const uint8_t palette)
 {
-    if ((tile_y * RENDERER_TILES_IN_ROW + tile_x) < RENDERER_DIRTY_TILES_SIZE)
+    if ((name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
     {
-        rendererSetDirtyBgTiles(tile_y * RENDERER_TILES_IN_ROW + tile_x);
+        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
+        s_attribute_table[name_table_idx] |= ((palette & RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK) << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
+        rendererSetDirtyBgTiles(name_table_idx);
     }
+}
+
+static uint8_t rendererAttributeTableGetPaletteIdx(const uint8_t name_table_idx)
+{
+    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS)) >> RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
+    }
+    return 0U;
+}
+
+static void rendererAttributeTableSetFlipVIdx(const uint8_t name_table_idx, const bool isFlipV)
+{
+    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
+        if (isFlipV)
+        {
+            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
+        }
+        rendererSetDirtyBgTiles(name_table_idx);
+    }
+}
+
+static bool rendererAttributeTableGetFlipVIdx(const uint8_t name_table_idx)
+{
+    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS)) != 0U);
+    }
+    return false;
+}
+
+static void rendererAttributeTableSetFlipHIdx(const uint8_t name_table_idx, const bool isFlipH)
+{
+    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
+    {
+        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
+        if (isFlipH)
+        {
+            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
+        }
+        rendererSetDirtyBgTiles(name_table_idx);
+    }
+}
+
+static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
+{
+    if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
+    {
+        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS)) != 0U);
+    }
+    return false;
 }
 
 static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
@@ -397,7 +452,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), rendererAttributeTableGetFlipH(i), rendererAttributeTableGetFlipV(i));
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
         }
     }
 
@@ -477,25 +532,26 @@ void rendererPatternTableClear()
 
 void rendererSetDirtyCompleteRedraw(void)
 {
-    // TODO Modify this
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_NEW_SET, RENDERER_DIRTY_TILES_SIZE);
 }
 
 void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx)
 {
-    if ((tile_y * RENDERER_TILES_IN_ROW + tile_x) < RENDERER_NAME_TABLE_SIZE)
+    const uint8_t nametable_idx = RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y);
+    if ((nametable_idx) < RENDERER_NAME_TABLE_SIZE)
     {
-        s_name_table[tile_y * RENDERER_TILES_IN_ROW + tile_x] = tile_idx;
-        rendererSetDirtyBgTilesXYCoords(tile_x, tile_y);
+        s_name_table[nametable_idx] = tile_idx;
+        rendererSetDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
     }
 }
 
 void rendererNameTableClearTile(uint8_t tile_x, uint8_t tile_y)
 {
-    if ((tile_y * RENDERER_TILES_IN_ROW + tile_x) < RENDERER_NAME_TABLE_SIZE)
+    const uint8_t nametable_idx = RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y);
+    if ((nametable_idx) < RENDERER_NAME_TABLE_SIZE)
     {
-        s_name_table[tile_y * RENDERER_TILES_IN_ROW + tile_x] = 0U;
-        rendererSetDirtyBgTilesXYCoords(tile_x, tile_y);
+        s_name_table[nametable_idx] = 0U;
+        rendererSetDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
     }
 }
 
@@ -528,7 +584,7 @@ void rendererOamSetXYPos(const uint8_t oam_idx, const uint8_t x_pos, const uint8
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
         rendererOamSetIsDirty(oam_idx, true);
-        rendererSetDirtyBgTilesTouchedBySpriteXY(x_pos, y_pos);
+        rendererSetDirtyBgTilesTouchedBySprite(x_pos, y_pos);
     }
 }
 
@@ -680,93 +736,30 @@ uint8_t rendererOamGetYPos(const uint8_t oam_idx)
     return 0U;
 }
 
-void rendererAttributeTableSetPalette(const uint8_t name_table_idx, const uint8_t palette)
+void rendererAttributeTableSetPalette(const uint8_t tile_x, const uint8_t tile_y, const uint8_t palette)
 {
-    if ((name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
-    {
-        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
-        s_attribute_table[name_table_idx] |= ((palette & RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK) << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
-        rendererSetDirtyBgTiles(name_table_idx);
-    }
+    rendererAttributeTableSetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), palette);
+}
+uint8_t rendererAttributeTableGetPalette(const uint8_t tile_x, const uint8_t tile_y)
+{
+    return rendererAttributeTableGetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 
-uint8_t rendererAttributeTableGetPalette(const uint8_t name_table_idx)
+void rendererAttributeTableSetFlipV(const uint8_t tile_x, const uint8_t tile_y, bool isFlipV)
 {
-    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
-    {
-        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS)) >> RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
-    }
-    return 0U;
+    rendererAttributeTableSetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipV);
 }
-
-void rendererAttributeTableSetFlipV(const uint8_t name_table_idx, const bool isFlipV)
+bool rendererAttributeTableGetFlipV(const uint8_t tile_x, const uint8_t tile_y)
 {
-    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
-    {
-        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
-        if (isFlipV)
-        {
-            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
-        }
-        rendererSetDirtyBgTiles(name_table_idx);
-    }
+    return rendererAttributeTableGetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
-
-bool rendererAttributeTableGetFlipV(const uint8_t name_table_idx)
+void rendererAttributeTableSetFlipH(const uint8_t tile_x, const uint8_t tile_y, bool isFlipH)
 {
-    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
-    {
-        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS)) != 0U);
-    }
-    return false;
+    rendererAttributeTableSetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipH);
 }
-
-void rendererAttributeTableSetFlipH(const uint8_t name_table_idx, const bool isFlipH)
+bool rendererAttributeTableGetFlipH(const uint8_t tile_x, const uint8_t tile_y)
 {
-    if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
-    {
-        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
-        if (isFlipH)
-        {
-            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
-        }
-        rendererSetDirtyBgTiles(name_table_idx);
-    }
-}
-
-bool rendererAttributeTableGetFlipH(const uint8_t name_table_idx)
-{
-    if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
-    {
-        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS)) != 0U);
-    }
-    return false;
-}
-
-void rendererAttributeTableSetPaletteXYCoords(const uint8_t tile_x, const uint8_t tile_y, const uint8_t palette)
-{
-    rendererAttributeTableSetPalette(tile_y * RENDERER_TILES_IN_ROW + tile_x, palette);
-}
-uint8_t rendererAttributeTableGetPaletteXYCoords(const uint8_t tile_x, const uint8_t tile_y)
-{
-    return rendererAttributeTableGetPalette(tile_y * RENDERER_TILES_IN_ROW + tile_x);
-}
-
-void rendererAttributeTableSetFlipVXYCoords(const uint8_t tile_x, const uint8_t tile_y, bool isFlipV)
-{
-    rendererAttributeTableSetFlipV(tile_y * RENDERER_TILES_IN_ROW + tile_x, isFlipV);
-}
-bool rendererAttributeTableGetFlipVXYCoords(const uint8_t tile_x, const uint8_t tile_y)
-{
-    return rendererAttributeTableGetFlipV(tile_y * RENDERER_TILES_IN_ROW + tile_x);
-}
-void rendererAttributeTableSetFlipHXYCoords(const uint8_t tile_x, const uint8_t tile_y, bool isFlipH)
-{
-    rendererAttributeTableSetFlipH(tile_y * RENDERER_TILES_IN_ROW + tile_x, isFlipH);
-}
-bool rendererAttributeTableGetFlipHXYCoords(const uint8_t tile_x, const uint8_t tile_y)
-{
-    return rendererAttributeTableGetFlipH(tile_y * RENDERER_TILES_IN_ROW + tile_x);
+    return rendererAttributeTableGetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 
 uint16_t rendererGetSizeWidth()
