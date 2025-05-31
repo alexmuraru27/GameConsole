@@ -87,10 +87,12 @@ static void render()
   if (joystickGetSpecialBtn1())
   {
     ili9341FillWindow(ILI9341_BLACK);
+    rendererSetDirtyCompleteRedraw();
   }
   if (joystickGetSpecialBtn2())
   {
     ili9341FillWindow(ILI9341_WHITE);
+    rendererSetDirtyCompleteRedraw();
   }
 
   rendererRender();
@@ -103,6 +105,7 @@ static void screenInit()
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
   rendererOamSetFlipH(0U, true);
+  rendererOamSetPriority(0U, false);
 
   // backgrounds
   rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));

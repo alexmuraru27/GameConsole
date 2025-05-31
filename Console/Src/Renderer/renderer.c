@@ -431,7 +431,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && rendererOamGetPriority(i))
+        if ((tile_idx != 0U) && rendererOamGetPriority(i) && rendererOamGetIsDirty(i))
         {
             rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
@@ -462,7 +462,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)))
+        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)) && rendererOamGetIsDirty(i))
         {
             rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
