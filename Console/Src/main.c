@@ -41,11 +41,6 @@ static void consoleInit()
   rendererInit();
 }
 
-// TODO Remove statics :)
-static uint8_t x = 0U;
-static uint8_t y = 0U;
-const uint16_t SPEED = 5U;
-
 static void syncFrame()
 {
   if (getSysTime() - s_last_frame_time < FRAME_PERIOD)
@@ -61,7 +56,10 @@ static void syncFrame()
 
 static void update()
 {
-  if (x <= rendererGetSizeWidth() - rendererGetSizeTileScreen() - SPEED)
+  const uint16_t SPEED = 5U;
+  uint8_t x = rendererOamGetXPos(0U);
+  uint8_t y = rendererOamGetYPos(0U);
+  if (x <= rendererGetSizeWidth() - rendererGetSizeTileScreen())
   {
     x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -70,7 +68,7 @@ static void update()
     x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  if (y <= rendererGetSizeHeight() - rendererGetSizeTileScreen() - SPEED)
+  if (y <= rendererGetSizeHeight() - rendererGetSizeTileScreen())
   {
     y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -105,7 +103,7 @@ static void screenInit()
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
   rendererOamSetFlipH(0U, true);
-  rendererOamSetPriority(0U, true);
+  rendererOamSetPriority(0U, false);
 
   // backgrounds
   rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));
@@ -115,18 +113,10 @@ static void screenInit()
   rendererPatternTableSetTile(6U, bricks5_data, sizeof(bricks5_data));
 
   // background frame palette
-  const uint8_t brick_pallete_idx = 0U;
+  const uint8_t brick_pallete_idx = 1U;
   rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx, bricks1_palette[1U], bricks1_palette[2U], bricks1_palette[3U]);
-  rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx + 1, 5, 6, 7);
-  rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx + 2, 10, 11, 12);
 
-  // background set attribute table
-  // All the rest go to the default palette at brick_pallete_idx = 0
-  rendererAttributeTableSetPalette(2U, 0U, brick_pallete_idx + 1);
-  rendererAttributeTableSetPalette(3U, 0U, brick_pallete_idx + 1);
-  rendererAttributeTableSetPalette(4U, 0U, brick_pallete_idx + 2);
-  rendererAttributeTableSetPalette(5U, 0U, brick_pallete_idx + 2);
-
+  // tile [2,0] flipped in both directions
   rendererAttributeTableSetFlipH(2U, 0U, true);
   rendererAttributeTableSetFlipV(2U, 0U, true);
 
@@ -137,15 +127,26 @@ static void screenInit()
   rendererNameTableSetTile(5U, 5U + 3U, 5U);
   rendererNameTableSetTile(5U, 5U + 4U, 6U);
 
+  rendererAttributeTableSetPalette(5U, 5U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(5U, 5U + 1U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(5U, 5U + 2U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(5U, 5U + 3U, brick_pallete_idx);
+  rendererAttributeTableSetPalette(5U, 5U + 4U, brick_pallete_idx);
+
   for (uint8_t i = 0; i < rendererGetMaxTilesInColumn(); i++)
   {
     rendererNameTableSetTile(0U, i, 4U);
     rendererNameTableSetTile(rendererGetMaxTilesInRow() - 1, i, 4U);
+    rendererAttributeTableSetPalette(0U, i, brick_pallete_idx);
+    rendererAttributeTableSetPalette(rendererGetMaxTilesInRow() - 1, i, brick_pallete_idx);
   }
   for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
   {
     rendererNameTableSetTile(i, 0U, 6U);
     rendererNameTableSetTile(i, rendererGetMaxTilesInColumn() - 1, 6U);
+
+    rendererAttributeTableSetPalette(i, 0U, brick_pallete_idx);
+    rendererAttributeTableSetPalette(i, rendererGetMaxTilesInColumn() - 1, brick_pallete_idx);
   }
 }
 int main(void)

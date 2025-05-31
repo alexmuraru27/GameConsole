@@ -7,6 +7,10 @@
 #define RENDERER_HEIGHT 240U // 30
 #define RENDERER_TILE_SCREEN_SIZE 16U
 #define RENDERER_TILE_MEMORY_SIZE 64U
+
+#define RENDERER_COORD_MAX_X (RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE - 1U)
+#define RENDERER_COORD_MAX_Y (RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE - 1U)
+
 #define RENDERER_TILES_IN_ROW (RENDERER_WIDTH / RENDERER_TILE_SCREEN_SIZE)
 #define RENDERER_TILES_IN_COLUMN (RENDERER_HEIGHT / RENDERER_TILE_SCREEN_SIZE)
 #define RENDERER_HELPER_TILE_COORD_TO_INDEX(x, y) ((y) * RENDERER_TILES_IN_ROW + (x))
@@ -212,7 +216,7 @@ static uint8_t xyCoordsToTileIndexMap(const uint8_t screen_x, const uint8_t scre
 
 static void rendererSetDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const uint8_t sprite_y)
 {
-    if ((sprite_x <= (RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE)) && (sprite_y <= (RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE)))
+    if ((sprite_x <= RENDERER_COORD_MAX_X) && (sprite_y <= RENDERER_COORD_MAX_Y))
     {
         uint8_t tile_x_0 = sprite_x / RENDERER_TILE_SCREEN_SIZE;
         uint8_t tile_y_0 = sprite_y / RENDERER_TILE_SCREEN_SIZE;
@@ -317,14 +321,12 @@ static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
     return false;
 }
 
-static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
+static void drawTileSprite(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
 {
-    if (palette_idx >= RENDERER_FRAME_PALETTE_SIZE || pattern_index >= RENDERER_PATTERN_TABLE_SIZE)
+    if (pattern_index >= RENDERER_PATTERN_TABLE_SIZE || palette_idx >= RENDERER_FRAME_PALETTE_SIZE)
     {
         return;
     }
-
-    const uint16_t *palette = is_bg ? s_frame_palette_bg[palette_idx] : s_frame_palette_sprite[palette_idx];
 
     // tile fully opaque -> all pixels  color_idx != 0
     bool tile_fully_opaque = true;
@@ -368,7 +370,7 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
                 uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
                 uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
                 uint8_t color_idx = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
-                ili9341SendPixel(palette[color_idx]);
+                ili9341SendPixel(s_frame_palette_sprite[palette_idx][color_idx]);
             }
         }
         return;
@@ -404,7 +406,7 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
             uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
             uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
             uint8_t color_idx = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
-            row_colors[col] = palette[color_idx];
+            row_colors[col] = s_frame_palette_sprite[palette_idx][color_idx];
             is_transparent[col] = (color_idx == 0U);
         }
 
@@ -446,6 +448,40 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
     }
 }
 
+static void drawTileBackground(const uint8_t x, const uint8_t y, const uint8_t pattern_index, const uint8_t palette_idx, bool is_flip_h, bool is_flip_v)
+{
+    if (pattern_index >= RENDERER_PATTERN_TABLE_SIZE || palette_idx >= RENDERER_FRAME_PALETTE_SIZE)
+    {
+        return;
+    }
+
+    ili9341SetAddrWindow(x, y, RENDERER_TILE_SCREEN_SIZE, RENDERER_TILE_SCREEN_SIZE);
+    for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
+    {
+        // use flipped row index for vertical flip
+        uint8_t row_idx = is_flip_v ? (RENDERER_TILE_SCREEN_SIZE - 1 - row) : row;
+        uint8_t byte0_low = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte0_high = s_pattern_table[pattern_index][row_idx * RENDERER_TILE_ROW_BYTES + 1];
+        uint8_t byte1_low = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES];
+        uint8_t byte1_high = s_pattern_table[pattern_index][RENDERER_TILE_SCREEN_SIZE * RENDERER_TILE_ROW_BYTES + row_idx * RENDERER_TILE_ROW_BYTES + 1];
+
+        // process all 16 pixels, reversing order for horizontal flip
+        for (uint8_t col = 0U; col < RENDERER_TILE_SCREEN_SIZE; col++)
+        {
+            // map column: 0->15, 1->14, ..., 15->0 when flipped
+            uint8_t col_idx = is_flip_h ? (RENDERER_TILE_SCREEN_SIZE - 1 - col) : col;
+            // determine which byte and bit (0-7 for low, 8-15 for high)
+            uint8_t byte_idx = col_idx / 8U;
+            uint8_t bit_pos = 7U - (col_idx % 8U);
+            // select correct byte for each bitplane
+            uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
+            uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
+            uint8_t color_idx = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
+            // if 0 - transparent for sprites, for background we will paint the default value in the palette
+            ili9341SendPixel(s_frame_palette_bg[palette_idx][color_idx]);
+        }
+    }
+}
 void rendererRender(void)
 {
     // 1. render OAM with priority=1 -> back of BG
@@ -460,7 +496,7 @@ void rendererRender(void)
             const bool is_flip_v = rendererOamGetFlipV(i);
             const bool is_flip_h = rendererOamGetFlipH(i);
 
-            drawTile(x, y, false, tile_idx, palette, is_flip_h, is_flip_v);
+            drawTileSprite(x, y, tile_idx, palette, is_flip_h, is_flip_v);
         }
     }
 
@@ -468,13 +504,10 @@ void rendererRender(void)
     // TODO render only the dirty ones
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_name_table[i] != 0U && s_dirtyTiles[i] != 0U)
+        if (s_dirtyTiles[i] != 0U)
         {
-            if (s_dirtyTiles[i] > 0U)
-            {
-                s_dirtyTiles[i]--;
-            }
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
+            s_dirtyTiles[i]--;
+            drawTileBackground(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
         }
     }
 
@@ -490,7 +523,7 @@ void rendererRender(void)
             const bool is_flip_v = rendererOamGetFlipV(i);
             const bool is_flip_h = rendererOamGetFlipH(i);
 
-            drawTile(x, y, false, tile_idx, palette, is_flip_h, is_flip_v);
+            drawTileSprite(x, y, tile_idx, palette, is_flip_h, is_flip_v);
         }
     }
 }
@@ -583,10 +616,21 @@ uint8_t rendererOamGetXPos(const uint8_t oam_idx)
     return 0U;
 }
 
-void rendererOamSetXYPos(const uint8_t oam_idx, const uint8_t x_pos, const uint8_t y_pos)
+void rendererOamSetXYPos(const uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos)
 {
     if ((oam_idx < RENDERER_OAM_SIZE) && ((x_pos != rendererOamGetXPos(oam_idx)) || (y_pos != rendererOamGetYPos(oam_idx))))
     {
+        // clip the values to fit in screen
+        if (x_pos > RENDERER_COORD_MAX_X)
+        {
+            x_pos = RENDERER_COORD_MAX_X;
+        }
+        if (y_pos > RENDERER_COORD_MAX_Y)
+        {
+            y_pos = RENDERER_COORD_MAX_Y;
+        }
+        // trigger dirty old position
+        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
         // X Pos
         s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
         s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
@@ -595,6 +639,7 @@ void rendererOamSetXYPos(const uint8_t oam_idx, const uint8_t x_pos, const uint8
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
         rendererDirtyOamSet(oam_idx);
+        // trigger dirty new position
         rendererSetDirtyBgTilesTouchedBySprite(x_pos, y_pos);
     }
 }
@@ -622,6 +667,7 @@ void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
         }
         rendererDirtyOamSet(oam_idx);
+        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -648,6 +694,7 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
         }
         rendererDirtyOamSet(oam_idx);
+        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -673,6 +720,7 @@ void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
             s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS);
         }
         rendererDirtyOamSet(oam_idx);
+        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -711,6 +759,7 @@ void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
         rendererDirtyOamSet(oam_idx);
+        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
