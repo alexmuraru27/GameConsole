@@ -39,7 +39,7 @@ void rendererOamClearEntry(uint8_t oam_idx);
 void rendererOamSetXYPos(uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos);
 void rendererOamSetFlipV(uint8_t oam_idx, bool is_flip_v);
 void rendererOamSetFlipH(uint8_t oam_idx, bool is_flip_h);
-void rendererOamSetPriority(uint8_t oam_idx, bool is_priority);
+void rendererOamSetPriorityLow(uint8_t oam_idx, bool is_priority_low);
 void rendererOamSetPaletteIdx(uint8_t oam_idx, uint8_t palette_idx);
 void rendererOamSetTileIdx(uint8_t oam_idx, uint8_t tile_idx);
 
@@ -47,7 +47,7 @@ void rendererOamSetTileIdx(uint8_t oam_idx, uint8_t tile_idx);
 uint8_t rendererOamGetXPos(uint8_t oam_idx);
 bool rendererOamGetFlipV(uint8_t oam_idx);
 bool rendererOamGetFlipH(uint8_t oam_idx);
-bool rendererOamGetPriority(uint8_t oam_idx);
+bool rendererOamGetPriorityLow(uint8_t oam_idx);
 uint8_t rendererOamGetPaletteIdx(uint8_t oam_idx);
 uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
@@ -60,7 +60,7 @@ bool rendererAttributeTableGetFlipV(uint8_t tile_x, uint8_t tile_y);
 void rendererAttributeTableSetFlipH(uint8_t tile_x, uint8_t tile_y, bool isFlipH);
 bool rendererAttributeTableGetFlipH(uint8_t tile_x, uint8_t tile_y);
 
-void rendererAttributeTableSetPriority(uint8_t tile_x, uint8_t tile_y, bool priority);
-bool rendererAttributeTableGetPriority(uint8_t tile_x, uint8_t tile_y);
+void rendererAttributeTableSetPriorityHigh(uint8_t tile_x, uint8_t tile_y, bool is_priority_high);
+bool rendererAttributeTableGetPriorityHigh(uint8_t tile_x, uint8_t tile_y);
 
 #endif /* __RENDERER_H */

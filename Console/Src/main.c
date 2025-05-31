@@ -103,7 +103,7 @@ static void screenInit()
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
   rendererOamSetFlipH(0U, true);
-  rendererOamSetPriority(0U, true);
+  rendererOamSetPriorityLow(0U, true);
 
   // backgrounds
   rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));
@@ -141,8 +141,8 @@ static void screenInit()
     rendererAttributeTableSetPalette(0U, i, brick_pallete_idx);
     rendererAttributeTableSetPalette(rendererGetMaxTilesInRow() - 1, i, brick_pallete_idx);
 
-    rendererAttributeTableSetPriority(0U, i, true);
-    rendererAttributeTableSetPriority(rendererGetMaxTilesInRow() - 1, i, true);
+    rendererAttributeTableSetPriorityHigh(0U, i, true);
+    rendererAttributeTableSetPriorityHigh(rendererGetMaxTilesInRow() - 1, i, true);
   }
   for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
   {
@@ -152,8 +152,8 @@ static void screenInit()
     rendererAttributeTableSetPalette(i, 0U, brick_pallete_idx);
     rendererAttributeTableSetPalette(i, rendererGetMaxTilesInColumn() - 1, brick_pallete_idx);
 
-    rendererAttributeTableSetPriority(i, 0U, true);
-    rendererAttributeTableSetPriority(i, rendererGetMaxTilesInColumn() - 1, true);
+    rendererAttributeTableSetPriorityHigh(i, 0U, false);
+    rendererAttributeTableSetPriorityHigh(i, rendererGetMaxTilesInColumn() - 1, true);
   }
 }
 int main(void)

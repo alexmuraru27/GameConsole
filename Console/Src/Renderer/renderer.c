@@ -31,8 +31,8 @@
 #define RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS 5U
 #define RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK 0x01U
 
-#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS 6U
-#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK 0x01U
+#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_POS 6U
+#define RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_MASK 0x01U
 #define RENDERER_ATTRIBUTE_TABLE_SIZE RENDERER_NAME_TABLE_SIZE
 
 #define RENDERER_DIRTY_TILES_SIZE RENDERER_NAME_TABLE_SIZE
@@ -60,8 +60,8 @@
 #define RENDERER_OAM_FLIP_H_POS 22U
 #define RENDERER_OAM_FLIP_H_MASK 0x01U
 
-#define RENDERER_OAM_PRIORITY_POS 21U
-#define RENDERER_OAM_PRIORITY_MASK 0x01U
+#define RENDERER_OAM_PRIORITY_LOW_POS 21U
+#define RENDERER_OAM_PRIORITY_LOW_MASK 0x01U
 
 #define RENDERER_OAM_PALETTE_IDX_POS 16U
 #define RENDERER_OAM_PALETTE_IDX_MASK 0x0FU
@@ -329,23 +329,23 @@ static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
     return false;
 }
 
-void rendererAttributeTableSetPriorityIdx(const uint8_t name_table_idx, bool priority)
+void rendererAttributeTableSetPriorityHighIdx(const uint8_t name_table_idx, bool is_priority_high)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
-        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS);
-        if (priority)
+        s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_POS);
+        if (is_priority_high)
         {
-            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS);
+            s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_POS);
         }
         rendererSetDirtyBgTiles(name_table_idx);
     }
 }
-bool rendererAttributeTableGetPriorityIdx(const uint8_t name_table_idx)
+bool rendererAttributeTableGetPriorityHighIdx(const uint8_t name_table_idx)
 {
     if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
     {
-        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PRIORITY_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_POS)) != 0U);
+        return ((s_attribute_table[name_table_idx] & (RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_POS)) != 0U);
     }
     return false;
 }
@@ -483,7 +483,7 @@ void rendererRender(void)
     // 0 Render the bottom most bg
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_dirtyTiles[i] != 0U && (!rendererAttributeTableGetPriorityIdx(i)))
+        if (s_dirtyTiles[i] != 0U && (!rendererAttributeTableGetPriorityHighIdx(i)))
         {
             s_dirtyTiles[i]--;
             drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
@@ -494,7 +494,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && rendererOamGetPriority(i) && rendererDirtyOamGetAndDecrement(i))
+        if ((tile_idx != 0U) && rendererOamGetPriorityLow(i) && rendererDirtyOamGetAndDecrement(i))
         {
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
@@ -510,7 +510,7 @@ void rendererRender(void)
     // TODO render only the dirty ones
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_dirtyTiles[i] != 0U && rendererAttributeTableGetPriorityIdx(i))
+        if (s_dirtyTiles[i] != 0U && (rendererAttributeTableGetPriorityHighIdx(i)))
         {
             s_dirtyTiles[i]--;
             drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
@@ -521,7 +521,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)) && rendererDirtyOamGetAndDecrement(i))
+        if ((tile_idx != 0U) && (!rendererOamGetPriorityLow(i)) && rendererDirtyOamGetAndDecrement(i))
         {
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
@@ -705,26 +705,26 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
     }
 }
 
-bool rendererOamGetPriority(const uint8_t oam_idx)
+bool rendererOamGetPriorityLow(const uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
     {
-        return ((s_oam[oam_idx] & (RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS)) >> RENDERER_OAM_PRIORITY_POS) != 0U;
+        return ((s_oam[oam_idx] & (RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS)) >> RENDERER_OAM_PRIORITY_LOW_POS) != 0U;
     }
     return false;
 }
 
-void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
+void rendererOamSetPriorityLow(const uint8_t oam_idx, const bool is_priority_low)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && (is_priority != rendererOamGetPriority(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE && (is_priority_low != rendererOamGetPriorityLow(oam_idx)))
     {
-        if (is_priority)
+        if (is_priority_low)
         {
-            s_oam[oam_idx] |= (RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS);
+            s_oam[oam_idx] |= (RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
         }
         else
         {
-            s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS);
+            s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
         }
         rendererDirtyOamSet(oam_idx);
         rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
@@ -804,13 +804,13 @@ bool rendererAttributeTableGetFlipH(const uint8_t tile_x, const uint8_t tile_y)
 {
     return rendererAttributeTableGetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
-void rendererAttributeTableSetPriority(uint8_t tile_x, uint8_t tile_y, bool priority)
+void rendererAttributeTableSetPriorityHigh(uint8_t tile_x, uint8_t tile_y, bool is_priority_high)
 {
-    rendererAttributeTableSetPriorityIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), priority);
+    rendererAttributeTableSetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), is_priority_high);
 }
-bool rendererAttributeTableGetPriority(uint8_t tile_x, uint8_t tile_y)
+bool rendererAttributeTableGetPriorityHigh(uint8_t tile_x, uint8_t tile_y)
 {
-    return rendererAttributeTableGetPriorityIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+    return rendererAttributeTableGetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 uint16_t rendererGetSizeWidth()
 {
