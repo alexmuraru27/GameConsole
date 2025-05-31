@@ -5,7 +5,7 @@
 
 void rendererInit(void);
 void rendererRender(void);
-void rendererTriggerCompleteRedraw(void);
+void rendererSetDirtyCompleteRedraw(void);
 
 // Renderer sizes
 uint16_t rendererGetSizeWidth();
@@ -30,21 +30,20 @@ void rendererPatternTableSetTile(uint8_t pattern_table_idx, const uint8_t *tile_
 void rendererPatternTableClear();
 
 // Name table
-void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx);
-void rendererNameTableClearTile(uint8_t name_table_idx);
+void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx);
+void rendererNameTableClearTile(uint8_t tile_x, uint8_t tile_y);
 
 // Oam
 void rendererOamClearEntry(uint8_t oam_idx);
 
 // Oam setters
-void rendererOamSetXPos(uint8_t oam_idx, uint8_t x_pos);
+void rendererOamSetXYPos(uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos);
 void rendererOamSetFlipV(uint8_t oam_idx, bool is_flip_v);
 void rendererOamSetFlipH(uint8_t oam_idx, bool is_flip_h);
 void rendererOamSetPriority(uint8_t oam_idx, bool is_priority);
 void rendererOamSetIsDirty(uint8_t oam_idx, bool is_dirty);
 void rendererOamSetPaletteIdx(uint8_t oam_idx, uint8_t palette_idx);
 void rendererOamSetTileIdx(uint8_t oam_idx, uint8_t tile_idx);
-void rendererOamSetYPos(uint8_t oam_idx, uint8_t y_pos);
 
 // Oam getters
 uint8_t rendererOamGetXPos(uint8_t oam_idx);
@@ -56,20 +55,20 @@ uint8_t rendererOamGetPaletteIdx(uint8_t oam_idx);
 uint8_t rendererOamGetTileIdx(uint8_t oam_idx);
 uint8_t rendererOamGetYPos(uint8_t oam_idx);
 
-// AttributeTable attr_table_idx addresing
-void rendererAttributeTableSetPalette(uint8_t attr_table_idx, uint8_t palette);
-uint8_t rendererAttributeTableGetPalette(uint8_t attr_table_idx);
-void rendererAttributeTableSetFlipV(uint8_t attr_table_idx, bool isFlipV);
-bool rendererAttributeTableGetFlipV(uint8_t attr_table_idx);
-void rendererAttributeTableSetFlipH(uint8_t attr_table_idx, bool isFlipH);
-bool rendererAttributeTableGetFlipH(uint8_t attr_table_idx);
+// AttributeTable name_table_idx addresing
+void rendererAttributeTableSetPalette(uint8_t name_table_idx, uint8_t palette);
+uint8_t rendererAttributeTableGetPalette(uint8_t name_table_idx);
+void rendererAttributeTableSetFlipV(uint8_t name_table_idx, bool isFlipV);
+bool rendererAttributeTableGetFlipV(uint8_t name_table_idx);
+void rendererAttributeTableSetFlipH(uint8_t name_table_idx, bool isFlipH);
+bool rendererAttributeTableGetFlipH(uint8_t name_table_idx);
 
 // AttributeTable XY Coords addressing
-void rendererAttributeTableSetPaletteXYCoords(uint8_t x, uint8_t y, uint8_t palette);
-uint8_t rendererAttributeTableGetPaletteXYCoords(uint8_t x, uint8_t y);
-void rendererAttributeTableSetFlipVXYCoords(uint8_t x, uint8_t y, bool isFlipV);
-bool rendererAttributeTableGetFlipVXYCoords(uint8_t x, uint8_t y);
-void rendererAttributeTableSetFlipHXYCoords(uint8_t x, uint8_t y, bool isFlipH);
-bool rendererAttributeTableGetFlipHXYCoords(uint8_t x, uint8_t y);
+void rendererAttributeTableSetPaletteXYCoords(uint8_t tile_x, uint8_t tile_y, uint8_t palette);
+uint8_t rendererAttributeTableGetPaletteXYCoords(uint8_t tile_x, uint8_t tile_y);
+void rendererAttributeTableSetFlipVXYCoords(uint8_t tile_x, uint8_t tile_y, bool isFlipV);
+bool rendererAttributeTableGetFlipVXYCoords(uint8_t tile_x, uint8_t tile_y);
+void rendererAttributeTableSetFlipHXYCoords(uint8_t tile_x, uint8_t tile_y, bool isFlipH);
+bool rendererAttributeTableGetFlipHXYCoords(uint8_t tile_x, uint8_t tile_y);
 
 #endif /* __RENDERER_H */

@@ -79,8 +79,7 @@ static void update()
     y -= ((joystickGetLAnalogY() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogY() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  rendererOamSetXPos(0U, x);
-  rendererOamSetYPos(0U, y);
+  rendererOamSetXYPos(0U, x, y);
 }
 
 static void render()
