@@ -20,18 +20,18 @@ uint16_t rendererGetMaxTilesInRow();
 uint16_t rendererGetMaxTilesInColumn();
 
 // Frame Palette
-void rendererFramePaletteSetSprite(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererFramePaletteSetSprite(uint8_t palette_idx, uint8_t color_idx, uint8_t system_palette_idx);
 void rendererFramePaletteSetSpriteMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
-void rendererFramePaletteSetBackground(uint8_t palette_index, uint8_t color_index, uint8_t system_palette_index);
+void rendererFramePaletteSetBackground(uint8_t palette_idx, uint8_t color_idx, uint8_t system_palette_idx);
 void rendererFramePaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
 
 // Pattern table
-void rendererPatternTableSetTile(uint8_t table_index, const uint8_t *tile_data, uint8_t tile_size);
+void rendererPatternTableSetTile(uint8_t pattern_table_idx, const uint8_t *tile_data, uint8_t tile_size);
 void rendererPatternTableClear();
 
 // Name table
 void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx);
-void rendererNameTableClearTile(uint8_t table_index);
+void rendererNameTableClearTile(uint8_t name_table_idx);
 
 // Oam
 void rendererOamClearEntry(uint8_t oam_idx);
@@ -59,5 +59,7 @@ uint8_t rendererOamGetYPos(uint8_t oam_idx);
 // AttributeTable
 void rendererAttributeTableSetPalette(uint8_t nametable_idx, uint8_t palette);
 uint8_t rendererAttributeTableGetPalette(uint8_t nametable_idx);
+void rendererAttributeTableSetPaletteXYCoords(uint8_t x, uint8_t y, uint8_t palette);
+uint8_t rendererAttributeTableGetPaletteXYCoords(uint8_t x, uint8_t y);
 
 #endif /* __RENDERER_H */

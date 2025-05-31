@@ -21,7 +21,7 @@
 #define RENDERER_ATTRIBUTE_TABLE_ENTRY_MASK ((1 << RENDERER_ATTRIBUTE_TABLE_ENTRY_BITS) - 1U)
 #define RENDERER_ATTRIBUTE_TABLE_SIZE ((RENDERER_NAME_TABLE_SIZE) / RENDERER_ATTRIBUTE_TABLE_CLUSTERING_SIZE)
 
-#define RENDERER_DIRTY_TILES_SIZE RENDERER_TILES_IN_COLUMN
+#define RENDERER_DIRTY_TILES_SIZE RENDERER_NAME_TABLE_SIZE
 
 #define RENDERER_PATTERN_TABLE_SIZE 256U
 
@@ -61,6 +61,10 @@
 
 #define RENDERER_OAM_Y_POS 0U
 #define RENDERER_OAM_Y_MASK 0xFFU
+
+#define RENDERER_DIRTY_FLAG_CLEAR 0U
+#define RENDERER_DIRTY_FLAG_OLD_SET 1U
+#define RENDERER_DIRTY_FLAG_NEW_SET 2U
 
 // System colors from 0x00-0x3F = 64 colors. RGB565
 const uint16_t s_system_palette[RENDERER_SYSTEM_PALETTE_SIZE] = {
@@ -171,7 +175,7 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
 
     const uint16_t *palette = is_bg ? s_frame_palette_bg[palette_idx] : s_frame_palette_sprite[palette_idx];
 
-    // tile fully opaque -> all pixels  color_index != 0
+    // tile fully opaque -> all pixels  color_idx != 0
     bool tile_fully_opaque = true;
     for (uint8_t row = 0U; row < RENDERER_TILE_SCREEN_SIZE; row++)
     {
@@ -212,8 +216,8 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
                 // select correct byte for each bitplane
                 uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
                 uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
-                uint8_t color_index = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
-                ili9341SendPixel(palette[color_index]);
+                uint8_t color_idx = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
+                ili9341SendPixel(palette[color_idx]);
             }
         }
         return;
@@ -248,9 +252,9 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
             // select correct byte for each bitplane
             uint8_t byte0 = (byte_idx == 0) ? byte0_low : byte0_high;
             uint8_t byte1 = (byte_idx == 0) ? byte1_low : byte1_high;
-            uint8_t color_index = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
-            row_colors[col] = palette[color_index];
-            is_transparent[col] = (color_index == 0U);
+            uint8_t color_idx = (((byte1 >> bit_pos) & 1U) << 1U) | ((byte0 >> bit_pos) & 1U);
+            row_colors[col] = palette[color_idx];
+            is_transparent[col] = (color_idx == 0U);
         }
 
         // send bursts of opaque pixels
@@ -318,7 +322,7 @@ void rendererRender(void)
     {
         if (s_name_table[i] != 0U)
         {
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), true, true);
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPalette(i), false, false);
         }
     }
 
@@ -340,11 +344,11 @@ void rendererRender(void)
     }
 }
 
-void rendererFramePaletteSetSprite(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
+void rendererFramePaletteSetSprite(const uint8_t palette_idx, const uint8_t color_idx, const uint8_t system_palette_idx)
 {
-    if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
+    if ((palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (color_idx < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_idx != 0U))
     {
-        s_frame_palette_sprite[palette_index][color_index] = s_system_palette[system_palette_index];
+        s_frame_palette_sprite[palette_idx][color_idx] = s_system_palette[system_palette_idx];
     }
 }
 
@@ -359,11 +363,11 @@ void rendererFramePaletteSetSpriteMultiple(const uint8_t palette_idx, const uint
     }
 }
 
-void rendererFramePaletteSetBackground(const uint8_t palette_index, const uint8_t color_index, const uint8_t system_palette_index)
+void rendererFramePaletteSetBackground(const uint8_t palette_idx, const uint8_t color_idx, const uint8_t system_palette_idx)
 {
-    if ((palette_index < RENDERER_FRAME_PALETTE_SIZE) && (color_index < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_index != 0U))
+    if ((palette_idx < RENDERER_FRAME_PALETTE_SIZE) && (color_idx < RENDERER_FRAME_SUBPALETTE_SIZE) && (color_idx != 0U))
     {
-        s_frame_palette_bg[palette_index][color_index] = s_system_palette[system_palette_index];
+        s_frame_palette_bg[palette_idx][color_idx] = s_system_palette[system_palette_idx];
     }
 }
 
@@ -378,13 +382,13 @@ void rendererFramePaletteSetBackgroundMultiple(const uint8_t palette_idx, const 
     }
 }
 
-void rendererPatternTableSetTile(const uint8_t table_index, const uint8_t *tile_data, const uint8_t tile_size)
+void rendererPatternTableSetTile(const uint8_t pattern_table_idx, const uint8_t *tile_data, const uint8_t tile_size)
 {
-    if ((tile_size == RENDERER_TILE_MEMORY_SIZE) && (table_index < RENDERER_PATTERN_TABLE_SIZE) && (table_index > 0U))
+    if ((tile_size == RENDERER_TILE_MEMORY_SIZE) && (pattern_table_idx < RENDERER_PATTERN_TABLE_SIZE) && (pattern_table_idx > 0U))
     {
         for (int i = 0U; i < RENDERER_TILE_MEMORY_SIZE; ++i)
         {
-            s_pattern_table[table_index][i] = tile_data[i];
+            s_pattern_table[pattern_table_idx][i] = tile_data[i];
         }
     }
 }
@@ -396,7 +400,8 @@ void rendererPatternTableClear()
 
 void rendererTriggerCompleteRedraw(void)
 {
-    memset(&s_dirtyTiles, 0xFFU, RENDERER_DIRTY_TILES_SIZE);
+    // TODO Modify this
+    memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_NEW_SET, RENDERER_DIRTY_TILES_SIZE);
 }
 
 void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx)
@@ -407,11 +412,11 @@ void rendererNameTableSetTile(uint8_t x, uint8_t y, uint8_t tile_idx)
     }
 }
 
-void rendererNameTableClearTile(uint8_t table_index)
+void rendererNameTableClearTile(uint8_t name_table_idx)
 {
-    if (table_index < RENDERER_NAME_TABLE_SIZE)
+    if (name_table_idx < RENDERER_NAME_TABLE_SIZE)
     {
-        s_name_table[table_index] = 0U;
+        s_name_table[name_table_idx] = 0U;
     }
 }
 
@@ -620,6 +625,15 @@ uint8_t rendererAttributeTableGetPalette(const uint8_t nametable_idx)
     }
 
     return 0U;
+}
+
+void rendererAttributeTableSetPaletteXYCoords(const uint8_t x, const uint8_t y, const uint8_t palette)
+{
+    rendererAttributeTableSetPalette(y * RENDERER_TILES_IN_ROW + x, palette);
+}
+uint8_t rendererAttributeTableGetPaletteXYCoords(const uint8_t x, const uint8_t y)
+{
+    return rendererAttributeTableGetPalette(y * RENDERER_TILES_IN_ROW + x);
 }
 
 uint16_t rendererGetSizeWidth()
