@@ -31,7 +31,6 @@ void rendererPatternTableClear();
 
 // Name table
 void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx);
-void rendererNameTableClearTile(uint8_t tile_x, uint8_t tile_y);
 
 // Oam
 void rendererOamClearEntry(uint8_t oam_idx);

@@ -545,16 +545,6 @@ void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx)
     }
 }
 
-void rendererNameTableClearTile(uint8_t tile_x, uint8_t tile_y)
-{
-    const uint8_t nametable_idx = RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y);
-    if ((nametable_idx) < RENDERER_NAME_TABLE_SIZE)
-    {
-        s_name_table[nametable_idx] = 0U;
-        rendererSetDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
-    }
-}
-
 void rendererOamClearEntry(const uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
