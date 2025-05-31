@@ -168,24 +168,6 @@ static CCMRAM uint16_t s_frame_palette_bg[RENDERER_FRAME_PALETTE_SIZE][RENDERER_
 // Background tile positions that need to be redrawn
 static CCMRAM uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
 
-const uint8_t bg_data[64U] = DEFINE_TILE_16(
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
-
 void rendererInit(void)
 {
     memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
@@ -196,18 +178,9 @@ void rendererInit(void)
     memset(&s_frame_palette_bg, 0U, sizeof(s_frame_palette_bg));
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_CLEAR, sizeof(s_dirtyTiles));
 
-    // TODO make this to work with tileid 0
-    rendererPatternTableSetTile(RENDERER_NAME_TABLE_SIZE - 1U, bg_data, sizeof(bg_data));
-    rendererFramePaletteSetSpriteMultiple(15U, 0U, 0U, 0U);
-    for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
-    {
-        for (uint8_t j = 0; j < rendererGetMaxTilesInColumn(); j++)
-        {
-            rendererNameTableSetTile(i, j, RENDERER_NAME_TABLE_SIZE - 1U);
-
-            rendererAttributeTableSetPalette(i, j, 15U);
-        }
-    }
+    // First pattern table filled with FF for the default background
+    memset(&s_pattern_table[0U], 0xFF, RENDERER_TILE_MEMORY_SIZE);
+    rendererSetDirtyCompleteRedraw();
 }
 
 static void rendererDirtyOamSet(uint8_t oam_idx)
