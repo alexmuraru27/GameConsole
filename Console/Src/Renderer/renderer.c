@@ -40,10 +40,9 @@
 #define RENDERER_FRAME_SUBPALETTE_SIZE 4U
 
 // Priority (0: in front of background; 1: behind background)
-// isDirty - 1 if sprite needs to be redrawn
 // as bits 2-4 were not used inside byte 3, we will use them to extend the palette information to 4 bits = max 16 sprite palettes per frame
 // also we will add a dirty flag
-// [X pos][Filp_V Flip_H Priority isDirty IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
+// [X pos][Filp_V Flip_H Priority 0 IdxPalette3 IdxPalette2 IdxPalette1 IdxPalette0][Tile idx][Y Pos]
 #define RENDERER_OAM_X_POS 24U
 #define RENDERER_OAM_X_MASK 0xFFU
 
@@ -55,9 +54,6 @@
 
 #define RENDERER_OAM_PRIORITY_POS 21U
 #define RENDERER_OAM_PRIORITY_MASK 0x01U
-
-#define RENDERER_OAM_IS_DIRTY_POS 20U
-#define RENDERER_OAM_IS_DIRTY_MASK 0x01U
 
 #define RENDERER_OAM_PALETTE_IDX_POS 16U
 #define RENDERER_OAM_PALETTE_IDX_MASK 0x0FU
@@ -152,6 +148,9 @@ static CCMRAM uint8_t s_attribute_table[RENDERER_ATTRIBUTE_TABLE_SIZE];
 // Object attribute memory
 static CCMRAM uint32_t s_oam[RENDERER_OAM_SIZE];
 
+// Dirty attribute memory
+static CCMRAM uint8_t s_dirty_oam[RENDERER_OAM_SIZE];
+
 // Frame palette for sprites. Contains indexes for SystemPalette
 static CCMRAM uint16_t s_frame_palette_sprite[RENDERER_FRAME_PALETTE_SIZE][RENDERER_FRAME_SUBPALETTE_SIZE];
 
@@ -170,6 +169,28 @@ void rendererInit(void)
     memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
     memset(&s_frame_palette_bg, 0U, sizeof(s_frame_palette_bg));
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_CLEAR, sizeof(s_dirtyTiles));
+}
+
+static void rendererDirtyOamSet(uint8_t oam_idx)
+{
+    if (oam_idx < RENDERER_OAM_SIZE)
+    {
+        s_dirty_oam[oam_idx] = RENDERER_DIRTY_FLAG_NEW_SET;
+    }
+}
+
+static uint8_t rendererDirtyOamGetAndDecrement(uint8_t oam_idx)
+{
+    if (oam_idx < RENDERER_OAM_SIZE)
+    {
+        uint8_t old_dirty_value = s_dirty_oam[oam_idx];
+        if (old_dirty_value > 0U)
+        {
+            s_dirty_oam[oam_idx]--;
+        }
+        return old_dirty_value;
+    }
+    return 0U;
 }
 
 static uint8_t xyCoordsToTileIndexMap(const uint8_t screen_x, const uint8_t screen_y)
@@ -431,9 +452,8 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && rendererOamGetPriority(i) && rendererOamGetIsDirty(i))
+        if ((tile_idx != 0U) && rendererOamGetPriority(i) && rendererDirtyOamGetAndDecrement(i))
         {
-            rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
             const uint8_t palette = rendererOamGetPaletteIdx(i);
@@ -462,9 +482,8 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)) && rendererOamGetIsDirty(i))
+        if ((tile_idx != 0U) && (!rendererOamGetPriority(i)) && rendererDirtyOamGetAndDecrement(i))
         {
-            rendererOamSetIsDirty(i, false);
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
             const uint8_t palette = rendererOamGetPaletteIdx(i);
@@ -575,7 +594,7 @@ void rendererOamSetXYPos(const uint8_t oam_idx, const uint8_t x_pos, const uint8
         // Y Pos
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
-        rendererOamSetIsDirty(oam_idx, true);
+        rendererDirtyOamSet(oam_idx);
         rendererSetDirtyBgTilesTouchedBySprite(x_pos, y_pos);
     }
 }
@@ -602,7 +621,7 @@ void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
         }
-        rendererOamSetIsDirty(oam_idx, true);
+        rendererDirtyOamSet(oam_idx);
     }
 }
 
@@ -628,7 +647,7 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
         }
-        rendererOamSetIsDirty(oam_idx, true);
+        rendererDirtyOamSet(oam_idx);
     }
 }
 
@@ -653,31 +672,7 @@ void rendererOamSetPriority(const uint8_t oam_idx, const bool is_priority)
         {
             s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_MASK << RENDERER_OAM_PRIORITY_POS);
         }
-        rendererOamSetIsDirty(oam_idx, true);
-    }
-}
-
-bool rendererOamGetIsDirty(const uint8_t oam_idx)
-{
-    if (oam_idx < RENDERER_OAM_SIZE)
-    {
-        return ((s_oam[oam_idx] & (RENDERER_OAM_IS_DIRTY_MASK << RENDERER_OAM_IS_DIRTY_POS)) >> RENDERER_OAM_IS_DIRTY_POS) != 0U;
-    }
-    return false;
-}
-
-void rendererOamSetIsDirty(const uint8_t oam_idx, const bool is_dirty)
-{
-    if (oam_idx < RENDERER_OAM_SIZE)
-    {
-        if (is_dirty)
-        {
-            s_oam[oam_idx] |= (RENDERER_OAM_IS_DIRTY_MASK << RENDERER_OAM_IS_DIRTY_POS);
-        }
-        else
-        {
-            s_oam[oam_idx] &= ~(RENDERER_OAM_IS_DIRTY_MASK << RENDERER_OAM_IS_DIRTY_POS);
-        }
+        rendererDirtyOamSet(oam_idx);
     }
 }
 
@@ -696,7 +691,7 @@ void rendererOamSetPaletteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
         s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
-        rendererOamSetIsDirty(oam_idx, true);
+        rendererDirtyOamSet(oam_idx);
     }
 }
 
@@ -715,7 +710,7 @@ void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
-        rendererOamSetIsDirty(oam_idx, true);
+        rendererDirtyOamSet(oam_idx);
     }
 }
 

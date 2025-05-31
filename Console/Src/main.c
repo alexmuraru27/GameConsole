@@ -105,7 +105,7 @@ static void screenInit()
   rendererOamSetTileIdx(0U, 1U);
   rendererOamSetPaletteIdx(0U, 0U);
   rendererOamSetFlipH(0U, true);
-  rendererOamSetPriority(0U, false);
+  rendererOamSetPriority(0U, true);
 
   // backgrounds
   rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));
