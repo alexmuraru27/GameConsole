@@ -191,7 +191,7 @@ static uint8_t xyCoordsToTileIndexMap(const uint8_t screen_x, const uint8_t scre
 
 static void rendererSetDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const uint8_t sprite_y)
 {
-    if ((sprite_x < (RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE)) && (sprite_y < (RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE)))
+    if ((sprite_x <= (RENDERER_WIDTH - RENDERER_TILE_SCREEN_SIZE)) && (sprite_y <= (RENDERER_HEIGHT - RENDERER_TILE_SCREEN_SIZE)))
     {
         uint8_t tile_x_0 = sprite_x / RENDERER_TILE_SCREEN_SIZE;
         uint8_t tile_y_0 = sprite_y / RENDERER_TILE_SCREEN_SIZE;
@@ -427,9 +427,6 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
 
 void rendererRender(void)
 {
-    // TODO dirty checker
-    // TODO overlap checker
-
     // 1. render OAM with priority=1 -> back of BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
@@ -448,10 +445,15 @@ void rendererRender(void)
     }
 
     // 2. render BG
+    // TODO render only the dirty ones
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_name_table[i] != 0U)
+        if (s_name_table[i] != 0U && s_dirtyTiles[i] != 0U)
         {
+            if (s_dirtyTiles[i] > 0U)
+            {
+                s_dirtyTiles[i]--;
+            }
             drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
         }
     }
