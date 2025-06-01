@@ -1,7 +1,6 @@
 #include "renderer.h"
 #include "string.h"
 #include "ILI9341.h"
-#include "tileCreator.h"
 #define CCMRAM __attribute__((section(".ccmram")))
 
 #define RENDERER_WIDTH 256U  // 32
@@ -480,7 +479,7 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
 
 void rendererRender(void)
 {
-    // 0 Render the bottom most bg
+    // 0 Render the bottom most bg - LOW PRIO
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
         if (s_dirtyTiles[i] != 0U && (!rendererAttributeTableGetPriorityHighIdx(i)))
@@ -490,7 +489,7 @@ void rendererRender(void)
         }
     }
 
-    // 1. render OAM with priority=1 -> back of BG
+    // 1. render OAM with priority=1 -> back of high prio BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
@@ -506,8 +505,7 @@ void rendererRender(void)
         }
     }
 
-    // 2. render BG
-    // TODO render only the dirty ones
+    // 2. render BG - high prio bg
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
         if (s_dirtyTiles[i] != 0U && (rendererAttributeTableGetPriorityHighIdx(i)))
@@ -517,7 +515,7 @@ void rendererRender(void)
         }
     }
 
-    // 3. render OAM with priority=0 -> front of BG
+    // 3. render OAM with priority=0 -> front of high prio BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
