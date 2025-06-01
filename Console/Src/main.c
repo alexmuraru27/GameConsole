@@ -8,6 +8,7 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
+#include "buzzer.h"
 #include "pacman_ghost.h"
 #include "bricks1.h"
 #include "bricks2.h"
@@ -33,6 +34,7 @@ static void peripheralsInit()
   ili9341Init(3U, rendererGetSizeWidth(), rendererGetSizeHeight());
   adcInit();
   joystickInit();
+  buzzerInit();
 }
 
 static void consoleInit()

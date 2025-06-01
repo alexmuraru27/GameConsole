@@ -47,8 +47,10 @@ Console/Src/Peripherals/dma.c \
 Console/Src/Peripherals/spi.c \
 Console/Src/Peripherals/timer.c \
 Console/Src/Peripherals/adc.c \
+Console/Src/Peripherals/dac.c \
 Console/Src/Devices/ILI9341.c \
 Console/Src/Devices/joystick.c \
+Console/Src/Devices/buzzer.c \
 Console/Src/Renderer/renderer.c
 
 # ASM sources
