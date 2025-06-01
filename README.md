@@ -4,6 +4,7 @@
 	- [Defines](#defines)
 	- [Pinning](#pinning)
 		- [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
+		- [DAC (Audio)](#dac-audio)
 		- [SPI1 (Display ILI9341)](#spi1-display-ili9341)
 		- [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
 		- [GPIO (Button Joysticks)](#gpio-button-joysticks)
@@ -48,6 +49,9 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 1. PA2 (TX - AF7)
 2. PA3 (RX - AF7)
 
+### DAC (Audio) 
+1. PA4 (DAC1_OUT - Buzzer)
+   
 ### SPI1 (Display ILI9341) 
 1. PA5 (SCK - AF5)  - Yellow
 2. PA6 (MISO - AF5) - Red
