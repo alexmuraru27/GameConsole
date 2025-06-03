@@ -191,7 +191,7 @@ static void peripheralsClockEnable(void)
 
     // ######## APB1 ########
     RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
-    RCC->APB1ENR |= RCC_APB1ENR_DACEN;
+    RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
 

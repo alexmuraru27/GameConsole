@@ -23,22 +23,56 @@ void TIM7_IRQHandler()
     }
 }
 
-static void timer6Init(const uint32_t sample_rate_hz)
+void timer3Disable(void)
 {
-    const uint32_t ARR_COUNT = 100U;
-    TIM6->PSC = ((84000000U / sample_rate_hz) / ARR_COUNT) - 1U;
-    TIM6->ARR = ARR_COUNT - 1U;
+    TIM3->CR1 &= ~TIM_CR1_CEN;
+}
 
-    // TRGO to update event
-    // MMS = 010: update event -> TRGO
-    TIM6->CR2 &= ~TIM_CR2_MMS;
-    TIM6->CR2 |= TIM_CR2_MMS_1;
+void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
+{
+    // calculate PWM period for frequency: cycles = (84000000U / frequency_hz )
+    // cycles per period
+    uint32_t arr = 84000000U / frequency_hz;
+    // ensure valid period (arr should be at least 2)
+    if (arr < 2)
+        arr = 2;
+    // adjust prescaler for low frequencies to improve precision
+    uint32_t psc = 0;
+    while (arr > 65535)
+    {
+        // TIM3 ARR is 16-bit
+        psc++;
+        arr = 84000000U / (frequency_hz * (psc + 1));
+    }
 
-    // enable update interrupt
+    TIM3->PSC = psc;
+    TIM3->ARR = arr - 1;
+    TIM3->CCR2 = arr / (100U / duty);
+    TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+static void timer3Init()
+{
+    TIM3->CR1 = 0;                                                                         // Reset control register
+    TIM3->PSC = 0;                                                                         // Prescaler = 1 (84 MHz clock)
+    TIM3->ARR = 1000;                                                                      // Default period
+    TIM3->CCR2 = 500;                                                                      // 50% duty cycle for Channel 2
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1); // PWM mode 1 for Channel 2
+    TIM3->CCER |= TIM_CCER_CC2E;                                                           // Enable channel 2 output
+}
+
+static void timer6Init()
+{
+    // (1 µs tick)
+    TIM6->PSC = (84U - 1);
+    // 1000 ticks = 1 ms
+    TIM6->ARR = 1000U;
+    // Enable update interrupt
     TIM6->DIER |= TIM_DIER_UIE;
-    NVIC_EnableIRQ(TIM6_DAC_IRQn);
-
     TIM6->CR1 |= TIM_CR1_CEN;
+    // High prio - sound
+    NVIC_SetPriority(TIM6_DAC_IRQn, 1);
+    NVIC_EnableIRQ(TIM6_DAC_IRQn);
 }
 
 static void timer7Init(uint16_t time_ms)
@@ -66,8 +100,9 @@ static void timer7Init(uint16_t time_ms)
 
 void timerInit(void)
 {
-    // timer 6 - frequency of 8KHz
-    timer6Init(8000U);
+    timer3Init();
+    // timer 6 -  period of 1ms
+    timer6Init();
     // timer 7 - period of 50ms
     timer7Init(50U);
 }

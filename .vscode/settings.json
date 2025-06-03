@@ -36,7 +36,7 @@
         "pacman2.h": "c",
         "buzzer.h": "c",
         "bricks4.h": "c",
-        "dac.h": "c",
-        "timer.h": "c"
+        "timer.h": "c",
+        "stm32f4xx.h": "c"
     }
 }

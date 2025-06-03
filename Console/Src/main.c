@@ -8,7 +8,6 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
-#include "dac.h"
 #include "buzzer.h"
 #include "pacman_ghost.h"
 #include "bricks1.h"
@@ -40,7 +39,6 @@ static void peripheralsInit()
   ili9341Init(3U, rendererGetSizeWidth(), rendererGetSizeHeight());
   adcInit();
   joystickInit();
-  dacInit();
   buzzerInit();
 }
 
@@ -95,6 +93,7 @@ static void render()
   {
     ili9341FillWindow(ILI9341_BLACK);
     rendererSetDirtyCompleteRedraw();
+    buzzerPlayMelody();
   }
   if (joystickGetSpecialBtn2())
   {
