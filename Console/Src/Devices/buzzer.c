@@ -5,7 +5,6 @@
 #include "timer.h"
 #include "stddef.h"
 
-#define MAX_NOTES 100
 #define SOUND_TRACKS 3
 typedef struct
 {
@@ -15,11 +14,15 @@ typedef struct
 } TrackData;
 
 static TrackData s_track_data_queue[SOUND_TRACKS];
-static uint32_t s_note_idx[SOUND_TRACKS];    // Index of current note being played
-static uint32_t s_ms_counter[SOUND_TRACKS];  // Counts milliseconds for current note
-static uint32_t s_duration_ms[SOUND_TRACKS]; // Current note duration in milliseconds
-static bool s_is_playing[SOUND_TRACKS];      // Playback status
+static uint32_t s_note_idx[SOUND_TRACKS];   // Index of current note being played
+static uint32_t s_ms_counter[SOUND_TRACKS]; // Counts milliseconds for current note
+static bool s_is_playing[SOUND_TRACKS];     // Playback status
 static void (*s_buzzer_on_done_callback[SOUND_TRACKS])(void);
+
+uint8_t buzzerGetMaxTracks()
+{
+    return SOUND_TRACKS;
+}
 
 bool buzzerSetCallback(const uint8_t track_number, void (*onDone)(void))
 {
@@ -35,7 +38,7 @@ bool buzzerPause(const uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
     {
-        // TODO
+        s_is_playing[track_number] = false;
         return true;
     }
     return false;
@@ -44,7 +47,11 @@ bool buzzerStop(const uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
     {
-        // TODO
+        buzzerClearNotes(track_number);
+        if (s_buzzer_on_done_callback[track_number] != NULL)
+        {
+            s_buzzer_on_done_callback[track_number]();
+        }
         return true;
     }
     return false;
@@ -52,9 +59,9 @@ bool buzzerStop(const uint8_t track_number)
 
 bool buzzerResume(uint8_t track_number)
 {
-    if (track_number < SOUND_TRACKS)
+    if (track_number < SOUND_TRACKS && (s_track_data_queue[track_number].durations_ms != NULL) && (s_track_data_queue[track_number].frequencies_hz != NULL))
     {
-        // TODO
+        s_is_playing[track_number] = true;
         return true;
     }
     return false;
@@ -69,7 +76,6 @@ void buzzerInit(void)
         s_buzzer_on_done_callback[track_id] = NULL;
         s_note_idx[track_id] = 0U;
         s_ms_counter[track_id] = 0U;
-        s_duration_ms[track_id] = 0U;
         s_is_playing[track_id] = false;
     }
 }
@@ -78,48 +84,51 @@ bool buzzerClearNotes(const uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
     {
+        s_is_playing[track_number] = false;
         s_track_data_queue[track_number].durations_ms = NULL;
         s_track_data_queue[track_number].frequencies_hz = NULL;
         s_track_data_queue[track_number].notes = 0U;
         s_note_idx[track_number] = 0U;
         s_ms_counter[track_number] = 0U;
-        s_duration_ms[track_number] = 0U;
-        s_is_playing[track_number] = false;
         return true;
     }
     return false;
 }
 
-static void updatePWM(void)
+static void updatePWM(uint8_t track_id)
 {
-    bool is_one_track_already_playing = false;
+    if (s_note_idx[track_id] >= s_track_data_queue[track_id].notes)
+    {
+        buzzerClearNotes(track_id);
+        if (s_buzzer_on_done_callback[track_id] != NULL)
+        {
+            s_buzzer_on_done_callback[track_id]();
+        }
+        return;
+    }
+
+    // lowest track IDs have priority in playing
+    uint8_t first_track_playing = 0U;
     for (uint8_t track_id = 0U; track_id < SOUND_TRACKS; track_id++)
     {
-        if (s_note_idx[track_id] >= s_track_data_queue[track_id].notes)
+        if (s_is_playing[track_id])
         {
-            s_is_playing[track_id] = false;
-            if (s_buzzer_on_done_callback[track_id] != NULL)
-            {
-                s_buzzer_on_done_callback[track_id]();
-            }
-            continue;
+            first_track_playing = track_id;
+            break;
         }
+    }
 
+    s_ms_counter[track_id] = 0;
+    if (track_id == first_track_playing)
+    {
         const uint32_t frequency_hz = s_track_data_queue[track_id].frequencies_hz[s_note_idx[track_id]];
-        s_duration_ms[track_id] = s_track_data_queue[track_id].durations_ms[s_note_idx[track_id]];
-        s_ms_counter[track_id] = 0;
-
-        if (s_is_playing[track_id] && (!is_one_track_already_playing))
+        if (frequency_hz == 0)
         {
-            is_one_track_already_playing = true;
-            if (frequency_hz == 0)
-            {
-                timer3Disable();
-            }
-            else
-            {
-                timer3Trigger(frequency_hz, 50U);
-            }
+            timer3Disable();
+        }
+        else
+        {
+            timer3Trigger(frequency_hz, 50U);
         }
     }
 }
@@ -136,10 +145,10 @@ void buzzerInterruptHandler(void)
         }
 
         s_ms_counter[track_id]++;
-        if (s_ms_counter[track_id] >= s_duration_ms[track_id])
+        if (s_ms_counter[track_id] >= s_track_data_queue[track_id].durations_ms[s_note_idx[track_id]])
         {
             s_note_idx[track_id]++;
-            updatePWM();
+            updatePWM(track_id);
         }
     }
 }
@@ -148,13 +157,11 @@ bool buzzerPlay(uint8_t track_number, uint16_t *frequencies, uint16_t *durations
 {
     if (track_number < SOUND_TRACKS)
     {
-        s_is_playing[track_number] = true;
-        s_note_idx[track_number] = 0U;
-
+        buzzerClearNotes(track_number);
         s_track_data_queue[track_number].frequencies_hz = frequencies;
         s_track_data_queue[track_number].durations_ms = durations_ms;
         s_track_data_queue[track_number].notes = notes;
-        updatePWM();
+        s_is_playing[track_number] = true;
         return true;
     }
     return false;

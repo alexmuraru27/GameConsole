@@ -71,6 +71,7 @@
 #define NOTE_DS8 4978U
 
 void buzzerInit(void);
+uint8_t buzzerGetMaxTracks();
 bool buzzerClearNotes(uint8_t track_number);
 bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
