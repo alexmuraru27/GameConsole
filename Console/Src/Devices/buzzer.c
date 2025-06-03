@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "stm32f4xx.h"
 #include "timer.h"
+#include "stddef.h"
 
 #define MAX_NOTES 100
 typedef struct
@@ -17,6 +18,21 @@ static uint32_t s_queue_tail = 0;  // Index of current note being played
 static uint32_t s_ms_counter = 0;  // Counts milliseconds for current note
 static uint32_t s_duration_ms = 0; // Current note duration in milliseconds
 static bool s_is_playing = false;  // Playback status
+static void (*s_buzzer_on_done_callback)(void) = NULL;
+
+void buzzerSetCallback(void (*onDone)(void))
+{
+    s_buzzer_on_done_callback = onDone;
+}
+
+void buzzerPause(void)
+{
+    // TODO
+}
+void buzzerStop(void)
+{
+    // TODO
+}
 
 void buzzerInit(void)
 {
@@ -25,6 +41,7 @@ void buzzerInit(void)
     s_ms_counter = 0U;
     s_duration_ms = 0U;
     s_is_playing = false;
+    s_buzzer_on_done_callback = NULL;
 }
 
 bool buzzerAddNote(const uint16_t frequency_hz, const uint16_t s_duration_ms)
@@ -39,10 +56,14 @@ bool buzzerAddNote(const uint16_t frequency_hz, const uint16_t s_duration_ms)
     return true;
 }
 
-void buzzerClean()
+void buzzerClearNotes()
 {
     timer3Disable();
-    buzzerInit();
+    s_queue_head = 0U;
+    s_queue_tail = 0U;
+    s_ms_counter = 0U;
+    s_duration_ms = 0U;
+    s_is_playing = false;
 }
 
 static void updatePWM(void)
@@ -52,6 +73,10 @@ static void updatePWM(void)
     {
         timer3Disable();
         s_is_playing = false;
+        if (s_buzzer_on_done_callback != NULL)
+        {
+            s_buzzer_on_done_callback();
+        }
         return;
     }
 

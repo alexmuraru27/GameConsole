@@ -70,9 +70,12 @@
 #define NOTE_D8 4699U
 #define NOTE_DS8 4978U
 
-void buzzerInterruptHandler(void);
 void buzzerInit(void);
-void buzzerClean(void);
+void buzzerClearNotes(void);
 void buzzerPlayMelody(void);
+void buzzerPause(void);
+void buzzerStop(void);
 bool buzzerAddNote(uint16_t frequency_hz, uint16_t s_duration_ms);
+void buzzerSetCallback(void (*onDone)(void));
+void buzzerInterruptHandler(void);
 #endif /* __BUZZER_H */
