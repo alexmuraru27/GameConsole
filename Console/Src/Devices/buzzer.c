@@ -93,39 +93,122 @@ void buzzerInterruptHandler(void)
     }
 }
 
+uint16_t melody[] = {
+    NOTE_E7, NOTE_E7, 0, NOTE_E7,
+    0, NOTE_C7, NOTE_E7, 0,
+    NOTE_G7, 0, 0, 0,
+    NOTE_G6, 0, 0, 0,
+
+    NOTE_C7, 0, 0, NOTE_G6,
+    0, 0, NOTE_E6, 0,
+    0, NOTE_A6, 0, NOTE_B6,
+    0, NOTE_AS6, NOTE_A6, 0,
+
+    NOTE_G6, NOTE_E7, NOTE_G7,
+    NOTE_A7, 0, NOTE_F7, NOTE_G7,
+    0, NOTE_E7, 0, NOTE_C7,
+    NOTE_D7, NOTE_B6, 0, 0,
+
+    NOTE_C7, 0, 0, NOTE_G6,
+    0, 0, NOTE_E6, 0,
+    0, NOTE_A6, 0, NOTE_B6,
+    0, NOTE_AS6, NOTE_A6, 0,
+
+    NOTE_G6, NOTE_E7, NOTE_G7,
+    NOTE_A7, 0, NOTE_F7, NOTE_G7,
+    0, NOTE_E7, 0, NOTE_C7,
+    NOTE_D7, NOTE_B6, 0, 0};
+
+uint16_t tempo[] = {
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    90,
+    90,
+    90,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    90,
+    90,
+    90,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+    120,
+};
 void buzzerPlayMelody(void)
 {
     // TODO Make this play from user buffer
     s_queue_head = 0;
     s_queue_tail = 0;
 
-    buzzerAddNote(NOTE_C4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_C4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_E4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_E4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_G4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_G4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_F4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 250U);
-    buzzerAddNote(NOTE_D4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_E4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_F4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 250U);
-    buzzerAddNote(NOTE_E4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_F4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_G4, 500U);
-    buzzerAddNote(NOTE_PAUSE, 10U);
-    buzzerAddNote(NOTE_E4, 500U);
+    for (uint16_t i = 0; i < sizeof(melody) / sizeof(uint16_t); i++)
+    {
+        buzzerAddNote(melody[i], tempo[i]);
+    }
 
     buzzerPlay();
 }
