@@ -71,11 +71,12 @@
 #define NOTE_DS8 4978U
 
 void buzzerInit(void);
-void buzzerClearNotes(void);
-void buzzerPlayMelody(void);
-void buzzerPause(void);
-void buzzerStop(void);
+bool buzzerClearNotes(uint8_t track_number);
+bool buzzerPause(uint8_t track_number);
+bool buzzerResume(uint8_t track_number);
+bool buzzerStop(uint8_t track_number);
+bool buzzerPlay(uint8_t track_number, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number);
 bool buzzerAddNote(uint16_t frequency_hz, uint16_t s_duration_ms);
-void buzzerSetCallback(void (*onDone)(void));
+bool buzzerSetCallback(uint8_t track_number, void (*onDone)(void));
 void buzzerInterruptHandler(void);
 #endif /* __BUZZER_H */
