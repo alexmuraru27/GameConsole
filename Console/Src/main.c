@@ -22,11 +22,6 @@ uint32_t s_last_frame_time = 0U;
 
 void SystemInit(void)
 {
-  // enable FPU
-  SCB->CPACR |= (0x0FU << 20U);
-  __DSB();
-  __ISB();
-
   systemClockConfig();
 }
 
