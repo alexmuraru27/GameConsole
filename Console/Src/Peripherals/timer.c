@@ -47,7 +47,7 @@ void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
 
     TIM3->PSC = psc;
     TIM3->ARR = arr - 1;
-    TIM3->CCR2 = arr / (100U / duty);
+    TIM3->CCR2 = (arr * duty) / 100U;
     TIM3->CR1 |= TIM_CR1_CEN;
 }
 
