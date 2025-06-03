@@ -126,10 +126,20 @@ static void initGpioAdc1()
     GPIOC->MODER |= (GPIO_MODER_MODER0 | GPIO_MODER_MODER1 | GPIO_MODER_MODER2 | GPIO_MODER_MODER3);
     GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1 | GPIO_PUPDR_PUPD2 | GPIO_PUPDR_PUPD3);
 }
+
+static void initGpioDac1()
+{
+    // configure PA4 as analog
+    GPIOA->MODER |= GPIO_MODER_MODER4;
+    // no pull-up/pull-down
+    GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD4);
+}
+
 void gpioInit(void)
 {
     initGpioUsart2();
     initGpioSpi1();
     initGpioJoystick();
     initGpioAdc1();
+    initGpioDac1();
 }

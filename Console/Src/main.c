@@ -8,6 +8,7 @@
 #include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
+#include "dac.h"
 #include "buzzer.h"
 #include "pacman_ghost.h"
 #include "bricks1.h"
@@ -22,6 +23,11 @@ uint32_t s_last_frame_time = 0U;
 
 void SystemInit(void)
 {
+  // enable FPU
+  SCB->CPACR |= (0x0FU << 20U);
+  __DSB();
+  __ISB();
+
   systemClockConfig();
 }
 
@@ -34,6 +40,7 @@ static void peripheralsInit()
   ili9341Init(3U, rendererGetSizeWidth(), rendererGetSizeHeight());
   adcInit();
   joystickInit();
+  dacInit();
   buzzerInit();
 }
 
@@ -162,7 +169,6 @@ int main(void)
 {
   consoleInit();
   screenInit();
-
   while (1)
   {
     update();
