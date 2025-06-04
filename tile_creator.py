@@ -3,7 +3,7 @@ import pygame
 import sys
 import os
 
-OUTPUT_FILES_DIR = "GeneratedTiles"
+OUTPUT_FILES_DIR = "Tiles"
 DEFAULT_H_FILENAME = "tile"
 TILE_SIZE = 16
 PIXEL_SIZE = 20
