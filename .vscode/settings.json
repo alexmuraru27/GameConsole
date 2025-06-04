@@ -37,6 +37,9 @@
         "buzzer.h": "c",
         "bricks4.h": "c",
         "timer.h": "c",
-        "stm32f4xx.h": "c"
+        "stm32f4xx.h": "c",
+        "console_api.h": "c",
+        "game_console_api.h": "c",
+        "game_console.h": "c"
     }
 }

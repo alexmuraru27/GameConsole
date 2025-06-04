@@ -15,8 +15,10 @@ MEMORY
 SECTIONS
 {
     /* Shared RAM section - for common data or API access */
-    .shared_ram :
+    .game_console_api :
     {
-        *(.shared_ram)  /* Shared RAM data */
+        __game_console_api_start = .; 
+        KEEP(*(.game_console_api))  
+        __game_console_api_end = .;
     } > SHARED_RAM
 }

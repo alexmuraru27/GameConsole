@@ -4,7 +4,11 @@
 #include "stdbool.h"
 
 void rendererInit(void);
+
+// Trigger rendering
 void rendererRender(void);
+
+// Complete redraw
 void rendererSetDirtyCompleteRedraw(void);
 
 // Renderer sizes
@@ -31,7 +35,7 @@ void rendererPatternTableSetTile(uint8_t pattern_table_idx, const uint8_t *tile_
 void rendererPatternTableClear();
 
 // Name table
-void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx);
+void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t pattern_table_idx);
 
 // Oam
 void rendererOamClearEntry(uint8_t oam_idx);
@@ -60,7 +64,6 @@ void rendererAttributeTableSetFlipV(uint8_t tile_x, uint8_t tile_y, bool isFlipV
 bool rendererAttributeTableGetFlipV(uint8_t tile_x, uint8_t tile_y);
 void rendererAttributeTableSetFlipH(uint8_t tile_x, uint8_t tile_y, bool isFlipH);
 bool rendererAttributeTableGetFlipH(uint8_t tile_x, uint8_t tile_y);
-
 void rendererAttributeTableSetPriorityHigh(uint8_t tile_x, uint8_t tile_y, bool is_priority_high);
 bool rendererAttributeTableGetPriorityHigh(uint8_t tile_x, uint8_t tile_y);
 

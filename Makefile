@@ -38,6 +38,7 @@ BUILD_DIR = build
 # C sources
 C_SOURCES =  \
 Console/Src/main.c \
+Console/Src/game_console.c \
 Console/Src/stm32f4xx_it.c \
 Console/Src/syscalls.c \
 Console/Src/Peripherals/sysclock.c \
@@ -114,6 +115,7 @@ C_INCLUDES =  \
 -IConsole/Inc/Devices \
 -IConsole/Inc/Renderer \
 -ITiles \
+-IShared/Inc \
 -IShared/Inc/TileUtils \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include

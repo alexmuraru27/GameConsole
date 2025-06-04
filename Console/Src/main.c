@@ -15,6 +15,7 @@
 #include "bricks3.h"
 #include "bricks4.h"
 #include "bricks5.h"
+#include "game_console.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -26,7 +27,7 @@ void SystemInit(void)
   systemClockConfig();
 }
 
-static void peripheralsInit()
+static void consoleInit()
 {
   dmaInit();
   gpioInit();
@@ -36,12 +37,8 @@ static void peripheralsInit()
   adcInit();
   joystickInit();
   buzzerInit();
-}
-
-static void consoleInit()
-{
-  peripheralsInit();
   rendererInit();
+  gameConsoleInit();
 }
 
 static void syncFrame()

@@ -72,8 +72,7 @@
 #define RENDERER_OAM_Y_MASK 0xFFU
 
 #define RENDERER_DIRTY_FLAG_CLEAR 0U
-#define RENDERER_DIRTY_FLAG_OLD_SET 1U
-#define RENDERER_DIRTY_FLAG_NEW_SET 2U
+#define RENDERER_DIRTY_FLAG_NEW_SET 1U
 
 // System colors from 0x00-0x3F = 64 colors. RGB565
 const uint16_t s_system_palette[RENDERER_SYSTEM_PALETTE_SIZE] = {
@@ -594,12 +593,12 @@ void rendererSetDirtyCompleteRedraw(void)
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_NEW_SET, RENDERER_DIRTY_TILES_SIZE);
 }
 
-void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx)
+void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t pattern_table_idx)
 {
     const uint8_t nametable_idx = RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y);
-    if ((nametable_idx) < RENDERER_NAME_TABLE_SIZE)
+    if ((nametable_idx < RENDERER_NAME_TABLE_SIZE) && (pattern_table_idx < RENDERER_PATTERN_TABLE_SIZE))
     {
-        s_name_table[nametable_idx] = tile_idx;
+        s_name_table[nametable_idx] = pattern_table_idx;
         setDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
     }
 }
