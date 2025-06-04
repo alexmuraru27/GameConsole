@@ -93,7 +93,7 @@ typedef struct
 {
     uint32_t magic;
     uint32_t version;
-    ConsoleAPI *api;
+    ConsoleAPI api;
 } ConsoleAPIHeader;
 
 #endif /* __CONSOLE_API_H */

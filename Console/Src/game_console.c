@@ -93,7 +93,7 @@ static void gameConsoleExposeApi()
     const ConsoleAPIHeader api_header = {
         .magic = API_MAGIC,
         .version = API_VERSION,
-        .api = &api};
+        .api = api};
 
     *API_PTR = api_header;
 }

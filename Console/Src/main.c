@@ -346,7 +346,7 @@ static void testApi()
   ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
   if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
   {
-    api_hdr_ptr->api->debugString("Hello from shared api :D\r\n");
+    api_hdr_ptr->api.debugString("Hello from shared api :D\r\n");
   }
 }
 
