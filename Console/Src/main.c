@@ -246,6 +246,18 @@ static void render()
     buzzerPlay(1, underworld_melody, underworld_tempo, sizeof(underworld_melody) / sizeof(uint16_t));
   }
 
+  if (joystickGetRBtnUp())
+  {
+    buzzerPause(0);
+  }
+  if (joystickGetRBtnDown())
+  {
+    buzzerResume(0);
+  }
+  if (joystickGetRBtnLeft())
+  {
+    buzzerStop(0);
+  }
   rendererRender();
 }
 

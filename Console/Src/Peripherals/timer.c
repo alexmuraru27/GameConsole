@@ -53,8 +53,9 @@ void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
 
 static void timer3Init()
 {
+    // Defaults to 1ms
     TIM3->CR1 = 0U;                                                                        // Reset control register
-    TIM3->PSC = 0U;                                                                        // Prescaler = 1 (84 MHz clock)
+    TIM3->PSC = (84U - 1);                                                                 // Prescaler = 1 (84 MHz clock)
     TIM3->ARR = 1000U;                                                                     // Default period
     TIM3->CCR2 = 500U;                                                                     // 50% duty cycle for Channel 2
     TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1); // PWM mode 1 for Channel 2

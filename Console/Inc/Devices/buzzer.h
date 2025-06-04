@@ -70,14 +70,16 @@
 #define NOTE_D8 4699U
 #define NOTE_DS8 4978U
 
+// API
 void buzzerInit(void);
 uint8_t buzzerGetMaxTracks();
-bool buzzerClearNotes(uint8_t track_number);
+bool buzzerPlay(uint8_t track_number, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number);
 bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
-bool buzzerPlay(uint8_t track_number, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number);
-bool buzzerAddNote(uint16_t frequency_hz, uint16_t s_duration_ms);
 bool buzzerSetCallback(uint8_t track_number, void (*onDone)(void));
+bool buzzerUnSetCallback(const uint8_t track_number);
+
+// Interrupt Handler
 void buzzerInterruptHandler(void);
 #endif /* __BUZZER_H */
