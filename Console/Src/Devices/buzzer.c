@@ -5,7 +5,7 @@
 #include "timer.h"
 #include "stddef.h"
 
-#define SOUND_TRACKS 3
+#define SOUND_TRACKS 5
 #define INVALID_TRACK 255
 typedef struct
 {
