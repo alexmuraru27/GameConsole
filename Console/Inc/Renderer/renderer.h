@@ -8,16 +8,17 @@ void rendererRender(void);
 void rendererSetDirtyCompleteRedraw(void);
 
 // Renderer sizes
-uint16_t rendererGetSizeWidth();
-uint16_t rendererGetSizeHeight();
-uint16_t rendererGetSizeTileScreen();
-uint16_t rendererGetSizeTileMemory();
-uint16_t rendererGetSizeFramePalette();
-uint16_t rendererGetSizePatternTable();
-uint16_t rendererGetSizeNameTable();
-uint16_t rendererGetSizeOam();
-uint16_t rendererGetMaxTilesInRow();
-uint16_t rendererGetMaxTilesInColumn();
+uint16_t rendererGetWidthPixels();
+uint16_t rendererGetHeightPixels();
+uint16_t rendererGetWidthTiles();
+uint16_t rendererGetHeightTiles();
+uint16_t rendererGetTilePixelSize();
+uint16_t rendererGetTileMemorySize();
+uint16_t rendererGetFramePaletteSize();
+uint16_t rendererGetFrameSubPaletteSize();
+uint16_t rendererGetPatternTableSize();
+uint16_t rendererGetNameTableSize();
+uint16_t rendererGetOamSize();
 
 // Frame Palette
 void rendererFramePaletteSetSprite(uint8_t palette_idx, uint8_t color_idx, uint8_t system_palette_idx);

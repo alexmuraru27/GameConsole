@@ -32,7 +32,7 @@ static void peripheralsInit()
   gpioInit();
   usartInit();
   timerInit();
-  ili9341Init(3U, rendererGetSizeWidth(), rendererGetSizeHeight());
+  ili9341Init(3U, rendererGetWidthPixels(), rendererGetHeightPixels());
   adcInit();
   joystickInit();
   buzzerInit();
@@ -65,7 +65,7 @@ static void update()
   const uint16_t SPEED = 5U;
   uint8_t x = rendererOamGetXPos(0U);
   uint8_t y = rendererOamGetYPos(0U);
-  if (x <= rendererGetSizeWidth() - rendererGetSizeTileScreen())
+  if (x <= rendererGetWidthPixels() - rendererGetTilePixelSize())
   {
     x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -74,7 +74,7 @@ static void update()
     x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
   }
 
-  if (y <= rendererGetSizeHeight() - rendererGetSizeTileScreen())
+  if (y <= rendererGetHeightPixels() - rendererGetTilePixelSize())
   {
     y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
   }
@@ -317,27 +317,27 @@ static void screenInit()
   rendererAttributeTableSetPalette(5U, 5U + 3U, brick_pallete_idx);
   rendererAttributeTableSetPalette(5U, 5U + 4U, brick_pallete_idx);
 
-  for (uint8_t i = 0; i < rendererGetMaxTilesInColumn(); i++)
+  for (uint8_t i = 0; i < rendererGetHeightTiles(); i++)
   {
     rendererNameTableSetTile(0U, i, 4U);
-    rendererNameTableSetTile(rendererGetMaxTilesInRow() - 1, i, 4U);
+    rendererNameTableSetTile(rendererGetWidthTiles() - 1, i, 4U);
 
     rendererAttributeTableSetPalette(0U, i, brick_pallete_idx);
-    rendererAttributeTableSetPalette(rendererGetMaxTilesInRow() - 1, i, brick_pallete_idx);
+    rendererAttributeTableSetPalette(rendererGetWidthTiles() - 1, i, brick_pallete_idx);
 
     rendererAttributeTableSetPriorityHigh(0U, i, true);
-    rendererAttributeTableSetPriorityHigh(rendererGetMaxTilesInRow() - 1, i, true);
+    rendererAttributeTableSetPriorityHigh(rendererGetWidthTiles() - 1, i, true);
   }
-  for (uint8_t i = 0; i < rendererGetMaxTilesInRow(); i++)
+  for (uint8_t i = 0; i < rendererGetWidthTiles(); i++)
   {
     rendererNameTableSetTile(i, 0U, 6U);
-    rendererNameTableSetTile(i, rendererGetMaxTilesInColumn() - 1, 6U);
+    rendererNameTableSetTile(i, rendererGetHeightTiles() - 1, 6U);
 
     rendererAttributeTableSetPalette(i, 0U, brick_pallete_idx);
-    rendererAttributeTableSetPalette(i, rendererGetMaxTilesInColumn() - 1, brick_pallete_idx);
+    rendererAttributeTableSetPalette(i, rendererGetHeightTiles() - 1, brick_pallete_idx);
 
     rendererAttributeTableSetPriorityHigh(i, 0U, false);
-    rendererAttributeTableSetPriorityHigh(i, rendererGetMaxTilesInColumn() - 1, true);
+    rendererAttributeTableSetPriorityHigh(i, rendererGetHeightTiles() - 1, true);
   }
 }
 int main(void)
