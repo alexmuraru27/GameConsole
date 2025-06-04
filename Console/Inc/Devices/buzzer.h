@@ -73,12 +73,11 @@
 // API
 void buzzerInit(void);
 uint8_t buzzerGetMaxTracks();
-bool buzzerPlay(uint8_t track_number, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number);
+bool buzzerPlay(uint8_t track_number, bool is_looped, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number);
+bool buzzerPlayWithCallback(uint8_t track_number, bool is_looped, uint16_t *frequencies_hz, uint16_t *durations_ms, uint16_t notes_number, void (*on_done_callback)(void));
 bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
-bool buzzerSetCallback(uint8_t track_number, void (*onDone)(void));
-bool buzzerUnSetCallback(const uint8_t track_number);
 
 // Interrupt Handler
 void buzzerInterruptHandler(void);

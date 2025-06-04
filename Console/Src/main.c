@@ -16,6 +16,7 @@
 #include "bricks4.h"
 #include "bricks5.h"
 
+bool is_debug_fps = false;
 #define FPS 50
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
@@ -51,8 +52,11 @@ static void syncFrame()
     while ((getSysTime() - s_last_frame_time) < FRAME_PERIOD)
       ;
   }
-  debugInt(1000 / (getSysTime() - s_last_frame_time));
-  debugString("\r\n");
+  if (is_debug_fps)
+  {
+    debugInt(1000 / (getSysTime() - s_last_frame_time));
+    debugString("\r\n");
+  }
   s_last_frame_time = getSysTime(); // Keep consistent frame timing
 }
 
@@ -237,19 +241,28 @@ uint16_t explosion_notes[] = {
 uint16_t explosion_durations[] = {
     10U, 10U, 15U, 15U, 20U, 20U, 30U, 40U, 50U};
 
+bool isTrack1Playing = false;
+void track1FinishedCallback()
+{
+  isTrack1Playing = false;
+  debugString("track1FinishedCallback\r\n");
+}
+
+void track0FinishedCallback()
+{
+  debugString("track0FinishedCallback\r\n");
+}
+
 static void render()
 {
   if (joystickGetSpecialBtn1())
   {
-    ili9341FillWindow(ILI9341_BLACK);
-    rendererSetDirtyCompleteRedraw();
-    buzzerPlay(0, melody, tempo, sizeof(melody) / sizeof(uint16_t));
+    buzzerPlayWithCallback(0, true, melody, tempo, sizeof(melody) / sizeof(uint16_t), &track0FinishedCallback);
   }
-  if (joystickGetSpecialBtn2())
+  if (joystickGetSpecialBtn2() && (!isTrack1Playing))
   {
-    ili9341FillWindow(ILI9341_WHITE);
-    rendererSetDirtyCompleteRedraw();
-    buzzerPlay(1, explosion_notes, explosion_durations, sizeof(explosion_notes) / sizeof(uint16_t));
+    isTrack1Playing = true;
+    buzzerPlayWithCallback(1, false, explosion_notes, explosion_durations, sizeof(explosion_notes) / sizeof(uint16_t), &track1FinishedCallback);
   }
 
   if (joystickGetRBtnUp())
