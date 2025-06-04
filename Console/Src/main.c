@@ -16,6 +16,8 @@
 #include "bricks4.h"
 #include "bricks5.h"
 #include "game_console.h"
+#include "game_console_api.h"
+#include "stddef.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -337,10 +339,22 @@ static void screenInit()
     rendererAttributeTableSetPriorityHigh(i, rendererGetHeightTiles() - 1, true);
   }
 }
+
+extern ConsoleAPIHeader __game_console_api_start; // linker
+static void testApi()
+{
+  ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
+  if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
+  {
+    api_hdr_ptr->api->debugString("Hello from shared api :D\r\n");
+  }
+}
+
 int main(void)
 {
   consoleInit();
   screenInit();
+  testApi();
   while (1)
   {
     update();
