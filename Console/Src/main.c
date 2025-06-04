@@ -231,6 +231,12 @@ uint16_t underworld_tempo[] = {
     100, 100, 100,
     30, 30, 3};
 
+uint16_t explosion_notes[] = {
+    1000U, 800U, 600U, 500U, 400U, 300U, 200U, 150U, 100U};
+
+uint16_t explosion_durations[] = {
+    10U, 10U, 15U, 15U, 20U, 20U, 30U, 40U, 50U};
+
 static void render()
 {
   if (joystickGetSpecialBtn1())
@@ -243,7 +249,7 @@ static void render()
   {
     ili9341FillWindow(ILI9341_WHITE);
     rendererSetDirtyCompleteRedraw();
-    buzzerPlay(1, underworld_melody, underworld_tempo, sizeof(underworld_melody) / sizeof(uint16_t));
+    buzzerPlay(1, explosion_notes, explosion_durations, sizeof(explosion_notes) / sizeof(uint16_t));
   }
 
   if (joystickGetRBtnUp())

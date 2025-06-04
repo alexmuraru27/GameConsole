@@ -87,11 +87,7 @@ static void updatePWM(uint8_t track_id)
     {
         if (s_note_idx[track_id] >= s_track_data_queue[track_id].notes)
         {
-            clearNotes(track_id);
-            if (s_buzzer_on_done_callback[track_id] != NULL)
-            {
-                s_buzzer_on_done_callback[track_id]();
-            }
+            buzzerStop(track_id);
             return;
         }
 
@@ -148,6 +144,7 @@ bool buzzerPause(const uint8_t track_number)
     }
     return false;
 }
+
 bool buzzerStop(const uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
