@@ -40,6 +40,9 @@
         "stm32f4xx.h": "c",
         "console_api.h": "c",
         "game_console_api.h": "c",
-        "game_console.h": "c"
+        "game_console.h": "c",
+        "test_buzzer.h": "c",
+        "test_renderer.h": "c",
+        "test_usart.h": "c"
     }
 }

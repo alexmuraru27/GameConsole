@@ -51,6 +51,11 @@ Console/Src/Peripherals/adc.c \
 Console/Src/Devices/ILI9341.c \
 Console/Src/Devices/joystick.c \
 Console/Src/Devices/buzzer.c \
+Console/Src/Test/test_buzzer.c \
+Console/Src/Test/test_joystick.c \
+Console/Src/Test/test_renderer.c \
+Console/Src/Test/test_usart.c \
+Console/Src/Test/test_console.c \
 Console/Src/Renderer/renderer.c
 
 # ASM sources
@@ -111,6 +116,7 @@ AS_INCLUDES =
 # C includes
 C_INCLUDES =  \
 -IConsole/Inc \
+-IConsole/Inc/Test \
 -IConsole/Inc/Peripherals \
 -IConsole/Inc/Devices \
 -IConsole/Inc/Renderer \
