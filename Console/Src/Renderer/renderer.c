@@ -182,7 +182,7 @@ void rendererInit(void)
     rendererSetDirtyCompleteRedraw();
 }
 
-static void rendererDirtyOamSet(uint8_t oam_idx)
+static void dirtyOamSet(uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
     {
@@ -190,7 +190,7 @@ static void rendererDirtyOamSet(uint8_t oam_idx)
     }
 }
 
-static uint8_t rendererDirtyOamGetAndDecrement(uint8_t oam_idx)
+static uint8_t dirtyOamGetAndDecrement(uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
     {
@@ -221,7 +221,7 @@ static uint8_t xyCoordsToTileIndexMap(const uint8_t screen_x, const uint8_t scre
     return 0U;
 }
 
-static void rendererSetDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const uint8_t sprite_y)
+static void setDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const uint8_t sprite_y)
 {
     if ((sprite_x <= RENDERER_COORD_MAX_X) && (sprite_y <= RENDERER_COORD_MAX_Y))
     {
@@ -257,7 +257,7 @@ static void rendererSetDirtyBgTilesTouchedBySprite(const uint8_t sprite_x, const
     }
 }
 
-static void rendererSetDirtyBgTiles(const uint8_t nametable_idx)
+static void setDirtyBgTiles(const uint8_t nametable_idx)
 {
     if (nametable_idx < RENDERER_DIRTY_TILES_SIZE)
     {
@@ -265,17 +265,17 @@ static void rendererSetDirtyBgTiles(const uint8_t nametable_idx)
     }
 }
 
-static void rendererAttributeTableSetPaletteIdx(const uint8_t name_table_idx, const uint8_t palette)
+static void attributeTableSetPaletteIdx(const uint8_t name_table_idx, const uint8_t palette)
 {
     if ((name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE)) && (palette < RENDERER_FRAME_PALETTE_SIZE))
     {
         s_attribute_table[name_table_idx] &= ~(RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
         s_attribute_table[name_table_idx] |= ((palette & RENDERER_ATTRIBUTE_TABLE_PALETTE_MASK) << RENDERER_ATTRIBUTE_TABLE_PALETTE_POS);
-        rendererSetDirtyBgTiles(name_table_idx);
+        setDirtyBgTiles(name_table_idx);
     }
 }
 
-static uint8_t rendererAttributeTableGetPaletteIdx(const uint8_t name_table_idx)
+static uint8_t attributeTableGetPaletteIdx(const uint8_t name_table_idx)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
@@ -284,7 +284,7 @@ static uint8_t rendererAttributeTableGetPaletteIdx(const uint8_t name_table_idx)
     return 0U;
 }
 
-static void rendererAttributeTableSetFlipVIdx(const uint8_t name_table_idx, const bool isFlipV)
+static void attributeTableSetFlipVIdx(const uint8_t name_table_idx, const bool isFlipV)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
@@ -293,11 +293,11 @@ static void rendererAttributeTableSetFlipVIdx(const uint8_t name_table_idx, cons
         {
             s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_V_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_V_POS);
         }
-        rendererSetDirtyBgTiles(name_table_idx);
+        setDirtyBgTiles(name_table_idx);
     }
 }
 
-static bool rendererAttributeTableGetFlipVIdx(const uint8_t name_table_idx)
+static bool attributeTableGetFlipVIdx(const uint8_t name_table_idx)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
@@ -306,7 +306,7 @@ static bool rendererAttributeTableGetFlipVIdx(const uint8_t name_table_idx)
     return false;
 }
 
-static void rendererAttributeTableSetFlipHIdx(const uint8_t name_table_idx, const bool isFlipH)
+static void attributeTableSetFlipHIdx(const uint8_t name_table_idx, const bool isFlipH)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
@@ -315,11 +315,11 @@ static void rendererAttributeTableSetFlipHIdx(const uint8_t name_table_idx, cons
         {
             s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_FLIP_H_MASK << RENDERER_ATTRIBUTE_TABLE_FLIP_H_POS);
         }
-        rendererSetDirtyBgTiles(name_table_idx);
+        setDirtyBgTiles(name_table_idx);
     }
 }
 
-static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
+static bool attributeTableGetFlipHIdx(const uint8_t name_table_idx)
 {
     if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
     {
@@ -328,7 +328,7 @@ static bool rendererAttributeTableGetFlipHIdx(const uint8_t name_table_idx)
     return false;
 }
 
-void rendererAttributeTableSetPriorityHighIdx(const uint8_t name_table_idx, bool is_priority_high)
+static void attributeTableSetPriorityHighIdx(const uint8_t name_table_idx, bool is_priority_high)
 {
     if (name_table_idx < (RENDERER_ATTRIBUTE_TABLE_SIZE))
     {
@@ -337,10 +337,11 @@ void rendererAttributeTableSetPriorityHighIdx(const uint8_t name_table_idx, bool
         {
             s_attribute_table[name_table_idx] |= (RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_MASK << RENDERER_ATTRIBUTE_TABLE_PRIORITY_HIGH_POS);
         }
-        rendererSetDirtyBgTiles(name_table_idx);
+        setDirtyBgTiles(name_table_idx);
     }
 }
-bool rendererAttributeTableGetPriorityHighIdx(const uint8_t name_table_idx)
+
+static bool attributeTableGetPriorityHighIdx(const uint8_t name_table_idx)
 {
     if (name_table_idx < (RENDERER_NAME_TABLE_SIZE))
     {
@@ -482,10 +483,10 @@ void rendererRender(void)
     // 0 Render the bottom most bg - LOW PRIO
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_dirtyTiles[i] != 0U && (!rendererAttributeTableGetPriorityHighIdx(i)))
+        if (s_dirtyTiles[i] != 0U && (!attributeTableGetPriorityHighIdx(i)))
         {
             s_dirtyTiles[i]--;
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], attributeTableGetPaletteIdx(i), attributeTableGetFlipHIdx(i), attributeTableGetFlipVIdx(i));
         }
     }
 
@@ -493,7 +494,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && rendererOamGetPriorityLow(i) && rendererDirtyOamGetAndDecrement(i))
+        if ((tile_idx != 0U) && rendererOamGetPriorityLow(i) && dirtyOamGetAndDecrement(i))
         {
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
@@ -508,10 +509,10 @@ void rendererRender(void)
     // 2. render BG - high prio bg
     for (uint16_t i = 0U; i < RENDERER_NAME_TABLE_SIZE; i++)
     {
-        if (s_dirtyTiles[i] != 0U && (rendererAttributeTableGetPriorityHighIdx(i)))
+        if (s_dirtyTiles[i] != 0U && (attributeTableGetPriorityHighIdx(i)))
         {
             s_dirtyTiles[i]--;
-            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], rendererAttributeTableGetPaletteIdx(i), rendererAttributeTableGetFlipHIdx(i), rendererAttributeTableGetFlipVIdx(i));
+            drawTile(((i * RENDERER_TILE_SCREEN_SIZE) % RENDERER_WIDTH), ((i / RENDERER_TILES_IN_ROW) * RENDERER_TILE_SCREEN_SIZE), true, s_name_table[i], attributeTableGetPaletteIdx(i), attributeTableGetFlipHIdx(i), attributeTableGetFlipVIdx(i));
         }
     }
 
@@ -519,7 +520,7 @@ void rendererRender(void)
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {
         const uint8_t tile_idx = rendererOamGetTileIdx(i);
-        if ((tile_idx != 0U) && (!rendererOamGetPriorityLow(i)) && rendererDirtyOamGetAndDecrement(i))
+        if ((tile_idx != 0U) && (!rendererOamGetPriorityLow(i)) && dirtyOamGetAndDecrement(i))
         {
             const uint8_t x = rendererOamGetXPos(i);
             const uint8_t y = rendererOamGetYPos(i);
@@ -599,7 +600,7 @@ void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t tile_idx)
     if ((nametable_idx) < RENDERER_NAME_TABLE_SIZE)
     {
         s_name_table[nametable_idx] = tile_idx;
-        rendererSetDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+        setDirtyBgTiles(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
     }
 }
 
@@ -607,7 +608,7 @@ void rendererOamClearEntry(const uint8_t oam_idx)
 {
     if (oam_idx < RENDERER_OAM_SIZE)
     {
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
         s_oam[oam_idx] = 0U;
     }
 }
@@ -635,7 +636,7 @@ void rendererOamSetXYPos(const uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos)
             y_pos = RENDERER_COORD_MAX_Y;
         }
         // trigger dirty old position
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
         // X Pos
         s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
         s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
@@ -643,9 +644,9 @@ void rendererOamSetXYPos(const uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos)
         // Y Pos
         s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
         s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
-        rendererDirtyOamSet(oam_idx);
+        dirtyOamSet(oam_idx);
         // trigger dirty new position
-        rendererSetDirtyBgTilesTouchedBySprite(x_pos, y_pos);
+        setDirtyBgTilesTouchedBySprite(x_pos, y_pos);
     }
 }
 
@@ -671,8 +672,8 @@ void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
         }
-        rendererDirtyOamSet(oam_idx);
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        dirtyOamSet(oam_idx);
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -698,8 +699,8 @@ void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 
             s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
         }
-        rendererDirtyOamSet(oam_idx);
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        dirtyOamSet(oam_idx);
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -724,8 +725,8 @@ void rendererOamSetPriorityLow(const uint8_t oam_idx, const bool is_priority_low
         {
             s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
         }
-        rendererDirtyOamSet(oam_idx);
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        dirtyOamSet(oam_idx);
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -744,7 +745,7 @@ void rendererOamSetPaletteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
         s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
-        rendererDirtyOamSet(oam_idx);
+        dirtyOamSet(oam_idx);
     }
 }
 
@@ -763,8 +764,8 @@ void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
     {
         s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
         s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
-        rendererDirtyOamSet(oam_idx);
-        rendererSetDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        dirtyOamSet(oam_idx);
+        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -779,36 +780,36 @@ uint8_t rendererOamGetYPos(const uint8_t oam_idx)
 
 void rendererAttributeTableSetPalette(const uint8_t tile_x, const uint8_t tile_y, const uint8_t palette)
 {
-    rendererAttributeTableSetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), palette);
+    attributeTableSetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), palette);
 }
 uint8_t rendererAttributeTableGetPalette(const uint8_t tile_x, const uint8_t tile_y)
 {
-    return rendererAttributeTableGetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+    return attributeTableGetPaletteIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 
 void rendererAttributeTableSetFlipV(const uint8_t tile_x, const uint8_t tile_y, bool isFlipV)
 {
-    rendererAttributeTableSetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipV);
+    attributeTableSetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipV);
 }
 bool rendererAttributeTableGetFlipV(const uint8_t tile_x, const uint8_t tile_y)
 {
-    return rendererAttributeTableGetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+    return attributeTableGetFlipVIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 void rendererAttributeTableSetFlipH(const uint8_t tile_x, const uint8_t tile_y, bool isFlipH)
 {
-    rendererAttributeTableSetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipH);
+    attributeTableSetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), isFlipH);
 }
 bool rendererAttributeTableGetFlipH(const uint8_t tile_x, const uint8_t tile_y)
 {
-    return rendererAttributeTableGetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+    return attributeTableGetFlipHIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 void rendererAttributeTableSetPriorityHigh(uint8_t tile_x, uint8_t tile_y, bool is_priority_high)
 {
-    rendererAttributeTableSetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), is_priority_high);
+    attributeTableSetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y), is_priority_high);
 }
 bool rendererAttributeTableGetPriorityHigh(uint8_t tile_x, uint8_t tile_y)
 {
-    return rendererAttributeTableGetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
+    return attributeTableGetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
 uint16_t rendererGetSizeWidth()
 {
