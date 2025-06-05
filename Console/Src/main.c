@@ -280,16 +280,14 @@ static void render()
   if (joystickGetRBtnRight())
   {
     GameHeader *game_header = (GameHeader *)&__game_header_start;
-    uint32_t magic = game_header->magic;
-    uint32_t version = game_header->version;
-    uint32_t entry_point = game_header->entry_point;
 
-    if (magic != 0x47414D45)
+    if (game_header->magic != 0x47414D45 || game_header->version != 1U)
     {
       return;
     }
 
-    void (*game_entry)(void) = (void (*)(void))entry_point;
+    __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
+    void (*game_entry)(void) = (void (*)(void))game_header->entry_point;
     game_entry();
   }
   rendererRender();
