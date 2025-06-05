@@ -252,6 +252,7 @@ void track0FinishedCallback()
   debugString("track0FinishedCallback\r\n");
 }
 
+extern uint32_t __game_header_start;
 static void render()
 {
   if (joystickGetSpecialBtn1())
@@ -275,6 +276,21 @@ static void render()
   if (joystickGetRBtnLeft())
   {
     buzzerStop(0);
+  }
+  if (joystickGetRBtnRight())
+  {
+    GameHeader *game_header = (GameHeader *)&__game_header_start;
+    uint32_t magic = game_header->magic;
+    uint32_t version = game_header->version;
+    uint32_t entry_point = game_header->entry_point;
+
+    if (magic != 0x47414D45)
+    {
+      return;
+    }
+
+    void (*game_entry)(void) = (void (*)(void))entry_point;
+    game_entry();
   }
   rendererRender();
 }

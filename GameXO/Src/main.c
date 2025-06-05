@@ -12,14 +12,17 @@ static void testApi()
 
 int main(void)
 {
-    testApi();
 
+    ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
     while (true)
     {
+        api_hdr_ptr->api.debugString("In Loop\r\n");
         asm("nop");
+        testApi();
     }
 }
 
+extern uint32_t __game_header_start, __game_header_end;
 extern uint32_t __text_start, __text_end;
 extern uint32_t __data_start, __data_end;
 extern uint32_t __assets_start, __assets_end;
@@ -28,6 +31,8 @@ __attribute__((section(".game_header")))
 const GameHeader game_header = {
     .magic = 0x47414D45, // GAME
     .version = 1U,
+    .game_header_start = (uint32_t)&__game_header_start,
+    .game_header_end = (uint32_t)&__game_header_end,
     .text_start = (uint32_t)&__text_start,
     .text_end = (uint32_t)&__text_end,
     .data_start = (uint32_t)&__data_start,

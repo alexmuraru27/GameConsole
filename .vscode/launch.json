@@ -29,7 +29,8 @@
             "loadFiles": [], // Optional: prevent loading binaries
             "postLaunchCommands": [
                 "monitor halt",
-                "add-symbol-file ./build/GameXO/GameXO.elf 0x2001F800"
+                "monitor load_image ./build/GameXO/GameXO.bin 0x20008000 bin",
+                "add-symbol-file ./build/GameXO/GameXO.elf 0x20008000"
             ]
         },
     ]

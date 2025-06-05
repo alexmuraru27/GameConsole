@@ -1,8 +1,8 @@
 TOTAL_RAM_SIZE = 128K; 
 SHARED_RAM_SIZE = 2K;
 GAME_RAM_EXEC_SIZE = 64K;
-GAME_RAM_DATA_SIZE = 30k;
-CONSOLE_RAM_SIZE = TOTAL_RAM_SIZE - GAME_RAM_DATA_SIZE - GAME_RAM_EXEC_SIZE - SHARED_RAM_SIZE; /* 31K */
+GAME_RAM_DATA_SIZE = 30K;
+CONSOLE_RAM_SIZE = TOTAL_RAM_SIZE - GAME_RAM_DATA_SIZE - GAME_RAM_EXEC_SIZE - SHARED_RAM_SIZE; /* 32K */
 MEMORY
 {
     CONSOLE_RAM      (rwx) : ORIGIN = 0x20000000, LENGTH = CONSOLE_RAM_SIZE
@@ -23,4 +23,12 @@ SECTIONS
         KEEP(*(.game_console_api))  
         __game_console_api_end = .;
     } > SHARED_RAM
+
+
+    .game_header :
+    {
+        __game_header_start = .;
+        KEEP(*(.game_header))
+        __game_header_end = .;
+    } > GAME_RAM_EXEC
 }

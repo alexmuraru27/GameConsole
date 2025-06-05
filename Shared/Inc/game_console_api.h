@@ -100,6 +100,8 @@ typedef struct
 {
     uint32_t magic; // Just to identify it's a valid game file
     uint32_t version;
+    uint32_t game_header_start;
+    uint32_t game_header_end;
     uint32_t text_start;
     uint32_t text_end;
     uint32_t data_start;

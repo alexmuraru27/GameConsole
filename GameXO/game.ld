@@ -9,13 +9,6 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Define output sections */
 SECTIONS
 {
-  .game_header :
-  {
-    __game_header_start = .;
-    KEEP(*(.game_header))  /* Put the header here */
-    __game_header_end = .;
-  } > GAME_RAM_EXEC
-
   /* The program code and other data goes into GAME_RAM_EXEC */
   .text :
   {
