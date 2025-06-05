@@ -99,12 +99,13 @@ typedef struct
 typedef struct
 {
     uint32_t magic; // Just to identify it's a valid game file
+    uint32_t version;
     uint32_t text_start;
-    uint32_t text_size;
+    uint32_t text_end;
     uint32_t data_start;
-    uint32_t data_size;
+    uint32_t data_end;
     uint32_t assets_start;
-    uint32_t assets_size;
+    uint32_t assets_end;
     uint32_t entry_point;
 } GameHeader;
 

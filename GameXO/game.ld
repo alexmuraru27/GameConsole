@@ -11,8 +11,10 @@ SECTIONS
 {
   .game_header :
   {
+    __game_header_start = .;
     KEEP(*(.game_header))  /* Put the header here */
-  } > GAME_RAM_DATA
+    __game_header_end = .;
+  } > GAME_RAM_EXEC
 
   /* The program code and other data goes into GAME_RAM_EXEC */
   .text :
@@ -31,7 +33,6 @@ SECTIONS
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
     __text_end = .;
-    __text_size = __text_end - __text_start;
   } >GAME_RAM_EXEC
 
   /* Constant data goes into GAME_RAM_EXEC */
@@ -49,7 +50,6 @@ SECTIONS
     __assets_start = .;
     KEEP (*(.assets*)) 
     __assets_end = .;
-    __assets_size = __assets_end - __assets_start;
   } > GAME_RAM_DATA
 
   /* used by the startup to initialize data */
@@ -69,7 +69,6 @@ SECTIONS
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
     __data_end = .;
-    __data_size = __data_end - __data_start;
   } >GAME_RAM_DATA
 
   /* GAME_CCMRAM section uninitialized */
