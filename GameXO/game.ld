@@ -1,18 +1,24 @@
-INCLUDE "common.ld"
+INCLUDE "../common.ld"
 
 /* Highest address of the user mode stack */
-_estack = ORIGIN(GAME_RAM) + LENGTH(GAME_RAM);    /* end of GAME_RAM */
-/* Generate a link error if heap and stack don't fit into GAME_RAM */
+_estack = ORIGIN(GAME_RAM_DATA) + LENGTH(GAME_RAM_DATA);    /* end of GAME_RAM_DATA */
+/* Generate a link error if heap and stack don't fit into GAME_RAM_DATA */
 _Min_Heap_Size = 0x0;  /* required amount of heap=0 -> use only static allocated memory  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
 /* Define output sections */
 SECTIONS
 {
-  /* The program code and other data goes into GAME_FLASH */
+  .game_header :
+  {
+    KEEP(*(.game_header))  /* Put the header here */
+  } > GAME_RAM_DATA
+
+  /* The program code and other data goes into GAME_RAM_EXEC */
   .text :
   {
     . = ALIGN(4);
+    __text_start = .;
     *(.text)           /* .text sections (code) */
     *(.text*)          /* .text* sections (code) */
     *(.glue_7)         /* glue arm to thumb code */
@@ -24,25 +30,37 @@ SECTIONS
 
     . = ALIGN(4);
     _etext = .;        /* define a global symbols at end of code */
-  } >GAME_FLASH
+    __text_end = .;
+    __text_size = __text_end - __text_start;
+  } >GAME_RAM_EXEC
 
-  /* Constant data goes into GAME_FLASH */
+  /* Constant data goes into GAME_RAM_EXEC */
   .rodata :
   {
     . = ALIGN(4);
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
-  } >GAME_FLASH
+  } >GAME_RAM_EXEC
+
+  .assets :
+  {
+    . = ALIGN(4);
+    __assets_start = .;
+    KEEP (*(.assets*)) 
+    __assets_end = .;
+    __assets_size = __assets_end - __assets_start;
+  } > GAME_RAM_DATA
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
-  /* Initialized data sections goes into GAME_RAM, load LMA copy after code */
+  /* Initialized data sections goes into GAME_RAM_DATA, load LMA copy after code */
   .data :
   {
     . = ALIGN(4);
     _sdata = .;        /* create a global symbol at data start */
+    __data_start = .;
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
     *(.RamFunc)        /* .RamFunc sections */
@@ -50,7 +68,9 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >GAME_RAM AT> GAME_FLASH
+    __data_end = .;
+    __data_size = __data_end - __data_start;
+  } >GAME_RAM_DATA
 
   /* GAME_CCMRAM section uninitialized */
   .ccmram (NOLOAD):
@@ -78,9 +98,9 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
-  } >GAME_RAM
+  } >GAME_RAM_DATA
 
-  /* User_heap_stack section, used to check that there is enough GAME_RAM left */
+  /* User_heap_stack section, used to check that there is enough GAME_RAM_DATA left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -89,7 +109,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >GAME_RAM
+  } >GAME_RAM_DATA
 
 
   /* Remove information from the standard libraries */

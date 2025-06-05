@@ -48,7 +48,7 @@
 **
 *****************************************************************************
 */
-INCLUDE "common.ld"
+INCLUDE "../common.ld"
 /* Entry Point */
 ENTRY(Reset_Handler)
 
