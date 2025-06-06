@@ -137,6 +137,34 @@ static void initGpioBuzzer()
     GPIOB->AFR[0] |= (2U << GPIO_AFRL_AFSEL5_Pos);
 }
 
+static void initSdio()
+{
+
+    // set to Alternate function mode
+    GPIOC->MODER &= ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk | GPIO_MODER_MODE10_Msk | GPIO_MODER_MODE11_Msk | GPIO_MODER_MODE12_Msk);
+
+    GPIOC->MODER |= ((2U << GPIO_MODER_MODE8_Pos) | (2U << GPIO_MODER_MODE9_Pos) | (2U << GPIO_MODER_MODE10_Pos) |
+                     (2U << GPIO_MODER_MODE11_Pos) | (2U << GPIO_MODER_MODE12_Pos));
+
+    GPIOD->MODER &= ~(GPIO_MODER_MODE2_Msk);
+    GPIOD->MODER |= (2U << GPIO_MODER_MODE2_Pos);
+
+    // set speed to very high
+    GPIOC->OSPEEDR |= ((3U << GPIO_OSPEEDR_OSPEED8_Pos) | (3U << GPIO_OSPEEDR_OSPEED9_Pos) | (3U << GPIO_OSPEEDR_OSPEED10_Pos) |
+                       (3U << GPIO_OSPEEDR_OSPEED11_Pos) | (3U << GPIO_OSPEEDR_OSPEED12_Pos));
+    GPIOD->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED2_Pos);
+
+    // GPIOC PC8 PC9 PC10 PC11 PC12 - AF12
+    GPIOC->AFR[1] &= ~(GPIO_AFRH_AFRH0 | GPIO_AFRH_AFRH1 | GPIO_AFRH_AFRH2 | GPIO_AFRH_AFRH3 | GPIO_AFRH_AFRH4);
+    GPIOC->AFR[1] |= ((12U << GPIO_AFRH_AFSEL8_Pos) | (12U << GPIO_AFRH_AFSEL9_Pos) |
+                      (12U << GPIO_AFRH_AFSEL10_Pos) | (12U << GPIO_AFRH_AFSEL11_Pos) |
+                      (12U << GPIO_AFRH_AFSEL12_Pos));
+
+    // GPIOD PD2 AF12
+    GPIOD->AFR[0] &= ~(GPIO_AFRL_AFRL2);
+    GPIOD->AFR[0] |= (12 << GPIO_AFRL_AFSEL2_Pos);
+}
+
 void gpioInit(void)
 {
     initGpioUsart2();
@@ -144,4 +172,5 @@ void gpioInit(void)
     initGpioJoystick();
     initGpioAdc1();
     initGpioBuzzer();
+    initSdio();
 }

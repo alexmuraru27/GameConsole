@@ -18,6 +18,7 @@
 #include "game_console.h"
 #include "game_console_api.h"
 #include "stddef.h"
+#include "sdio.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -41,6 +42,7 @@ static void consoleInit()
   buzzerInit();
   rendererInit();
   gameConsoleInit();
+  sdioInit();
 }
 
 static void syncFrame()

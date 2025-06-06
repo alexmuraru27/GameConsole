@@ -27,6 +27,7 @@ Src/Peripherals/dma.c \
 Src/Peripherals/spi.c \
 Src/Peripherals/timer.c \
 Src/Peripherals/adc.c \
+Src/Peripherals/sdio.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
