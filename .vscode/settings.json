@@ -44,5 +44,6 @@
         "test_buzzer.h": "c",
         "test_renderer.h": "c",
         "test_usart.h": "c"
-    }
+    },
+    "cortex-debug.variableUseNaturalFormat": false
 }

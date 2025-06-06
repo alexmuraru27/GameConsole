@@ -13,7 +13,7 @@ SECTIONS
   .text :
   {
     . = ALIGN(4);
-    __text_start = .;
+    __game_text_start = .;
     *(.text)           /* .text sections (code) */
     *(.text*)          /* .text* sections (code) */
     *(.glue_7)         /* glue arm to thumb code */
@@ -24,26 +24,20 @@ SECTIONS
     KEEP (*(.fini))
 
     . = ALIGN(4);
+    __game_text_end = .;
     _etext = .;        /* define a global symbols at end of code */
-    __text_end = .;
   } >GAME_RAM_EXEC
 
   /* Constant data goes into GAME_RAM_EXEC */
   .rodata :
   {
     . = ALIGN(4);
+    __game_ro_data_start = .;
     *(.rodata)         /* .rodata sections (constants, strings, etc.) */
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
+    __game_ro_data_end = .;
   } >GAME_RAM_EXEC
-
-  .assets :
-  {
-    . = ALIGN(4);
-    __assets_start = .;
-    KEEP (*(.assets*)) 
-    __assets_end = .;
-  } > GAME_RAM_DATA
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
@@ -52,8 +46,8 @@ SECTIONS
   .data :
   {
     . = ALIGN(4);
+    __game_data_init_start = .;
     _sdata = .;        /* create a global symbol at data start */
-    __data_start = .;
     *(.data)           /* .data sections */
     *(.data*)          /* .data* sections */
     *(.RamFunc)        /* .RamFunc sections */
@@ -61,28 +55,17 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-    __data_end = .;
+    __game_data_init_end = .;
   } >GAME_RAM_DATA
 
-  /* GAME_CCMRAM section uninitialized */
-  .ccmram (NOLOAD):
-  {
-    . = ALIGN(4);
-    _sccmram = .;       /* create a global symbol at ccmram start */
-    *(.ccmram)
-    *(.ccmram*)
-
-    . = ALIGN(4);
-    _eccmram = .;       /* create a global symbol at ccmram end */
-  } >GAME_CCMRAM
-
   /* Uninitialized data section */
-  . = ALIGN(4);
   .bss :
   {
+    . = ALIGN(4);
     /* This is used by the startup in order to initialize the .bss secion */
     _sbss = .;         /* define a global symbol at bss start */
     __bss_start__ = _sbss;
+    __game_data_no_init_start = .;
     *(.bss)
     *(.bss*)
     *(COMMON)
@@ -90,6 +73,7 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
+    __game_data_no_init_end = .;
   } >GAME_RAM_DATA
 
   /* User_heap_stack section, used to check that there is enough GAME_RAM_DATA left */
@@ -103,6 +87,14 @@ SECTIONS
     . = ALIGN(8);
   } >GAME_RAM_DATA
 
+  .assets :
+  {
+    . = ALIGN(4);
+    __game_code_assets_start = .;
+    KEEP (*(.assets*)) 
+    . = ALIGN(4);
+    __game_code_assets_end = .;
+  } >GAME_RAM_ASSETS
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
@@ -111,4 +103,11 @@ SECTIONS
     libm.a ( * )
     libgcc.a ( * )
   }
+
 }
+
+ASSERT(__game_header_end <= __game_text_start, "Linker symbols order should be preserved in memory");
+ASSERT(__game_text_end <= __game_ro_data_start, "Linker symbols order should be preserved in memory");
+ASSERT(__game_ro_data_end <= __game_data_init_start, "Linker symbols order should be preserved in memory");
+ASSERT(__game_data_init_end <= __game_data_no_init_start, "Linker symbols order should be preserved in memory");
+ASSERT(__game_data_no_init_end <= __game_code_assets_start, "Linker symbols order should be preserved in memory");

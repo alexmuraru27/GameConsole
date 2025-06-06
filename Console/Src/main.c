@@ -253,6 +253,7 @@ void track0FinishedCallback()
 }
 
 extern uint32_t __game_header_start;
+bool is_pressed = false;
 static void render()
 {
   if (joystickGetSpecialBtn1())
@@ -276,16 +277,43 @@ static void render()
   if (joystickGetRBtnLeft())
   {
     buzzerStop(0);
+    is_pressed = false;
   }
-  if (joystickGetRBtnRight())
+  if (joystickGetRBtnRight() && !is_pressed)
   {
+    is_pressed = true;
     GameHeader *game_header = (GameHeader *)&__game_header_start;
 
-    if (game_header->magic != 0x47414D45 || game_header->version != 1U)
+    if (game_header->magic != 0x47414D45U)
     {
       return;
     }
 
+    uint32_t header_size = game_header->header_end - game_header->header_start;
+    uint32_t text_size = game_header->text_end - game_header->text_start;
+    uint32_t ro_data_size = game_header->ro_data_end - game_header->ro_data_start;
+    uint32_t assets_size = game_header->assets_end - game_header->assets_start;
+    uint32_t data_size = game_header->data_end - game_header->data_start;
+    uint32_t bss_size = game_header->bss_end - game_header->bss_start;
+    uint32_t total = header_size + text_size + ro_data_size + assets_size + data_size + bss_size;
+    debugString("\r\nheader_size = ");
+    debugInt(header_size);
+    debugString("\r\ntext_size = ");
+    debugInt(text_size);
+    debugString("\r\nro_data_size = ");
+    debugInt(ro_data_size);
+    debugString("\r\ndata_size = ");
+    debugInt(data_size);
+    debugString("\r\nbss_size = ");
+    debugInt(bss_size);
+    debugString("\r\nassets_size = ");
+    debugInt(assets_size);
+    debugString("\r\ntotal = ");
+    debugInt(total);
+
+    delay(50);
+    usartBufferFlush();
+    delay(4000);
     __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
     void (*game_entry)(void) = (void (*)(void))game_header->entry_point;
     game_entry();
