@@ -42,7 +42,7 @@ static void consoleInit()
   buzzerInit();
   rendererInit();
   gameConsoleInit();
-  sdioInit();
+  sdCardInit();
 }
 
 static void syncFrame()
@@ -399,6 +399,7 @@ int main(void)
   consoleInit();
   screenInit();
   testApi();
+  sdCardExample();
   while (1)
   {
     update();
