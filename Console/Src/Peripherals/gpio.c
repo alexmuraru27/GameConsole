@@ -163,6 +163,11 @@ static void initSdio()
     // GPIOD PD2 AF12
     GPIOD->AFR[0] &= ~(GPIO_AFRL_AFRL2);
     GPIOD->AFR[0] |= (12 << GPIO_AFRL_AFSEL2_Pos);
+
+    // Pull-up for data lines (NOT CLK)
+    GPIOC->PUPDR |= (1 << GPIO_PUPDR_PUPD8_Pos) | (1 << GPIO_PUPDR_PUPD9_Pos) | (1 << GPIO_PUPDR_PUPD10_Pos) | (1 << GPIO_PUPDR_PUPD11_Pos);
+    // Configure PD2 (CMD) with pull-up
+    GPIOD->PUPDR |= (1 << 4); // Pull-up (CRITICAL for Black Board)
 }
 
 void gpioInit(void)

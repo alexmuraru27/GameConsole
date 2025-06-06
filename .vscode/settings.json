@@ -43,7 +43,11 @@
         "game_console.h": "c",
         "test_buzzer.h": "c",
         "test_renderer.h": "c",
-        "test_usart.h": "c"
+        "test_usart.h": "c",
+        "diskio.h": "c",
+        "bricks2.h": "c",
+        "ff.h": "c",
+        "diskio_integration.h": "c"
     },
-    "cortex-debug.variableUseNaturalFormat": false
+    "cortex-debug.variableUseNaturalFormat": true
 }

@@ -31,6 +31,10 @@ Src/Peripherals/sdio.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
+Src/FatFs/diskio.c \
+Src/FatFs/diskio_integration.c \
+Src/FatFs/ff.c \
+Src/FatFs/ffunicode.c \
 Src/Test/test_buzzer.c \
 Src/Test/test_joystick.c \
 Src/Test/test_renderer.c \
@@ -55,6 +59,7 @@ C_INCLUDES =  \
 -IInc/Test \
 -IInc/Peripherals \
 -IInc/Devices \
+-IInc/FatFs \
 -IInc/Renderer \
 -I../Tiles \
 -I../Shared/Inc \
