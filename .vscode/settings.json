@@ -47,7 +47,8 @@
         "diskio.h": "c",
         "bricks2.h": "c",
         "ff.h": "c",
-        "diskio_integration.h": "c"
+        "diskio_integration.h": "c",
+        "stddef.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
