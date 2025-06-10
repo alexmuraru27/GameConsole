@@ -42,6 +42,9 @@ Src/Test/test_usart.c \
 Src/Test/test_console.c \
 Src/Test/test_fatfs.c \
 Src/Test/test_api.c \
+Src/Loader/loader.c \
+Src/Loader/game_loader.c \
+Src/Loader/asset_loader.c \
 Src/Renderer/renderer.c
 
 # ASM sources
@@ -63,6 +66,7 @@ C_INCLUDES =  \
 -IInc/Devices \
 -IInc/FatFs \
 -IInc/Renderer \
+-IInc/Loader \
 -I../Tiles \
 -I../Shared/Inc \
 -I../Shared/Inc/TileUtils \
