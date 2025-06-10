@@ -3,55 +3,149 @@
 #include <stm32f407xx.h>
 #include <string.h>
 
-#if !defined(USART_BUFFER_SIZE)
-#define USART_BUFFER_SIZE ((uint32_t)512U)
-#endif
+#define USART_BUFFER_SIZE ((uint32_t)1024U)
 
-uint8_t s_usart2_buffer_a[USART_BUFFER_SIZE] = {0U};
-uint8_t s_usart2_buffer_b[USART_BUFFER_SIZE] = {0U};
-uint8_t *s_usart2_active_buffer = s_usart2_buffer_a; // CPU writes here
-volatile uint16_t s_usart2_active_buffer_pos = 0;
+uint8_t s_usart2_circular_buffer[USART_BUFFER_SIZE] = {0U};
+volatile uint16_t s_usart2_head = 0;
+volatile uint16_t s_usart2_tail = 0;
+volatile uint16_t s_usart2_dma_length = 0;
 volatile uint8_t s_usart2_dma_busy = 0;
 
-void usart2SetDmaFree(void)
+static inline uint16_t circularBufferSize(void)
 {
-    s_usart2_dma_busy = 0U;
-}
-static void usart2BufferFlush(void)
-{
-    // if DMA is busy, don't flush
-    if (s_usart2_dma_busy)
-        return;
+    // actually this local vars have a purpose
+    // since s_usart2 head and tail are volatile
+    // we snapshot the values
+    uint16_t head = s_usart2_head;
+    uint16_t tail = s_usart2_tail;
 
-    // if the buffer is empty, there is nothing to write
-    if (s_usart2_active_buffer_pos == 0)
+    if (head >= tail)
+    {
+        return head - tail;
+    }
+    else
+    {
+        return USART_BUFFER_SIZE - tail + head;
+    }
+}
+
+static inline uint16_t circularBufferFree(void)
+{
+    return USART_BUFFER_SIZE - circularBufferSize() - 1U;
+}
+
+static inline uint16_t circularBufferContiguousSize(void)
+{
+    uint16_t head = s_usart2_head;
+    uint16_t tail = s_usart2_tail;
+
+    if (head >= tail)
+    {
+        return head - tail;
+    }
+    else
+    {
+        // data wraps around, return size from tail to end of buffer
+        return USART_BUFFER_SIZE - tail;
+    }
+}
+
+static void startDmaTransfer(void)
+{
+    // check if there's data to transmit
+    uint16_t size = circularBufferContiguousSize();
+    if (size == 0)
     {
         return;
     }
 
+    // disable DMA before configuration
     DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-    DMA1_Stream6->M0AR = (uint32_t)s_usart2_active_buffer;
-    DMA1_Stream6->NDTR = s_usart2_active_buffer_pos;
 
-    // Swap active buffer
-    s_usart2_active_buffer = (s_usart2_active_buffer == s_usart2_buffer_a) ? s_usart2_buffer_b : s_usart2_buffer_a;
-    s_usart2_active_buffer_pos = 0;
+    // wait for DMA to be actually disabled
+    while (DMA1_Stream6->CR & DMA_SxCR_EN)
+    {
+        // wait
+    }
 
-    // Start DMA transfer
+    // clear all DMA flags for Stream 6
+    DMA1->HIFCR = DMA_HIFCR_CTCIF6 | DMA_HIFCR_CHTIF6 | DMA_HIFCR_CTEIF6 |
+                  DMA_HIFCR_CDMEIF6 | DMA_HIFCR_CFEIF6;
+
+    // configure DMA transfer
+    DMA1_Stream6->M0AR = (uint32_t)&s_usart2_circular_buffer[s_usart2_tail];
+    DMA1_Stream6->NDTR = size;
+
+    // remember transfer length for tail update after completion
+    s_usart2_dma_length = size;
     s_usart2_dma_busy = 1;
+
+    // start DMA transfer
     DMA1_Stream6->CR |= DMA_SxCR_EN;
+}
+
+void usart2SetDmaFree(void)
+{
+    // update tail
+    if (s_usart2_dma_length > 0)
+    {
+        s_usart2_tail = (s_usart2_tail + s_usart2_dma_length) % USART_BUFFER_SIZE;
+        s_usart2_dma_length = 0;
+    }
+
+    s_usart2_dma_busy = 0;
+
+    // start next transfer if data is available
+    startDmaTransfer();
+}
+
+static void usart2BufferFlush(void)
+{
+    // if DMA is busy, it will automatically continue in usart2SetDmaFree
+    if (s_usart2_dma_busy)
+    {
+        return;
+    }
+
+    // try to start transmission
+    startDmaTransfer();
 }
 
 static void usart2Send(const uint8_t *data, uint16_t size)
 {
-    // If enough place inside the buffer, fill it
-    if (size < (USART_BUFFER_SIZE - s_usart2_active_buffer_pos))
+    // disable interrupts to protect buffer update
+    NVIC_DisableIRQ(DMA1_Stream6_IRQn);
+
+    // check if there's enough space
+    uint16_t free_space = circularBufferFree();
+    if (size > free_space)
     {
-        memcpy(&s_usart2_active_buffer[s_usart2_active_buffer_pos], data, size);
-        s_usart2_active_buffer_pos += size;
+        // truncate
+        size = free_space;
     }
 
-    // Try to always trigger a flush
+    // copy data to circular buffer
+    uint16_t head = s_usart2_head;
+    uint16_t space_to_end = USART_BUFFER_SIZE - head;
+
+    if (size <= space_to_end)
+    {
+        // data fits without wrapping
+        memcpy(&s_usart2_circular_buffer[head], data, size);
+        s_usart2_head = (head + size) % USART_BUFFER_SIZE;
+    }
+    else
+    {
+        // data wraps around
+        memcpy(&s_usart2_circular_buffer[head], data, space_to_end);
+        memcpy(&s_usart2_circular_buffer[0], &data[space_to_end], size - space_to_end);
+        s_usart2_head = size - space_to_end;
+    }
+
+    // re-enable interrupts
+    NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+
+    // try to always trigger a flush
     usart2BufferFlush();
 }
 
@@ -104,7 +198,7 @@ void debugInt(uint32_t num)
         }
     }
 
-    // send  reverse order
+    // send reverse order
     for (uint8_t j = 0U; j < i / 2U; j++)
     {
         uint8_t temp = buffer[j];
@@ -167,9 +261,4 @@ void debugBinary(uint32_t num, uint8_t width)
 void usartInit(void)
 {
     usart2Init();
-}
-
-void usartBufferFlush(void)
-{
-    usart2BufferFlush();
 }

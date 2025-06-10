@@ -10,7 +10,6 @@ typedef struct
     uint32_t (*getSysTime)(void);
 
     // USART DEBUG
-    void (*usartBufferFlush)(void);
     void (*debugChar)(char c);
     void (*debugString)(const char *str);
     void (*debugInt)(uint32_t num);

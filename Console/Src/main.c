@@ -151,7 +151,6 @@ static void render()
     debugInt(total);
 
     delay(50);
-    usartBufferFlush();
     delay(4000);
     __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
     void (*game_entry)(void) = (void (*)(void))game_header->entry_point;

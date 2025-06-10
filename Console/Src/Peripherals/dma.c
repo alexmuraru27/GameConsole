@@ -27,7 +27,11 @@ static void usart2DmaInit(void)
 {
     // disable DMA1 S6
     DMA1_Stream6->CR &= ~DMA_SxCR_EN;
-    // set peripheral data register to USART2-<DR
+    // Wait for DMA to be disabled
+    while (DMA1_Stream6->CR & DMA_SxCR_EN)
+        ;
+
+    // set peripheral data register to USART2->DR
     DMA1_Stream6->PAR = (uint32_t)&USART2->DR;
     // select channel 4(Usart2_TX)
     DMA1_Stream6->CR |= 4U << DMA_SxCR_CHSEL_Pos;
@@ -39,8 +43,8 @@ static void usart2DmaInit(void)
     DMA1_Stream6->CR |= 1U << DMA_SxCR_DIR_Pos;
     // enable interrupt: transfer complete
     DMA1_Stream6->CR |= DMA_SxCR_TCIE;
-    // reenable DMA1 S6
-    DMA1_Stream6->CR |= DMA_SxCR_EN;
+
+    // DMA should not be enabled without data!
     // enable interrupt in NVIC
     NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 }

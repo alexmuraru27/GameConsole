@@ -65,7 +65,6 @@ void fatfsDirRead(void)
                 debugString(" ");
                 debugInt(finfo.fsize);
             }
-            delay(1);
             debugString("\r\n");
         }
         f_closedir(&dir);
@@ -142,7 +141,6 @@ uint8_t fatfsReadFile(const char *filename, uint32_t maxBytes)
             }
             debugChar(buffer[i]);
             debugString(" ");
-            delay(1);
         }
 
         totalRead += bytesRead;
@@ -151,21 +149,14 @@ uint8_t fatfsReadFile(const char *filename, uint32_t maxBytes)
     debugString("\r\nTotal read:");
     debugHex(totalRead);
     debugString(" bytes\r\n");
-    delay(1);
-    usartBufferFlush();
     f_close(&file);
     return 0;
 }
 
 void testFatFs(void)
 {
-    delay(10);
     debugString("====== FatFs Test ======\r\n");
-    delay(10);
     fatfsDirRead();
     fatfsReadFile("test.txt", 100U);
-
-    delay(10);
     debugString("====== FatFs Test End ======\r\n");
-    delay(10);
 }

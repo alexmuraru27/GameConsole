@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 void usartInit(void);
-void usartBufferFlush(void);
 void usart2SetDmaFree(void);
 void debugChar(char c);
 void debugString(const char *str);

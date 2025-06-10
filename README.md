@@ -1,7 +1,6 @@
 - [GameConsole](#gameconsole)
 	- [Development Board](#development-board)
 	- [Naming Conventions](#naming-conventions)
-	- [Defines](#defines)
 	- [Pinning](#pinning)
 		- [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
 		- [DAC (Audio)](#dac-audio)
@@ -37,12 +36,6 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 | **Enum types**       | PascalCase              | `typedef enum PowerState`                   |
 | **Struct members**   | snake_case              | `uint16_t adc_value;`                       |
 | **Typedefs**         | PascalCase              | `typedef uint8_t Byte;`                     |
-
-## Defines
-- #define USART_BUFFER_SIZE ((uint32_t)512U)
-- #define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
-- #define HSE_CLOCK_VALUE ((uint32_t)8000000)
-- #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 
 ## Pinning
 ### USART2 (Debug Interface - Baud 921600) 

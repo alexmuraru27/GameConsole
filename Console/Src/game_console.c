@@ -17,7 +17,6 @@ static void gameConsoleExposeApi()
             // SYSTIME
             .getSysTime = &getSysTime,
             // USART DEBUG
-            .usartBufferFlush = &usartBufferFlush,
             .debugChar = &debugChar,
             .debugString = &debugString,
             .debugInt = &debugInt,
