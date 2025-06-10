@@ -1,11 +1,18 @@
 #include "game_console.h"
 #include "game_console_api.h"
-
 #include "sysclock.h"
 #include "usart.h"
 #include "joystick.h"
 #include "renderer.h"
 #include "buzzer.h"
+#include "gpio.h"
+#include "dma.h"
+#include "ILI9341.h"
+#include "adc.h"
+#include "timer.h"
+#include "sdio.h"
+#include "ff.h"
+#include "string.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -97,7 +104,23 @@ static void gameConsoleExposeApi()
     *API_PTR = api_header;
 }
 
+static FATFS s_fatfs;
+static void peripheralsInit()
+{
+    dmaInit();
+    gpioInit();
+    usartInit();
+    timerInit();
+    ili9341Init(3U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    adcInit();
+    joystickInit();
+    buzzerInit();
+    rendererInit();
+    f_mount(&s_fatfs, "0:", 1U);
+}
+
 void gameConsoleInit()
 {
+    peripheralsInit();
     gameConsoleExposeApi();
 }
