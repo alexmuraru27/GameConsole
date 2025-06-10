@@ -50,7 +50,10 @@
         "diskio_integration.h": "c",
         "stddef.h": "c",
         "test_fatfs.h": "c",
-        "game_loader.h": "c"
+        "game_loader.h": "c",
+        "font_9.h": "c",
+        "font_a.h": "c",
+        "font_b.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
