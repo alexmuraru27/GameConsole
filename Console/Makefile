@@ -41,6 +41,7 @@ Src/Test/test_renderer.c \
 Src/Test/test_usart.c \
 Src/Test/test_console.c \
 Src/Test/test_fatfs.c \
+Src/Test/test_api.c \
 Src/Renderer/renderer.c
 
 # ASM sources

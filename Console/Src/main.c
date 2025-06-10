@@ -18,6 +18,7 @@
 #include "test_fatfs.h"
 #include "test_buzzer.h"
 #include "test_renderer.h"
+#include "test_api.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -71,7 +72,6 @@ static void update()
   rendererOamSetXYPos(0U, x, y);
 }
 
-extern uint32_t __game_header_start;
 bool is_pressed = false;
 static void render()
 {
@@ -100,60 +100,16 @@ static void render()
   if (joystickGetRBtnRight() && !is_pressed)
   {
     is_pressed = true;
-    GameHeader *game_header = (GameHeader *)&__game_header_start;
-
-    if (game_header->magic != 0x47414D45U)
-    {
-      return;
-    }
-
-    uint32_t header_size = game_header->header_end - game_header->header_start;
-    uint32_t text_size = game_header->text_end - game_header->text_start;
-    uint32_t ro_data_size = game_header->ro_data_end - game_header->ro_data_start;
-    uint32_t assets_size = game_header->assets_end - game_header->assets_start;
-    uint32_t data_size = game_header->data_end - game_header->data_start;
-    uint32_t bss_size = game_header->bss_end - game_header->bss_start;
-    uint32_t total = header_size + text_size + ro_data_size + assets_size + data_size + bss_size;
-    debugString("\r\nheader_size = ");
-    debugInt(header_size);
-    debugString("\r\ntext_size = ");
-    debugInt(text_size);
-    debugString("\r\nro_data_size = ");
-    debugInt(ro_data_size);
-    debugString("\r\ndata_size = ");
-    debugInt(data_size);
-    debugString("\r\nbss_size = ");
-    debugInt(bss_size);
-    debugString("\r\nassets_size = ");
-    debugInt(assets_size);
-    debugString("\r\ntotal = ");
-    debugInt(total);
-
-    delay(50);
-    delay(4000);
-    // __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
-    // void (*game_entry)(void) = (void (*)(void))game_header->entry_point;
-    // game_entry();
   }
   rendererRender();
-}
-
-extern ConsoleAPIHeader __game_console_api_start; // linker
-static void testApi()
-{
-  ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
-  if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
-  {
-    api_hdr_ptr->api.debugString("Hello from shared api :D\r\n");
-  }
 }
 
 int main(void)
 {
   gameConsoleInit();
-  testApi();
   testRendererInit();
   testFatFs();
+  testApi();
   while (1)
   {
     update();
