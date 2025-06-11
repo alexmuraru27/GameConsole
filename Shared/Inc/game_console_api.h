@@ -113,4 +113,19 @@ typedef struct
     uint32_t entry_point;
 } GameHeader;
 
+typedef struct
+{
+    char magic[4];
+    uint32_t version;
+    uint32_t asset_count;
+} AssetHeader;
+
+typedef struct
+{
+    uint32_t id;
+    uint32_t type;
+    uint32_t size;
+    uint8_t data[];
+} AssetData;
+
 #endif /* __CONSOLE_API_H */

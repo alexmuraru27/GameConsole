@@ -91,7 +91,8 @@ SECTIONS
   {
     . = ALIGN(4);
     __game_code_assets_start = .;
-    KEEP (*(.assets*)) 
+    KEEP (*(.assets.header))
+    KEEP (*(.assets.data))
     . = ALIGN(4);
     __game_code_assets_end = .;
   } >GAME_RAM_ASSETS
