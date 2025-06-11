@@ -13,6 +13,7 @@
 #include "sdio.h"
 #include "ff.h"
 #include "string.h"
+#include "loader.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -107,6 +108,7 @@ static void gameConsoleExposeApi()
 static FATFS s_fatfs;
 static void peripheralsInit()
 {
+    f_mount(&s_fatfs, "0:", 1U);
     dmaInit();
     gpioInit();
     usartInit();
@@ -116,7 +118,6 @@ static void peripheralsInit()
     joystickInit();
     buzzerInit();
     rendererInit();
-    f_mount(&s_fatfs, "0:", 1U);
 }
 
 void gameConsoleInit()

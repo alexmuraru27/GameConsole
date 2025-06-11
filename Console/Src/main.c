@@ -1,24 +1,18 @@
 #include <stm32f407xx.h>
 #include "sysclock.h"
 #include "usart.h"
-#include "gpio.h"
-#include "dma.h"
-#include "ILI9341.h"
-#include "adc.h"
-#include "timer.h"
 #include "joystick.h"
 #include "renderer.h"
 #include "buzzer.h"
 #include "game_console.h"
 #include "game_console_api.h"
 #include "stddef.h"
-#include "sdio.h"
-#include "ff.h"
 #include "string.h"
 #include "test_fatfs.h"
 #include "test_buzzer.h"
 #include "test_renderer.h"
 #include "test_api.h"
+#include "loader.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -104,12 +98,28 @@ static void render()
   rendererRender();
 }
 
+void loaderTest(void)
+{
+  debugString("\r\nLoader number of bianry files found: ");
+  debugInt(loaderGetBinaryFilesNumberInDirectory());
+  debugString("\r\n");
+
+  char filename[loaderGetMaxFilenameSize()];
+  uint32_t filename_length = 0U;
+  loaderGetBinaryFilenameByIndex(0U, filename, &filename_length);
+
+  debugString(filename);
+  debugString(" - ");
+  debugInt(filename_length);
+}
+
 int main(void)
 {
   gameConsoleInit();
   testRendererInit();
-  testFatFs();
-  testApi();
+  // testFatFs();
+  // testApi();
+  loaderTest();
   while (1)
   {
     update();

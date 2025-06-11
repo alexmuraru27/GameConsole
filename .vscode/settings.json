@@ -53,7 +53,8 @@
         "game_loader.h": "c",
         "font_9.h": "c",
         "font_a.h": "c",
-        "font_b.h": "c"
+        "font_b.h": "c",
+        "stdlib.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
