@@ -56,10 +56,8 @@ static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, c
 }
 uint8_t gameLoaderLoadGame(uint8_t binary_index)
 {
-    FIL file;
     FRESULT res;
-
-    res = loaderOpenBinaryFileByIndex(binary_index, &file);
+    res = loaderOpenFile(binary_index);
     if (res != FR_OK)
     {
         return res;
@@ -67,7 +65,7 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 
     uint8_t game_header_buffer[sizeof(GameHeader)];
     UINT game_header_buffer_bytes_read;
-    res = f_read(&file, game_header_buffer, sizeof(GameHeader), &game_header_buffer_bytes_read);
+    res = f_read(loaderGetFile(), game_header_buffer, sizeof(GameHeader), &game_header_buffer_bytes_read);
     if (res != FR_OK || game_header_buffer_bytes_read == 0)
     {
         return res;
@@ -84,17 +82,17 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 
         if (text_file_size > 0U)
         {
-            loadRegionToMemory(&file, game_header_from_bin->text_start, game_header_from_bin->header_start, text_file_size);
+            loadRegionToMemory(loaderGetFile(), game_header_from_bin->text_start, game_header_from_bin->header_start, text_file_size);
         }
 
         if (ro_data_file_size > 0U)
         {
-            loadRegionToMemory(&file, game_header_from_bin->ro_data_start, game_header_from_bin->header_start, ro_data_file_size);
+            loadRegionToMemory(loaderGetFile(), game_header_from_bin->ro_data_start, game_header_from_bin->header_start, ro_data_file_size);
         }
 
         if (data_file_size > 0U)
         {
-            loadRegionToMemory(&file, game_header_from_bin->data_start, game_header_from_bin->header_start, data_file_size);
+            loadRegionToMemory(loaderGetFile(), game_header_from_bin->data_start, game_header_from_bin->header_start, data_file_size);
         }
 
         // TODO - switch the stack pointer
@@ -107,4 +105,9 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     }
 
     return 0U;
+}
+
+uint8_t gameLoaderCloseGame()
+{
+    return loaderCloseFile();
 }

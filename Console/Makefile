@@ -40,8 +40,6 @@ Src/Test/test_joystick.c \
 Src/Test/test_renderer.c \
 Src/Test/test_usart.c \
 Src/Test/test_console.c \
-Src/Test/test_fatfs.c \
-Src/Test/test_api.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \

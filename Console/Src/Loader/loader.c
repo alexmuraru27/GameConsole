@@ -4,6 +4,9 @@
 #include "stdlib.h"
 #include "string.h"
 
+FIL s_active_file;
+bool s_is_file_opened = false;
+
 static bool isBinaryFile(const char *filename)
 {
     const char *binary_extensions[] = {".bin", NULL};
@@ -22,6 +25,11 @@ static bool isBinaryFile(const char *filename)
         }
     }
     return false;
+}
+
+bool loaderIsFileOpened()
+{
+    return s_is_file_opened;
 }
 
 uint32_t loaderGetBinaryFilesNumberInDirectory(void)
@@ -61,17 +69,23 @@ uint32_t loaderGetBinaryFilesNumberInDirectory(void)
     return file_count;
 }
 
-FRESULT loaderOpenBinaryFileByIndex(const uint32_t index, FIL *const file)
+FIL *loaderGetFile()
+{
+    return &s_active_file;
+}
+
+FRESULT loaderCloseFile()
+{
+    s_is_file_opened = false;
+    return f_close(&s_active_file);
+}
+
+FRESULT loaderOpenFile(const uint32_t binary_index)
 {
     FRESULT res;
     DIR dir;
     FILINFO finfo;
     uint32_t binary_file_index = 0U;
-
-    if (!file)
-    {
-        return FR_INVALID_PARAMETER;
-    }
 
     res = f_opendir(&dir, "0:");
     if (res != FR_OK)
@@ -102,9 +116,13 @@ FRESULT loaderOpenBinaryFileByIndex(const uint32_t index, FIL *const file)
 
         if (isBinaryFile(finfo.fname))
         {
-            if (binary_file_index == index)
+            if (binary_file_index == binary_index)
             {
-                res = f_open(file, finfo.fname, FA_READ);
+                res = f_open(&s_active_file, finfo.fname, FA_READ);
+                if (res == FR_OK)
+                {
+                    s_is_file_opened = true;
+                }
                 f_closedir(&dir);
                 return res;
             }
@@ -113,7 +131,7 @@ FRESULT loaderOpenBinaryFileByIndex(const uint32_t index, FIL *const file)
     }
 }
 
-FRESULT loaderGetBinaryFilenameByIndex(const uint32_t index, char *const filename_out, uint32_t *const filename_length)
+FRESULT loaderGetFilenameByIndex(const uint32_t binary_index, char *const filename_out, uint32_t *const filename_length)
 {
     FRESULT res;
     DIR dir;
@@ -158,7 +176,7 @@ FRESULT loaderGetBinaryFilenameByIndex(const uint32_t index, char *const filenam
 
         if (isBinaryFile(finfo.fname))
         {
-            if (binary_file_index == index)
+            if (binary_file_index == binary_index)
             {
                 uint32_t actual_length = strlen(finfo.fname);
                 strncpy(filename_out, finfo.fname, FF_LFN_BUF - 1U);

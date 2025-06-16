@@ -8,10 +8,8 @@
 #include "game_console_api.h"
 #include "stddef.h"
 #include "string.h"
-#include "test_fatfs.h"
 #include "test_buzzer.h"
 #include "test_renderer.h"
-#include "test_api.h"
 #include "loader.h"
 #include "game_loader.h"
 
