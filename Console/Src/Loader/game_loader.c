@@ -97,9 +97,13 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
             loadRegionToMemory(&file, game_header_from_bin->data_start, game_header_from_bin->header_start, data_file_size);
         }
 
+        // TODO - switch the stack pointer
+        // TODO - save the OS stack pointer first
         // __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
-        // void (*game_entry)(void) = (void (*)(void))game_header_from_bin->entry_point;
-        // game_entry();
+        void (*game_entry)(void) = (void (*)(void))game_header_from_bin->entry_point;
+        game_entry();
+
+        // TODO restore OS stack pointer after game return
     }
 
     return 0U;

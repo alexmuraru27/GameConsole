@@ -28,27 +28,25 @@ int main(void)
     api_hdr_ptr->api.debugHex(pacman_ghost_palette[1U]);
     api_hdr_ptr->api.debugHex(pacman_ghost_palette[2U]);
     api_hdr_ptr->api.debugHex(pacman_ghost_palette[3U]);
-    while (true)
-    {
-        api_hdr_ptr->api.debugString("Data:");
-        api_hdr_ptr->api.debugInt(s_data_array[0]);
-        api_hdr_ptr->api.debugInt(s_data_array[1]);
-        api_hdr_ptr->api.debugInt(s_data_array[2]);
-        api_hdr_ptr->api.debugInt(s_data_array[3]);
-        api_hdr_ptr->api.debugInt(s_data_array[4]);
-        api_hdr_ptr->api.debugString("Bss:");
-        api_hdr_ptr->api.debugInt(s_bss[0]);
-        api_hdr_ptr->api.debugInt(s_bss[1]);
-        api_hdr_ptr->api.debugInt(s_bss[2]);
-        api_hdr_ptr->api.debugInt(s_bss[3]);
-        api_hdr_ptr->api.debugInt(s_bss[4]);
-        api_hdr_ptr->api.debugInt(s_bss[5]);
-        api_hdr_ptr->api.debugInt(s_bss[6]);
-        api_hdr_ptr->api.debugString("In Loop\r\n");
-        asm("nop");
-        testApi();
-        api_hdr_ptr->api.delay(500);
-    }
+
+    api_hdr_ptr->api.debugString("Data:");
+    api_hdr_ptr->api.debugInt(s_data_array[0]);
+    api_hdr_ptr->api.debugInt(s_data_array[1]);
+    api_hdr_ptr->api.debugInt(s_data_array[2]);
+    api_hdr_ptr->api.debugInt(s_data_array[3]);
+    api_hdr_ptr->api.debugInt(s_data_array[4]);
+    api_hdr_ptr->api.debugString("Bss:");
+    api_hdr_ptr->api.debugInt(s_bss[0]);
+    api_hdr_ptr->api.debugInt(s_bss[1]);
+    api_hdr_ptr->api.debugInt(s_bss[2]);
+    api_hdr_ptr->api.debugInt(s_bss[3]);
+    api_hdr_ptr->api.debugInt(s_bss[4]);
+    api_hdr_ptr->api.debugInt(s_bss[5]);
+    api_hdr_ptr->api.debugInt(s_bss[6]);
+    api_hdr_ptr->api.debugString("In Loop\r\n");
+    asm("nop");
+    testApi();
+    api_hdr_ptr->api.delay(500);
 }
 
 extern uint32_t __game_header_start, __game_header_end;
