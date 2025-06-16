@@ -374,8 +374,8 @@ static void drawTile(const uint8_t x, const uint8_t y, bool is_bg, const uint8_t
         }
     }
 
-    // if fully opaque, send it in one burst
-    if (tile_fully_opaque)
+    // if fully opaque or bg, send it in one burst
+    if (tile_fully_opaque || is_bg)
     {
         ili9341SetAddrWindow(x, y, RENDERER_TILE_PIXEL_SIZE, RENDERER_TILE_PIXEL_SIZE);
         for (uint8_t row = 0U; row < RENDERER_TILE_PIXEL_SIZE; row++)
