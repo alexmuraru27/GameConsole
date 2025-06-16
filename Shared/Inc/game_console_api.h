@@ -8,6 +8,7 @@ typedef struct
 {
     // SYSTIME
     uint32_t (*getSysTime)(void);
+    void (*delay)(uint32_t sys_time_delta);
 
     // USART DEBUG
     void (*debugChar)(char c);

@@ -24,6 +24,8 @@ static void gameConsoleExposeApi()
         {
             // SYSTIME
             .getSysTime = &getSysTime,
+            .delay = &delay,
+
             // USART DEBUG
             .debugChar = &debugChar,
             .debugString = &debugString,

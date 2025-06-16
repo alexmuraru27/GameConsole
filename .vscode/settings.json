@@ -54,7 +54,9 @@
         "font_9.h": "c",
         "font_a.h": "c",
         "font_b.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "loader.h": "c",
+        "test_api.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

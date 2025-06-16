@@ -13,6 +13,7 @@
 #include "test_renderer.h"
 #include "test_api.h"
 #include "loader.h"
+#include "game_loader.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -100,17 +101,11 @@ static void render()
 
 void loaderTest(void)
 {
-  debugString("\r\nLoader number of bianry files found: ");
+  debugString("\r\nLoader number of binary files found: ");
   debugInt(loaderGetBinaryFilesNumberInDirectory());
   debugString("\r\n");
 
-  char filename[loaderGetMaxFilenameSize()];
-  uint32_t filename_length = 0U;
-  loaderGetBinaryFilenameByIndex(0U, filename, &filename_length);
-
-  debugString(filename);
-  debugString(" - ");
-  debugInt(filename_length);
+  gameLoaderLoadGame(0U);
 }
 
 int main(void)
