@@ -13,9 +13,7 @@
 		- [Deps](#deps)
 		- [User inputs:](#user-inputs)
 		- [Usage](#usage)
-	- [Renderer Engine](#renderer-engine)
-		- [System Palette](#system-palette)
-		- [Z-order rendering of sprites and background](#z-order-rendering-of-sprites-and-background)
+	- [API \& Internal Documentation](#api--internal-documentation)
 
 
 # GameConsole
@@ -131,15 +129,8 @@ const uint8_t bricks1_palette[4U] = {0x30, 0x7, 0x17, 0x27};
 
 ```
 
-## Renderer Engine
-### System Palette
-![system_palette](docu/system_palette.png)
+## API & Internal Documentation
 
-### Z-order rendering of sprites and background
-| rendererOamSetPriorityLow | rendererAttributeTableSetPriorityHigh | Order of elements         | Explanation                                |
-| ------------------------- | ------------------------------------- | ------------------------- | ------------------------------------------ |
-| true                      | false/true                            | Bg Low - Bg High - Sprite | Sprite will always be on top               |
-| false                     | false                                 | Bg Low - Sprite           | Sprite is drawn over low priority BG       |
-| false                     | true                                  | Sprite - Bg High          | Sprite is drawn under the high priority BG |
+See [API_README.md](API_README.md) for a full API reference, module internals, renderer usage, and advanced graphics documentation.
 
 
