@@ -124,9 +124,9 @@ uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
                 dest_addr += bytes_read;
 
                 // read less than requested, end of file - RETURN ok
-                if (bytes_read <= bytes_to_read)
+                if (bytes_read < bytes_to_read)
                 {
-                    return ASSET_LOADER_RET_OK;
+                    break;
                 }
             }
 
@@ -134,6 +134,8 @@ uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
             {
                 return ASSET_LOADER_RET_ERR;
             }
+
+            return ASSET_LOADER_RET_OK;
         }
         else
         {

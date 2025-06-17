@@ -11,6 +11,8 @@ TARGET = GameConsole
 # Build path
 BUILD_DIR = ../build/Console
 
+OPT = -Og
+
 ######################################
 # source
 ######################################

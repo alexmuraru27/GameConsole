@@ -6,6 +6,26 @@
 
 typedef struct
 {
+    char magic[4];
+    uint32_t version;
+    uint32_t asset_count;
+} AssetHeader;
+
+typedef struct
+{
+    uint32_t id;
+    uint32_t type;
+    uint32_t size;
+} AssetMetaData;
+
+typedef struct
+{
+    AssetMetaData metadata;
+    uint8_t data[];
+} AssetData;
+
+typedef struct
+{
     // SYSTIME
     uint32_t (*getSysTime)(void);
     void (*delay)(uint32_t sys_time_delta);
@@ -84,6 +104,11 @@ typedef struct
     bool (*rendererAttributeTableGetFlipH)(uint8_t tile_x, uint8_t tile_y);
     void (*rendererAttributeTableSetPriorityHigh)(uint8_t tile_x, uint8_t tile_y, bool is_priority_high);
     bool (*rendererAttributeTableGetPriorityHigh)(uint8_t tile_x, uint8_t tile_y);
+
+    // ASSETS
+    uint8_t (*assetLoaderGetAssetSize)(uint32_t asset_id, uint32_t *buffer_size);
+    uint8_t (*assetLoaderGetAssetData)(uint32_t asset_id, uint8_t *buffer);
+    uint8_t (*assetLoaderGetAssetHeader)(AssetHeader *asset_header);
 } ConsoleAPI;
 
 #define API_MAGIC 0xDEADBEEFU
@@ -113,25 +138,5 @@ typedef struct
     uint32_t assets_end;
     uint32_t entry_point;
 } GameHeader;
-
-typedef struct
-{
-    char magic[4];
-    uint32_t version;
-    uint32_t asset_count;
-} AssetHeader;
-
-typedef struct
-{
-    uint32_t id;
-    uint32_t type;
-    uint32_t size;
-} AssetMetaData;
-
-typedef struct
-{
-    AssetMetaData metadata;
-    uint8_t data[];
-} AssetData;
 
 #endif /* __CONSOLE_API_H */

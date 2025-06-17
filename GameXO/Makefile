@@ -11,6 +11,8 @@ TARGET = GameXO
 # Build path
 BUILD_DIR = ../build/GameXO
 
+OPT = -Og
+
 ######################################
 # source
 ######################################

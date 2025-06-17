@@ -54,7 +54,7 @@ static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, c
         dest_addr += bytes_read;
 
         // read less than requested, end of file
-        if (bytes_read <= bytes_to_read)
+        if (bytes_read < bytes_to_read)
         {
             break;
         }

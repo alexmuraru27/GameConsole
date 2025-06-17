@@ -42,17 +42,57 @@ __attribute__((section(".assets.data"))) const AssetData test_data_2 = {
 int main(void)
 {
     ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
-    api_hdr_ptr->api.debugString("\r\n");
-    for (uint8_t i = 0U; i < test_data_1.metadata.size; i++)
+    api_hdr_ptr->api.debugString("\r\nblahblah");
+
+    uint32_t res = 0U;
+    uint32_t asset_1_size = 0U;
+    res = api_hdr_ptr->api.assetLoaderGetAssetSize(ASSET_NUMBER_SEQ_DATA, &asset_1_size);
+    if (!res)
     {
-        api_hdr_ptr->api.debugInt(test_data_1.data[i]);
-        api_hdr_ptr->api.debugString(" ");
+        uint8_t asset_1_data[asset_1_size];
+        res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_NUMBER_SEQ_DATA, asset_1_data);
+        if (!res)
+        {
+            for (uint8_t i = 0U; i < asset_1_size; i++)
+            {
+                api_hdr_ptr->api.debugInt(asset_1_data[i]);
+                api_hdr_ptr->api.debugString(" ");
+            }
+        }
+        else
+        {
+            api_hdr_ptr->api.debugString("\r\n asset1 data fail");
+        }
     }
+    else
+    {
+        api_hdr_ptr->api.debugString("\r\n asset1 size fail");
+    }
+
     api_hdr_ptr->api.debugString("\r\n");
-    api_hdr_ptr->api.debugHex(test_data_2.data[0U]);
-    api_hdr_ptr->api.debugHex(test_data_2.data[1U]);
-    api_hdr_ptr->api.debugHex(test_data_2.data[2U]);
-    api_hdr_ptr->api.debugHex(test_data_2.data[3U]);
+    uint32_t asset_2_size = 0U;
+    res = api_hdr_ptr->api.assetLoaderGetAssetSize(ASSET_NUMBER_SMALL_SEQ_DATA, &asset_2_size);
+    if (!res)
+    {
+        uint8_t asset_2_data[asset_2_size];
+        res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_NUMBER_SMALL_SEQ_DATA, asset_2_data);
+        if (!res)
+        {
+            for (uint8_t i = 0U; i < asset_2_size; i++)
+            {
+                api_hdr_ptr->api.debugHex(asset_2_data[i]);
+                api_hdr_ptr->api.debugString(" ");
+            }
+        }
+        else
+        {
+            api_hdr_ptr->api.debugString("\r\n asset2 data fail");
+        }
+    }
+    else
+    {
+        api_hdr_ptr->api.debugString("\r\n asset2 size fail");
+    }
 
     api_hdr_ptr->api.debugString("\r\nData:\r\n");
     api_hdr_ptr->api.debugInt(s_data_array[0]);

@@ -13,7 +13,7 @@
 #include "sdio.h"
 #include "ff.h"
 #include "string.h"
-#include "loader.h"
+#include "asset_loader.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -97,7 +97,10 @@ static void gameConsoleExposeApi()
             .rendererAttributeTableGetFlipH = &rendererAttributeTableGetFlipH,
             .rendererAttributeTableSetPriorityHigh = &rendererAttributeTableSetPriorityHigh,
             .rendererAttributeTableGetPriorityHigh = &rendererAttributeTableGetPriorityHigh,
-        };
+            // ASSETS
+            .assetLoaderGetAssetSize = &assetLoaderGetAssetSize,
+            .assetLoaderGetAssetData = &assetLoaderGetAssetData,
+            .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader};
 
     const ConsoleAPIHeader api_header = {
         .magic = API_MAGIC,
