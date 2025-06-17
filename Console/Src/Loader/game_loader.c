@@ -2,7 +2,20 @@
 #include "ff.h"
 #include "loader.h"
 #include "sysclock.h"
-#include "string.h"
+#include <string.h>
+
+GameHeader s_game_header;
+bool s_is_game_header_valid = false;
+
+uint8_t gameLoaderGetHeader(GameHeader *const game_header)
+{
+    if (!s_is_game_header_valid)
+    {
+        return GAME_LOADER_RET_ERR;
+    }
+    memcpy(game_header, &s_game_header, sizeof(GameHeader));
+    return GAME_LOADER_RET_OK;
+}
 
 static void clearBss(const uint32_t start_addr, const uint32_t size)
 {
@@ -41,7 +54,7 @@ static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, c
         dest_addr += bytes_read;
 
         // read less than requested, end of file
-        if (bytes_read < bytes_to_read)
+        if (bytes_read <= bytes_to_read)
         {
             break;
         }
@@ -57,6 +70,7 @@ static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, c
 uint8_t gameLoaderLoadGame(uint8_t binary_index)
 {
     FRESULT res;
+    s_is_game_header_valid = false;
     res = loaderOpenFile(binary_index);
     if (res != FR_OK)
     {
@@ -72,33 +86,34 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     }
     else
     {
-        GameHeader *game_header_from_bin = (GameHeader *)&game_header_buffer;
-        uint32_t text_file_size = game_header_from_bin->text_end - game_header_from_bin->text_start;
-        uint32_t ro_data_file_size = game_header_from_bin->ro_data_end - game_header_from_bin->ro_data_start;
-        uint32_t data_file_size = game_header_from_bin->data_end - game_header_from_bin->data_start;
-        uint32_t bss_file_size = game_header_from_bin->bss_end - game_header_from_bin->bss_start;
+        memcpy(&s_game_header, &game_header_buffer, sizeof(GameHeader));
+        s_is_game_header_valid = true;
+        uint32_t text_file_size = s_game_header.text_end - s_game_header.text_start;
+        uint32_t ro_data_file_size = s_game_header.ro_data_end - s_game_header.ro_data_start;
+        uint32_t data_file_size = s_game_header.data_end - s_game_header.data_start;
+        uint32_t bss_file_size = s_game_header.bss_end - s_game_header.bss_start;
 
-        clearBss(game_header_from_bin->bss_start, bss_file_size);
+        clearBss(s_game_header.bss_start, bss_file_size);
 
         if (text_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), game_header_from_bin->text_start, game_header_from_bin->header_start, text_file_size);
+            loadRegionToMemory(loaderGetFile(), s_game_header.text_start, s_game_header.header_start, text_file_size);
         }
 
         if (ro_data_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), game_header_from_bin->ro_data_start, game_header_from_bin->header_start, ro_data_file_size);
+            loadRegionToMemory(loaderGetFile(), s_game_header.ro_data_start, s_game_header.header_start, ro_data_file_size);
         }
 
         if (data_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), game_header_from_bin->data_start, game_header_from_bin->header_start, data_file_size);
+            loadRegionToMemory(loaderGetFile(), s_game_header.data_start, s_game_header.header_start, data_file_size);
         }
 
         // TODO - switch the stack pointer
         // TODO - save the OS stack pointer first
         // __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
-        void (*game_entry)(void) = (void (*)(void))game_header_from_bin->entry_point;
+        void (*game_entry)(void) = (void (*)(void))s_game_header.entry_point;
         game_entry();
 
         // TODO restore OS stack pointer after game return

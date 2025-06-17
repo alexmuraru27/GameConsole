@@ -13,29 +13,54 @@ static void testApi()
 // testing purposes
 static volatile uint8_t s_data_array[5U] = {1U, 2U, 3U, 4U, 5U};
 static volatile uint8_t s_bss[7U];
-__attribute__((section(".assets.data"))) volatile const uint8_t pacman_ghost_data[] = {
-    0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
-__attribute__((section(".assets.data"))) volatile const uint8_t pacman_ghost_palette[4U] = {0x20, 0x1c, 0x2c, 0xc};
+
+#define ASSET_NUMBER_SEQ_DATA 15U
+#define ASSET_NUMBER_SMALL_SEQ_DATA 16U
+
+#define ASSET_TYPE_TEST_DATA_1 1U
+#define ASSET_TYPE_TEST_DATA_2 2U
+
+__attribute__((section(".assets.header")))
+const AssetHeader asset_header = {
+    .magic = {'G', 'A', 'M', 'E'},
+    .version = 1U,
+    .asset_count = 2U};
+
+__attribute__((section(".assets.data"))) const AssetData test_data_1 = {
+    .metadata = {.id = ASSET_NUMBER_SEQ_DATA,
+                 .type = ASSET_TYPE_TEST_DATA_1,
+                 .size = 16U},
+    .data = {0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3}};
+
+__attribute__((section(".assets.data"))) const AssetData test_data_2 = {
+    .metadata = {
+        .id = ASSET_NUMBER_SMALL_SEQ_DATA,
+        .type = ASSET_TYPE_TEST_DATA_2,
+        .size = 4U},
+    .data = {0x20, 0x1c, 0x2c, 0xc}};
 
 int main(void)
 {
     ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
-    for (uint8_t i = 0U; i < 16U; i++)
+    api_hdr_ptr->api.debugString("\r\n");
+    for (uint8_t i = 0U; i < test_data_1.metadata.size; i++)
     {
-        api_hdr_ptr->api.debugInt(pacman_ghost_data[i]);
+        api_hdr_ptr->api.debugInt(test_data_1.data[i]);
+        api_hdr_ptr->api.debugString(" ");
     }
-    api_hdr_ptr->api.debugHex(pacman_ghost_palette[0U]);
-    api_hdr_ptr->api.debugHex(pacman_ghost_palette[1U]);
-    api_hdr_ptr->api.debugHex(pacman_ghost_palette[2U]);
-    api_hdr_ptr->api.debugHex(pacman_ghost_palette[3U]);
+    api_hdr_ptr->api.debugString("\r\n");
+    api_hdr_ptr->api.debugHex(test_data_2.data[0U]);
+    api_hdr_ptr->api.debugHex(test_data_2.data[1U]);
+    api_hdr_ptr->api.debugHex(test_data_2.data[2U]);
+    api_hdr_ptr->api.debugHex(test_data_2.data[3U]);
 
-    api_hdr_ptr->api.debugString("Data:");
+    api_hdr_ptr->api.debugString("\r\nData:\r\n");
     api_hdr_ptr->api.debugInt(s_data_array[0]);
     api_hdr_ptr->api.debugInt(s_data_array[1]);
     api_hdr_ptr->api.debugInt(s_data_array[2]);
     api_hdr_ptr->api.debugInt(s_data_array[3]);
     api_hdr_ptr->api.debugInt(s_data_array[4]);
-    api_hdr_ptr->api.debugString("Bss:");
+    api_hdr_ptr->api.debugString("\r\nBss:\r\n");
     api_hdr_ptr->api.debugInt(s_bss[0]);
     api_hdr_ptr->api.debugInt(s_bss[1]);
     api_hdr_ptr->api.debugInt(s_bss[2]);
@@ -43,6 +68,7 @@ int main(void)
     api_hdr_ptr->api.debugInt(s_bss[4]);
     api_hdr_ptr->api.debugInt(s_bss[5]);
     api_hdr_ptr->api.debugInt(s_bss[6]);
+    api_hdr_ptr->api.debugString("\r\n");
     api_hdr_ptr->api.debugString("In Loop\r\n");
     asm("nop");
     testApi();

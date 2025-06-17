@@ -126,6 +126,11 @@ typedef struct
     uint32_t id;
     uint32_t type;
     uint32_t size;
+} AssetMetaData;
+
+typedef struct
+{
+    AssetMetaData metadata;
     uint8_t data[];
 } AssetData;
 
