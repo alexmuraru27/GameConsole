@@ -71,7 +71,7 @@ static void testRendererInitBricks()
 
 static void testRendererInitFonts()
 {
-    rendererPatternTableSetTile(1U, font_a_data, sizeof(font_a_data));
+    rendererPatternTableSetTile(1U, font_star_data, sizeof(font_star_data));
     rendererPatternTableSetTile(2U, font_b_data, sizeof(font_b_data));
     rendererPatternTableSetTile(3U, font_c_data, sizeof(font_c_data));
     rendererPatternTableSetTile(4U, font_d_data, sizeof(font_d_data));
@@ -188,5 +188,5 @@ static void testRendererInitFonts()
 void testRendererInit(void)
 {
     testRendererInitBricks();
-    // testRendererInitFonts();
+    testRendererInitFonts();
 }

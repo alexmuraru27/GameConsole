@@ -61,7 +61,8 @@
         "initializer_list": "c",
         "utility": "c",
         "xstring": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "font_r.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

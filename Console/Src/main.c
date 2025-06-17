@@ -105,56 +105,12 @@ void loaderTest(void)
   debugString("\r\n");
 
   gameLoaderLoadGame(0U);
-
-  // uint8_t assetLoaderGetAssetSize(uint32_t asset_id, uint8_t *buffer_size);
-  // uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer);
-  // uint8_t assetLoaderGetAssetHeader(AssetHeader * asset_header);
-  // #define ASSET_NUMBER_SEQ_DATA 15U
-  // #define ASSET_NUMBER_SMALL_SEQ_DATA 16U
-
-  // #define ASSET_TYPE_TEST_DATA_1 1U
-  // #define ASSET_TYPE_TEST_DATA_2 2U
-  AssetHeader assetHeader;
-  assetLoaderGetAssetHeader(&assetHeader);
-  debugString(assetHeader.magic);
-
-  uint32_t asset_1_size = 0U;
-  assetLoaderGetAssetSize(15U, &asset_1_size);
-  debugString("\r\nAsset size:");
-  debugInt(asset_1_size);
-  debugString("\r\n");
-
-  uint32_t asset_2_size = 0U;
-  assetLoaderGetAssetSize(16U, &asset_2_size);
-  debugString("Asset size:");
-  debugInt(asset_2_size);
-  debugString("\r\n");
-
-  uint8_t asset_1_data[asset_1_size];
-  assetLoaderGetAssetData(15U, asset_1_data);
-
-  for (uint8_t i = 0U; i < asset_1_size; i++)
-  {
-    debugInt(asset_1_data[i]);
-    debugString(" ");
-  }
-
-  uint8_t asset_2_data[asset_2_size];
-  assetLoaderGetAssetData(16U, asset_2_data);
-
-  for (uint8_t i = 0U; i < asset_2_size; i++)
-  {
-    debugHex(asset_2_data[i]);
-    debugString(" ");
-  }
 }
 
 int main(void)
 {
   gameConsoleInit();
   testRendererInit();
-  // testFatFs();
-  // testApi();
   loaderTest();
   while (1)
   {

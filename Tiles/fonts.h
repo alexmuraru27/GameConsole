@@ -36,4 +36,5 @@
 #include "font_7.h"
 #include "font_8.h"
 #include "font_9.h"
+#include "font_star.h"
 #endif
