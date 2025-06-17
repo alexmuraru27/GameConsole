@@ -168,17 +168,47 @@ static CCMRAM uint8_t s_dirtyTiles[RENDERER_DIRTY_TILES_SIZE];
 
 void rendererInit(void)
 {
-    memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
-    memset(&s_name_table, 0U, sizeof(s_name_table));
-    memset(&s_attribute_table, 0U, sizeof(s_attribute_table));
-    memset(&s_oam, 0U, sizeof(s_oam));
-    memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
-    memset(&s_frame_palette_bg, 0U, sizeof(s_frame_palette_bg));
+    rendererPatternTableClear();
+    rendererNameTableClear();
+    rendererAttributeTableClear();
+    rendererOamClear();
+    rendererFramePaletteSpriteClear();
+    rendererFramePaletteBgClear();
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_CLEAR, sizeof(s_dirtyTiles));
 
     // First pattern table filled with FF for the default background
     memset(&s_pattern_table[0U], 0xFF, RENDERER_TILE_MEMORY_SIZE);
     rendererSetDirtyCompleteRedraw();
+}
+
+void rendererPatternTableClear()
+{
+    memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
+}
+
+void rendererNameTableClear()
+{
+    memset(&s_name_table, 0U, sizeof(s_name_table));
+}
+
+void rendererAttributeTableClear()
+{
+    memset(&s_attribute_table, 0U, sizeof(s_attribute_table));
+}
+
+void rendererOamClear()
+{
+    memset(&s_oam, 0U, sizeof(s_oam));
+}
+
+void rendererFramePaletteSpriteClear()
+{
+    memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
+}
+
+void rendererFramePaletteBgClear()
+{
+    memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
 }
 
 static void dirtyOamSet(uint8_t oam_idx)
@@ -583,11 +613,6 @@ void rendererPatternTableSetTile(const uint8_t pattern_table_idx, const uint8_t 
     }
 }
 
-void rendererPatternTableClear()
-{
-    memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
-}
-
 void rendererSetDirtyCompleteRedraw(void)
 {
     memset(&s_dirtyTiles, RENDERER_DIRTY_FLAG_NEW_SET, RENDERER_DIRTY_TILES_SIZE);
@@ -810,6 +835,7 @@ bool rendererAttributeTableGetPriorityHigh(uint8_t tile_x, uint8_t tile_y)
 {
     return attributeTableGetPriorityHighIdx(RENDERER_HELPER_TILE_COORD_TO_INDEX(tile_x, tile_y));
 }
+
 uint16_t rendererGetWidthPixels()
 {
     return RENDERER_WIDTH;

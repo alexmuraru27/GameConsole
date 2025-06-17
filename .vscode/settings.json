@@ -62,7 +62,17 @@
         "utility": "c",
         "xstring": "c",
         "xutility": "c",
-        "font_r.h": "c"
+        "font_r.h": "c",
+        "main_menu.h": "c",
+        "font_p.h": "c",
+        "font_e.h": "c",
+        "compare": "c",
+        "cstddef": "c",
+        "limits": "c",
+        "type_traits": "c",
+        "xmemory": "c",
+        "fonts.h": "c",
+        "font_d.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

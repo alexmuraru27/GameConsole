@@ -62,6 +62,13 @@ typedef struct
     uint8_t (*joystickGetLAnalogX)(void);
 
     // RENDERING
+    void (*rendererInit)(void);
+    void (*rendererPatternTableClear)();
+    void (*rendererNameTableClear)();
+    void (*rendererAttributeTableClear)();
+    void (*rendererOamClear)();
+    void (*rendererFramePaletteSpriteClear)();
+    void (*rendererFramePaletteBgClear)();
     void (*rendererRender)(void);
     void (*rendererSetDirtyCompleteRedraw)(void);
     uint16_t (*rendererGetWidthPixels)();
@@ -80,7 +87,6 @@ typedef struct
     void (*rendererFramePaletteSetBackground)(uint8_t palette_idx, uint8_t color_idx, uint8_t system_palette_idx);
     void (*rendererFramePaletteSetBackgroundMultiple)(uint8_t palette_idx, uint8_t system_palette_idx_1, uint8_t system_palette_idx_2, uint8_t system_palette_idx_3);
     void (*rendererPatternTableSetTile)(uint8_t pattern_table_idx, const uint8_t *tile_data, uint8_t tile_size);
-    void (*rendererPatternTableClear)();
     void (*rendererNameTableSetTile)(uint8_t tile_x, uint8_t tile_y, uint8_t pattern_table_idx);
     void (*rendererOamClearEntry)(uint8_t oam_idx);
     void (*rendererOamSetXYPos)(uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos);

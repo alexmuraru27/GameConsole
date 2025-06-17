@@ -4,6 +4,12 @@
 #include "stdbool.h"
 
 void rendererInit(void);
+void rendererPatternTableClear();
+void rendererNameTableClear();
+void rendererAttributeTableClear();
+void rendererOamClear();
+void rendererFramePaletteSpriteClear();
+void rendererFramePaletteBgClear();
 
 // Trigger rendering
 void rendererRender(void);
@@ -32,7 +38,6 @@ void rendererFramePaletteSetBackgroundMultiple(uint8_t palette_idx, uint8_t syst
 
 // Pattern table
 void rendererPatternTableSetTile(uint8_t pattern_table_idx, const uint8_t *tile_data, uint8_t tile_size);
-void rendererPatternTableClear();
 
 // Name table
 void rendererNameTableSetTile(uint8_t tile_x, uint8_t tile_y, uint8_t pattern_table_idx);

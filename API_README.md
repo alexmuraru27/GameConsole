@@ -224,10 +224,6 @@ The `Console` directory is organized into several submodules, each with its own 
 - **Files:** `diskio.[ch]`, `diskio_integration.[ch]`, `ff.[ch]`, `ffconf.h`, `ffunicode.c`
 - **Purpose:** FAT filesystem support for SD card storage. Integrates with SDIO and provides file access to games and assets.
 
-### Test
-- **Files:** `test_buzzer.[ch]`, `test_console.[ch]`, `test_joystick.[ch]`, `test_renderer.[ch]`, `test_usart.[ch]`
-- **Purpose:** Unit and integration tests for each major module. Useful for hardware validation and debugging.
-
 ---
 
 Each submodule is designed for separation of concerns, making the codebase modular and maintainable. For more details, see the respective header files in each subdirectory.

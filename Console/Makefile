@@ -40,8 +40,7 @@ Src/FatFs/ffunicode.c \
 Src/Test/test_buzzer.c \
 Src/Test/test_joystick.c \
 Src/Test/test_renderer.c \
-Src/Test/test_usart.c \
-Src/Test/test_console.c \
+Src/MainMenu/main_menu.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
@@ -67,6 +66,7 @@ C_INCLUDES =  \
 -IInc/FatFs \
 -IInc/Renderer \
 -IInc/Loader \
+-IInc/MainMenu \
 -I../Tiles \
 -I../Shared/Inc \
 -I../Shared/Inc/TileUtils \

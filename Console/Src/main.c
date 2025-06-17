@@ -1,18 +1,11 @@
 #include <stm32f407xx.h>
 #include "sysclock.h"
 #include "usart.h"
-#include "joystick.h"
 #include "renderer.h"
-#include "buzzer.h"
 #include "game_console.h"
-#include "game_console_api.h"
 #include "stddef.h"
 #include "string.h"
-#include "test_buzzer.h"
-#include "test_renderer.h"
-#include "loader.h"
-#include "game_loader.h"
-#include "asset_loader.h"
+#include "main_menu.h"
 
 bool is_debug_fps = false;
 #define FPS 50
@@ -42,76 +35,18 @@ static void syncFrame()
 
 static void update()
 {
-  const uint16_t SPEED = 5U;
-  uint8_t x = rendererOamGetXPos(0U);
-  uint8_t y = rendererOamGetYPos(0U);
-  if (x <= rendererGetWidthPixels() - rendererGetTilePixelSize())
-  {
-    x += ((joystickGetLAnalogX() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogX() == JoystickAnalogValueHighAxis)) * SPEED;
-  }
-  if (x >= 0U + SPEED)
-  {
-    x -= ((joystickGetLAnalogX() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogX() == JoystickAnalogValueLowAxis)) * SPEED;
-  }
-
-  if (y <= rendererGetHeightPixels() - rendererGetTilePixelSize())
-  {
-    y += ((joystickGetLAnalogY() == JoystickAnalogValueHighAxis) || (joystickGetRAnalogY() == JoystickAnalogValueHighAxis)) * SPEED;
-  }
-  if (y >= 0U + SPEED)
-  {
-    y -= ((joystickGetLAnalogY() == JoystickAnalogValueLowAxis) || (joystickGetRAnalogY() == JoystickAnalogValueLowAxis)) * SPEED;
-  }
-
-  rendererOamSetXYPos(0U, x, y);
+  mainMenuUpdate();
 }
 
-bool is_pressed = false;
 static void render()
 {
-  if (joystickGetSpecialBtn1())
-  {
-    testBuzzerTrack0();
-  }
-  if (joystickGetSpecialBtn2())
-  {
-    testBuzzerTrack1();
-  }
-
-  if (joystickGetRBtnUp())
-  {
-    buzzerPause(0);
-  }
-  if (joystickGetRBtnDown())
-  {
-    buzzerResume(0);
-  }
-  if (joystickGetRBtnLeft())
-  {
-    buzzerStop(0);
-    is_pressed = false;
-  }
-  if (joystickGetRBtnRight() && !is_pressed)
-  {
-    is_pressed = true;
-  }
   rendererRender();
-}
-
-void loaderTest(void)
-{
-  debugString("\r\nLoader number of binary files found: ");
-  debugInt(loaderGetBinaryFilesNumberInDirectory());
-  debugString("\r\n");
-
-  gameLoaderLoadGame(0U);
 }
 
 int main(void)
 {
   gameConsoleInit();
-  testRendererInit();
-  loaderTest();
+  mainMenuInit();
   while (1)
   {
     update();
