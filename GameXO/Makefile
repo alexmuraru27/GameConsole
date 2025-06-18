@@ -50,7 +50,7 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 # LDFLAGS
 #######################################
 # link script
-LDSCRIPT = game.ld
+LDSCRIPT = ../game.ld
 
 # libraries
 LIBS = -lc -lm -lnosys 
