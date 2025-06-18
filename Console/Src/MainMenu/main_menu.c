@@ -15,6 +15,7 @@
 
 static uint32_t s_num_binary_files = 0U;
 static uint32_t s_current_highlighted_game = 0U;
+static bool s_is_to_redraw_game_menu = false;
 
 typedef enum
 {
@@ -432,6 +433,7 @@ void mainMenuInit(void)
     fillPatternTable();
     fillFramePalette();
 
+    s_is_to_redraw_game_menu = true;
     s_num_binary_files = loaderGetBinaryFilesNumberInDirectory();
     s_current_highlighted_game = 0U;
 
@@ -462,6 +464,7 @@ static void computeSelectedGame()
         if ((s_current_highlighted_game + 1U) < s_num_binary_files)
         {
             s_current_highlighted_game++;
+            s_is_to_redraw_game_menu = true;
         }
     }
 
@@ -471,6 +474,7 @@ static void computeSelectedGame()
         if (s_current_highlighted_game > 0U)
         {
             s_current_highlighted_game--;
+            s_is_to_redraw_game_menu = true;
         }
     }
 
@@ -479,8 +483,6 @@ static void computeSelectedGame()
         sys_tick_value_select = sys_tick_time;
         if (isGameIndexValid(s_current_highlighted_game))
         {
-            debugString("\r\nCurrent s_current_highlighted_game = ");
-            debugInt(s_current_highlighted_game);
             gameLoaderLoadGame(s_current_highlighted_game);
             mainMenuInit();
         }
@@ -489,23 +491,28 @@ static void computeSelectedGame()
 
 static void drawGameSelection(const uint8_t y)
 {
-    const uint8_t x_offset = 1U;
-    uint32_t filename_length = 0U;
-    char filename_out[loaderGetMaxFilenameSize()];
-
-    drawString(x_offset - 1U, y, "*");
-
-    for (uint32_t i = 0U; i < 3U; i++)
+    if (s_is_to_redraw_game_menu)
     {
-        const uint32_t game_idx = s_current_highlighted_game + i;
-        drawClearPartialLine(x_offset, y + i, rendererGetWidthTiles());
-        if (isGameIndexValid(game_idx))
+        const uint8_t x_offset = 1U;
+        uint32_t filename_length = 0U;
+        char filename_out[loaderGetMaxFilenameSize()];
+
+        drawString(x_offset - 1U, y, "*");
+
+        for (uint32_t i = 0U; i < 3U; i++)
         {
-            if ((loaderGetFilenameByIndex(game_idx, filename_out, &filename_length) == FR_OK) && (filename_length > 1U))
+            const uint32_t game_idx = s_current_highlighted_game + i;
+            drawClearPartialLine(x_offset, y + i, rendererGetWidthTiles());
+            if (isGameIndexValid(game_idx))
             {
-                drawString(x_offset, y + i, filename_out);
+                if ((loaderGetFilenameByIndex(game_idx, filename_out, &filename_length) == FR_OK) && (filename_length > 1U))
+                {
+                    drawString(x_offset, y + i, filename_out);
+                }
             }
         }
+
+        s_is_to_redraw_game_menu = false;
     }
 }
 
