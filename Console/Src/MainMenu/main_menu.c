@@ -2,11 +2,19 @@
 #include "fonts.h"
 #include <stddef.h>
 #include "renderer.h"
+#include "loader.h"
+#include "game_loader.h"
 #include "string.h"
+#include "joystick.h"
+#include "sysclock.h"
+#include "usart.h"
 
 #define FONT_PALETTE_IDX 1U
 #define FONT_CHAR_PALETTE '0'
 #define MAX_STRING_CHARS_DRAWN 16
+
+static uint32_t s_num_binary_files = 0U;
+static uint32_t s_current_highlighted_game = 0U;
 
 typedef enum
 {
@@ -424,10 +432,85 @@ void mainMenuInit(void)
     fillPatternTable();
     fillFramePalette();
 
-    const char *test_string = "*HELLO PLAYER*";
-    drawString(centerStringXOffset(test_string), 1U, test_string);
+    s_num_binary_files = loaderGetBinaryFilesNumberInDirectory();
+    s_current_highlighted_game = 0U;
+
+    const char *welcome_string = "*HELLO PLAYER*";
+    drawString(centerStringXOffset(welcome_string), 1U, welcome_string);
+
+    const char *choose_string = "Choose to play";
+    drawString(centerStringXOffset(choose_string), 2U, choose_string);
+}
+
+static bool isGameIndexValid(const uint32_t game_index)
+{
+    return ((s_num_binary_files > 0U) && (game_index < s_num_binary_files));
+}
+
+static void computeSelectedGame()
+{
+    // SW debounce
+    static uint32_t sys_tick_value_down = 0U;
+    static uint32_t sys_tick_value_up = 0U;
+    static uint32_t sys_tick_value_select = 0U;
+    const uint32_t DEBOUNCE_TIME_MS = 500U;
+    const uint32_t sys_tick_time = getSysTime();
+
+    if ((joystickGetLBtnDown() || joystickGetRBtnDown()) && (sys_tick_time > (sys_tick_value_down + DEBOUNCE_TIME_MS)))
+    {
+        sys_tick_value_down = sys_tick_time;
+        if ((s_current_highlighted_game + 1U) < s_num_binary_files)
+        {
+            s_current_highlighted_game++;
+        }
+    }
+
+    if ((joystickGetLBtnUp() || joystickGetRBtnUp()) && (sys_tick_time > (sys_tick_value_up + DEBOUNCE_TIME_MS)))
+    {
+        sys_tick_value_up = sys_tick_time;
+        if (s_current_highlighted_game > 0U)
+        {
+            s_current_highlighted_game--;
+        }
+    }
+
+    if (joystickGetSpecialBtn1() && (sys_tick_time > (sys_tick_value_select + DEBOUNCE_TIME_MS)))
+    {
+        sys_tick_value_select = sys_tick_time;
+        if (isGameIndexValid(s_current_highlighted_game))
+        {
+            debugString("\r\nCurrent s_current_highlighted_game = ");
+            debugInt(s_current_highlighted_game);
+            gameLoaderLoadGame(s_current_highlighted_game);
+            mainMenuInit();
+        }
+    }
+}
+
+static void drawGameSelection(const uint8_t y)
+{
+    const uint8_t x_offset = 1U;
+    uint32_t filename_length = 0U;
+    char filename_out[loaderGetMaxFilenameSize()];
+
+    drawString(x_offset - 1U, y, "*");
+
+    for (uint32_t i = 0U; i < 3U; i++)
+    {
+        const uint32_t game_idx = s_current_highlighted_game + i;
+        drawClearPartialLine(x_offset, y + i, rendererGetWidthTiles());
+        if (isGameIndexValid(game_idx))
+        {
+            if ((loaderGetFilenameByIndex(game_idx, filename_out, &filename_length) == FR_OK) && (filename_length > 1U))
+            {
+                drawString(x_offset, y + i, filename_out);
+            }
+        }
+    }
 }
 
 void mainMenuUpdate(void)
 {
+    computeSelectedGame();
+    drawGameSelection(6U);
 }
