@@ -29,9 +29,9 @@
     cD0, cD1, cD2, cD3, cD4, cD5, cD6, cD7, cD8, cD9, cDA, cDB, cDC, cDD, cDE, cDF,                                                 \
     cE0, cE1, cE2, cE3, cE4, cE5, cE6, cE7, cE8, cE9, cEA, cEB, cEC, cED, cEE, cEF,                                                 \
     cF0, cF1, cF2, cF3, cF4, cF5, cF6, cF7, cF8, cF9, cFA, cFB, cFC, cFD, cFE, cFF)                                                 \
-    {                                                                                                                               \
-        /* Plane 0 */                                                                                                               \
-        ENCODE_PLANE0(c00, c01, c02, c03, c04, c05, c06, c07), ENCODE_PLANE0(c08, c09, c0A, c0B, c0C, c0D, c0E, c0F),               \
+                                                                                                                                    \
+    /* Plane 0 */                                                                                                                   \
+    ENCODE_PLANE0(c00, c01, c02, c03, c04, c05, c06, c07), ENCODE_PLANE0(c08, c09, c0A, c0B, c0C, c0D, c0E, c0F),                   \
         ENCODE_PLANE0(c10, c11, c12, c13, c14, c15, c16, c17), ENCODE_PLANE0(c18, c19, c1A, c1B, c1C, c1D, c1E, c1F),               \
         ENCODE_PLANE0(c20, c21, c22, c23, c24, c25, c26, c27), ENCODE_PLANE0(c28, c29, c2A, c2B, c2C, c2D, c2E, c2F),               \
         ENCODE_PLANE0(c30, c31, c32, c33, c34, c35, c36, c37), ENCODE_PLANE0(c38, c39, c3A, c3B, c3C, c3D, c3E, c3F),               \
@@ -62,6 +62,6 @@
         ENCODE_PLANE1(cC0, cC1, cC2, cC3, cC4, cC5, cC6, cC7), ENCODE_PLANE1(cC8, cC9, cCA, cCB, cCC, cCD, cCE, cCF),               \
         ENCODE_PLANE1(cD0, cD1, cD2, cD3, cD4, cD5, cD6, cD7), ENCODE_PLANE1(cD8, cD9, cDA, cDB, cDC, cDD, cDE, cDF),               \
         ENCODE_PLANE1(cE0, cE1, cE2, cE3, cE4, cE5, cE6, cE7), ENCODE_PLANE1(cE8, cE9, cEA, cEB, cEC, cED, cEE, cEF),               \
-        ENCODE_PLANE1(cF0, cF1, cF2, cF3, cF4, cF5, cF6, cF7), ENCODE_PLANE1(cF8, cF9, cFA, cFB, cFC, cFD, cFE, cFF)}
+        ENCODE_PLANE1(cF0, cF1, cF2, cF3, cF4, cF5, cF6, cF7), ENCODE_PLANE1(cF8, cF9, cFA, cFB, cFC, cFD, cFE, cFF)
 
 #endif /* __TILE_CREATOR_H */

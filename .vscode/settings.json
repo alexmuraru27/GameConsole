@@ -72,7 +72,9 @@
         "type_traits": "c",
         "xmemory": "c",
         "fonts.h": "c",
-        "font_d.h": "c"
+        "font_d.h": "c",
+        "tuple": "c",
+        "xtr1common": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

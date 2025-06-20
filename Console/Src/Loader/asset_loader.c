@@ -52,7 +52,7 @@ uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_meta
         else
         {
             // seek next AssetData position
-            file_offset += sizeof(AssetMetaData) + asset_metadata.size;
+            file_offset += sizeof(AssetMetaData) + asset_metadata.memory_size;
             res = f_lseek(loaderGetFile(), file_offset);
             if (res != FR_OK)
             {
@@ -108,7 +108,7 @@ uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
             uint8_t asset_read_buffer[128U];
             UINT bytes_read = 0U;
             uint32_t dest_addr = (uint32_t)buffer;
-            uint32_t remaining_bytes = asset_metadata.size;
+            uint32_t remaining_bytes = asset_metadata.memory_size;
             while (remaining_bytes > 0U)
             {
                 uint32_t bytes_to_read = (remaining_bytes > sizeof(asset_read_buffer)) ? sizeof(asset_read_buffer) : remaining_bytes;
@@ -140,7 +140,7 @@ uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
         else
         {
             // seek next AssetData position
-            file_offset += sizeof(AssetMetaData) + asset_metadata.size;
+            file_offset += sizeof(AssetMetaData) + asset_metadata.memory_size;
             res = f_lseek(loaderGetFile(), file_offset);
             if (res != FR_OK)
             {
