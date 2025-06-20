@@ -19,6 +19,7 @@ OPT = -Og
 # C sources
 C_SOURCES =  \
 Src/main.c \
+Assets/Src/assets.c \
 Src/syscalls.c
 
 #######################################
@@ -32,6 +33,7 @@ C_DEFS =  \
 # C includes
 C_INCLUDES =  \
 -IInc \
+-IAssets/Inc \
 -I../Tiles \
 -I../Shared/Inc \
 -I../Shared/Inc/TileUtils
@@ -96,6 +98,12 @@ $(BUILD_DIR):
 
 flash: all
 	@echo "GameXO — nothing to flash -> .bin loaded at runtime"
+
+
+deploy:
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_DRIVE)/
+	sync
+	@echo "$(TARGET).bin copied to SD card $(SD_DRIVE)"
 #######################################
 # clean up
 #######################################

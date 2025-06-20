@@ -93,8 +93,8 @@ SECTIONS
     __game_code_assets_start = .;
     KEEP (*(.assets.header))
     KEEP (*(.assets.data))
-    . = ALIGN(4);
     __game_code_assets_end = .;
+    . = ALIGN(4);
   } >GAME_RAM_ASSETS
 
   /* Remove information from the standard libraries */

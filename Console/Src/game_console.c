@@ -104,7 +104,7 @@ static void gameConsoleExposeApi()
             .rendererAttributeTableSetPriorityHigh = &rendererAttributeTableSetPriorityHigh,
             .rendererAttributeTableGetPriorityHigh = &rendererAttributeTableGetPriorityHigh,
             // ASSETS
-            .assetLoaderGetAssetSize = &assetLoaderGetAssetSize,
+            .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
             .assetLoaderGetAssetData = &assetLoaderGetAssetData,
             .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader};
 

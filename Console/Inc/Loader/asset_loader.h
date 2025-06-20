@@ -8,7 +8,7 @@
 #define ASSET_LOADER_RET_ERR 1U
 #define ASSET_LOADER_RET_ASSET_NOT_FOUND 2U
 
-uint8_t assetLoaderGetAssetSize(uint32_t asset_id, uint32_t *buffer_size);
+uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_metadata_out);
 uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer);
 uint8_t assetLoaderGetAssetHeader(AssetHeader *asset_header);
 

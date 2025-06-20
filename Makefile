@@ -26,7 +26,10 @@ clean:
 	$(MAKE) -C GameXO clean
 	$(MAKE) -C Shared clean
 	-rm -fR $(BUILD_DIR)
-  
+
+deploy: all
+	$(MAKE) -C GameXO deploy SD_DRIVE=/i
+
 #######################################
 # dependencies
 #######################################

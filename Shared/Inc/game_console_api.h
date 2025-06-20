@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include "stdbool.h"
 
+#define ASSET_SECTION_HEADER __attribute__((section(".assets.header"), aligned(1)))
+#define ASSET_SECTION_DATA __attribute__((section(".assets.data"), aligned(1)))
+
 typedef struct
 {
     char magic[4];
@@ -112,7 +115,7 @@ typedef struct
     bool (*rendererAttributeTableGetPriorityHigh)(uint8_t tile_x, uint8_t tile_y);
 
     // ASSETS
-    uint8_t (*assetLoaderGetAssetSize)(uint32_t asset_id, uint32_t *buffer_size);
+    uint8_t (*assetLoaderGetAssetMetadata)(uint32_t asset_id, AssetMetaData *asset_metadata_out);
     uint8_t (*assetLoaderGetAssetData)(uint32_t asset_id, uint8_t *buffer);
     uint8_t (*assetLoaderGetAssetHeader)(AssetHeader *asset_header);
 } ConsoleAPI;

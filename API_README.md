@@ -105,7 +105,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - ...and more (see `game_console_api.h`).
 
 ### Asset Loader
-- `assetLoaderGetAssetSize(asset_id, *size)`: Get asset size.
+- `assetLoaderGetAssetMetadata(asset_id, *size)`: Get asset size.
 - `assetLoaderGetAssetData(asset_id, *buffer)`: Load asset data.
 - `assetLoaderGetAssetHeader(*header)`: Get asset metadata.
 
@@ -150,7 +150,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - Loads game assets (tiles, sounds, etc.) from SD card or flash.
 - Provides asset size, data, and header information to games.
 - Internal functions:
-  - `assetLoaderGetAssetSize()`: Query asset size by ID.
+  - `assetLoaderGetAssetMetadata()`: Query asset size by ID.
   - `assetLoaderGetAssetData()`: Load asset data into buffer.
   - `assetLoaderGetAssetHeader()`: Read asset metadata.
 
@@ -308,13 +308,13 @@ See `README.md` for license and authorship.
 #### Asset Loader
 - **Purpose:** Load assets (tiles, sounds, etc.) from storage.
 - **Key Functions:**
-  - `assetLoaderGetAssetSize(asset_id, *size)`: Get asset size.
+  - `assetLoaderGetAssetMetadata(asset_id, *size)`: Get asset size.
   - `assetLoaderGetAssetData(asset_id, *buffer)`: Load asset data.
   - `assetLoaderGetAssetHeader(*header)`: Get asset metadata.
 - **Usage Example:**
   ```c
   uint32_t size;
-  assetLoaderGetAssetSize(15, &size);
+  assetLoaderGetAssetMetadata(15, &size);
   uint8_t buffer[size];
   assetLoaderGetAssetData(15, buffer);
   ```

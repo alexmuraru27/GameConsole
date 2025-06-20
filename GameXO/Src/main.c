@@ -1,4 +1,5 @@
 #include "game_console_api.h"
+#include "assets.h"
 
 extern ConsoleAPIHeader __game_console_api_start; // linker
 static void testApi()
@@ -14,46 +15,21 @@ static void testApi()
 static volatile uint8_t s_data_array[5U] = {1U, 2U, 3U, 4U, 5U};
 static volatile uint8_t s_bss[7U];
 
-#define ASSET_NUMBER_SEQ_DATA 15U
-#define ASSET_NUMBER_SMALL_SEQ_DATA 16U
-
-#define ASSET_TYPE_TEST_DATA_1 1U
-#define ASSET_TYPE_TEST_DATA_2 2U
-
-__attribute__((section(".assets.header")))
-const AssetHeader asset_header = {
-    .magic = {'G', 'A', 'M', 'E'},
-    .version = 1U,
-    .asset_count = 2U};
-
-__attribute__((section(".assets.data"))) const AssetData test_data_1 = {
-    .metadata = {.id = ASSET_NUMBER_SEQ_DATA,
-                 .type = ASSET_TYPE_TEST_DATA_1,
-                 .size = 16U},
-    .data = {0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3}};
-
-__attribute__((section(".assets.data"))) const AssetData test_data_2 = {
-    .metadata = {
-        .id = ASSET_NUMBER_SMALL_SEQ_DATA,
-        .type = ASSET_TYPE_TEST_DATA_2,
-        .size = 4U},
-    .data = {0x20, 0x1c, 0x2c, 0xc}};
-
 int main(void)
 {
     ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
     api_hdr_ptr->api.debugString("\r\nblahblah");
 
     uint32_t res = 0U;
-    uint32_t asset_1_size = 0U;
-    res = api_hdr_ptr->api.assetLoaderGetAssetSize(ASSET_NUMBER_SEQ_DATA, &asset_1_size);
+    AssetMetaData asset_1_metadata;
+    res = api_hdr_ptr->api.assetLoaderGetAssetMetadata(ASSET_ID_SEQ_DATA, &asset_1_metadata);
     if (!res)
     {
-        uint8_t asset_1_data[asset_1_size];
-        res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_NUMBER_SEQ_DATA, asset_1_data);
+        uint8_t asset_1_data[asset_1_metadata.size];
+        res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_ID_SEQ_DATA, asset_1_data);
         if (!res)
         {
-            for (uint8_t i = 0U; i < asset_1_size; i++)
+            for (uint8_t i = 0U; i < asset_1_metadata.size; i++)
             {
                 api_hdr_ptr->api.debugInt(asset_1_data[i]);
                 api_hdr_ptr->api.debugString(" ");
@@ -67,31 +43,6 @@ int main(void)
     else
     {
         api_hdr_ptr->api.debugString("\r\n asset1 size fail");
-    }
-
-    api_hdr_ptr->api.debugString("\r\n");
-    uint32_t asset_2_size = 0U;
-    res = api_hdr_ptr->api.assetLoaderGetAssetSize(ASSET_NUMBER_SMALL_SEQ_DATA, &asset_2_size);
-    if (!res)
-    {
-        uint8_t asset_2_data[asset_2_size];
-        res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_NUMBER_SMALL_SEQ_DATA, asset_2_data);
-        if (!res)
-        {
-            for (uint8_t i = 0U; i < asset_2_size; i++)
-            {
-                api_hdr_ptr->api.debugHex(asset_2_data[i]);
-                api_hdr_ptr->api.debugString(" ");
-            }
-        }
-        else
-        {
-            api_hdr_ptr->api.debugString("\r\n asset2 data fail");
-        }
-    }
-    else
-    {
-        api_hdr_ptr->api.debugString("\r\n asset2 size fail");
     }
 
     api_hdr_ptr->api.debugString("\r\nData:\r\n");

@@ -3,9 +3,9 @@
 #include "game_loader.h"
 #include <string.h>
 
-uint8_t assetLoaderGetAssetSize(uint32_t asset_id, uint32_t *buffer_size)
+uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_metadata_out)
 {
-    if (!loaderIsFileOpened() || buffer_size == NULL)
+    if (!loaderIsFileOpened() || asset_metadata_out == NULL)
     {
         return ASSET_LOADER_RET_ERR;
     }
@@ -46,7 +46,7 @@ uint8_t assetLoaderGetAssetSize(uint32_t asset_id, uint32_t *buffer_size)
 
         if (asset_metadata.id == asset_id)
         {
-            *buffer_size = asset_metadata.size;
+            memcpy(asset_metadata_out, &asset_metadata, sizeof(AssetMetaData));
             return ASSET_LOADER_RET_OK;
         }
         else
