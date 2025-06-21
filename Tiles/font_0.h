@@ -1,7 +1,7 @@
 #ifndef __font_0_H
 #define __font_0_H
 #include "tileCreator.h"
-const uint8_t font_0_data[64U] = {DEFINE_TILE_16(
+const uint8_t font_0_data[64U] = {DEFINE_TILE(
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
 	0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,

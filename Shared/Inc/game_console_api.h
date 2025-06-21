@@ -38,19 +38,19 @@ typedef struct
 } __attribute__((packed, aligned(1))) AssetData32;
 
 //  aligned(1) -> ensure continuous structure asset space
-#define ASSET_SECTION_HEADER __attribute__((section(".assets.header"), aligned(1)))
-#define ASSET_SECTION_DATA __attribute__((section(".assets.data"), aligned(1)))
+#define _ASSET_SECTION_HEADER __attribute__((section(".assets.header"), aligned(1)))
+#define _ASSET_SECTION_DATA __attribute__((section(".assets.data"), aligned(1)))
 
 #define EXPAND_DATA(...) __VA_ARGS__
 
 #define DEFINE_ASSET_HEADER(char_4_magic, version_nr, asset_count_nr) \
-    ASSET_SECTION_HEADER const AssetHeader asset_header = {           \
+    _ASSET_SECTION_HEADER const AssetHeader asset_header = {          \
         .magic = char_4_magic,                                        \
         .version = version_nr,                                        \
         .asset_count = asset_count_nr}
 
 #define _DEFINE_ASSET(name, asset_data_struct, data_type, asset_id, asset_type, asset_data)                                                                   \
-    ASSET_SECTION_DATA const asset_data_struct name = {                                                                                                       \
+    _ASSET_SECTION_DATA const asset_data_struct name = {                                                                                                      \
         .metadata = {asset_id, asset_type, sizeof((data_type[]){EXPAND_DATA asset_data}) / sizeof(data_type), sizeof((data_type[]){EXPAND_DATA asset_data})}, \
         .data = {EXPAND_DATA asset_data}}
 

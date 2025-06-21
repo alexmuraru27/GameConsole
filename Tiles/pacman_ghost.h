@@ -1,7 +1,7 @@
 #ifndef __pacman_ghost_H
 #define __pacman_ghost_H
 #include "tileCreator.h"
-const uint8_t pacman_ghost_data[64U] = {DEFINE_TILE_16(
+const uint8_t pacman_ghost_data[64U] = {DEFINE_TILE(
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 2, 2, 1, 1, 1, 1, 3, 3, 0, 0, 0, 0,

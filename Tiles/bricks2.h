@@ -1,7 +1,7 @@
 #ifndef __bricks2_H
 #define __bricks2_H
 #include "tileCreator.h"
-const uint8_t bricks2_data[64U] = {DEFINE_TILE_16(
+const uint8_t bricks2_data[64U] = {DEFINE_TILE(
 	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	1, 1, 3, 3, 3, 3, 3, 3, 1, 2, 3, 3, 3, 3, 3, 1,
 	1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1,

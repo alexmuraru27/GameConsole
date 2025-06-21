@@ -12,7 +12,7 @@
      (((c4) >> 1) & 1) << 3 | (((c5) >> 1) & 1) << 2 | (((c6) >> 1) & 1) << 1 | (((c7) >> 1) & 1) << 0)
 
 // 64 Bytes
-#define DEFINE_TILE_16(                                                                                                             \
+#define DEFINE_TILE(                                                                                                                \
     c00, c01, c02, c03, c04, c05, c06, c07, c08, c09, c0A, c0B, c0C, c0D, c0E, c0F,                                                 \
     c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c1A, c1B, c1C, c1D, c1E, c1F,                                                 \
     c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c2A, c2B, c2C, c2D, c2E, c2F,                                                 \
