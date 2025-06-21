@@ -4,16 +4,16 @@
 #include "sysclock.h"
 #include <string.h>
 
-GameHeader s_game_header;
+GameBinaryHeader s_game_header;
 bool s_is_game_header_valid = false;
 
-uint8_t gameLoaderGetHeader(GameHeader *const game_header)
+uint8_t gameLoaderGetHeader(GameBinaryHeader *const game_header)
 {
     if (!s_is_game_header_valid)
     {
         return GAME_LOADER_RET_ERR;
     }
-    memcpy(game_header, &s_game_header, sizeof(GameHeader));
+    memcpy(game_header, &s_game_header, sizeof(GameBinaryHeader));
     return GAME_LOADER_RET_OK;
 }
 
@@ -77,16 +77,16 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
         return res;
     }
 
-    uint8_t game_header_buffer[sizeof(GameHeader)];
+    uint8_t game_header_buffer[sizeof(GameBinaryHeader)];
     UINT game_header_buffer_bytes_read;
-    res = f_read(loaderGetFile(), game_header_buffer, sizeof(GameHeader), &game_header_buffer_bytes_read);
+    res = f_read(loaderGetFile(), game_header_buffer, sizeof(GameBinaryHeader), &game_header_buffer_bytes_read);
     if (res != FR_OK || game_header_buffer_bytes_read == 0)
     {
         return res;
     }
     else
     {
-        memcpy(&s_game_header, &game_header_buffer, sizeof(GameHeader));
+        memcpy(&s_game_header, &game_header_buffer, sizeof(GameBinaryHeader));
         s_is_game_header_valid = true;
         uint32_t text_file_size = s_game_header.text_end - s_game_header.text_start;
         uint32_t ro_data_file_size = s_game_header.ro_data_end - s_game_header.ro_data_start;

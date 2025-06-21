@@ -6,6 +6,6 @@
 #define GAME_LOADER_RET_ERR 1U
 
 uint8_t gameLoaderLoadGame(uint8_t binary_index);
-uint8_t gameLoaderGetHeader(GameHeader *game_header);
+uint8_t gameLoaderGetHeader(GameBinaryHeader *game_header);
 uint8_t gameLoaderCloseGame();
 #endif /* __GAME_LOADER_H */

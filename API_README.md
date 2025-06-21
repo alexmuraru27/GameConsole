@@ -328,7 +328,7 @@ See `README.md` for license and authorship.
 - **Usage Example:**
   ```c
   gameLoaderLoadGame(0);
-  GameHeader header;
+  GameBinaryHeader header;
   gameLoaderGetHeader(&header);
   gameLoaderCloseGame();
   ```

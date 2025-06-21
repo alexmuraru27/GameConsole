@@ -97,7 +97,7 @@ extern uint32_t __game_data_no_init_start, __game_data_no_init_end;
 extern uint32_t __game_code_assets_start, __game_code_assets_end;
 
 __attribute__((section(".game_header")))
-const GameHeader game_header = {
+const GameBinaryHeader game_header = {
     .magic = 0x47414D45, // GAME
     .header_start = (uint32_t)&__game_header_start,
     .header_end = (uint32_t)&__game_header_end,

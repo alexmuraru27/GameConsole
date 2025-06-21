@@ -182,6 +182,6 @@ typedef struct
     uint32_t assets_start;
     uint32_t assets_end;
     uint32_t entry_point;
-} GameHeader;
+} GameBinaryHeader;
 
 #endif /* __CONSOLE_API_H */

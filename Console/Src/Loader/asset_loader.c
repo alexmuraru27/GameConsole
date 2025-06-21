@@ -10,7 +10,7 @@ uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_meta
         return ASSET_LOADER_RET_ERR;
     }
     uint8_t res;
-    GameHeader game_header;
+    GameBinaryHeader game_header;
     res = gameLoaderGetHeader(&game_header);
     if (res != FR_OK)
     {
@@ -69,7 +69,7 @@ uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_meta
 uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
 {
     uint8_t res;
-    GameHeader game_header;
+    GameBinaryHeader game_header;
     res = gameLoaderGetHeader(&game_header);
     if (res != FR_OK)
     {
@@ -163,7 +163,7 @@ uint8_t assetLoaderGetAssetHeader(AssetHeader *asset_header)
     FRESULT res;
     UINT assets_header_bytes_read;
     uint8_t assets_header_buffer[sizeof(AssetHeader)];
-    GameHeader game_header;
+    GameBinaryHeader game_header;
     res = gameLoaderGetHeader(&game_header);
     if (res != FR_OK)
     {
