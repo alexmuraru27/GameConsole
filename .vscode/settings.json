@@ -74,7 +74,10 @@
         "fonts.h": "c",
         "font_d.h": "c",
         "tuple": "c",
-        "xtr1common": "c"
+        "xtr1common": "c",
+        "gamexo_selection.h": "c",
+        "bricks1.h": "c",
+        "gamexo_bar.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

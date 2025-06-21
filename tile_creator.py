@@ -16,14 +16,17 @@ WINDOW_HEIGHT = TILE_SIZE * PIXEL_SIZE + PALETTE_HEIGHT + 50  # Extra space for 
 BG_COLOR = (255, 255, 255)
 FONT_SIZE = 20
 
-MAGIC_FILENAME_REPLACE_PATTERN = "^!!!^"
-C_HEADER = f'#ifndef __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#define __{MAGIC_FILENAME_REPLACE_PATTERN}_H\n#include "tileCreator.h"\n'
-EXPORT_ARRAY_BEGINNING = f"{C_HEADER}const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_data[64U] = {{DEFINE_TILE(\n\t"
-EXPORT_ARRAY_ENDING = ")};\n"
-EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = (
-    f"const uint8_t {MAGIC_FILENAME_REPLACE_PATTERN}_palette[4U] = {{"
+FILENAME_REPLACE_PATTERN = "^!!!^"
+C_HEADER = f'#ifndef __{FILENAME_REPLACE_PATTERN}_H\n#define __{FILENAME_REPLACE_PATTERN}_H\n#include "tileCreator.h"\n'
+EXPORT_ARRAY_BEGINNING = (
+    f"#define DEFINE_{FILENAME_REPLACE_PATTERN}_TILE DEFINE_TILE("
 )
-EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "};\n#endif"
+EXPORT_ARRAY_ENDING = ")\n"
+EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING = (
+    f"#define DEFINE_{FILENAME_REPLACE_PATTERN}_PALETTE ("
+)
+EXPORT_ARRAY_SYSTEM_PALETTE_ENDING = "\n"
+C_HEADER_END = "#endif"
 
 NES_PALETTE = [
     (98, 98, 98),
@@ -220,23 +223,28 @@ def export_as_array(filename):
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
     with open(full_path, "w") as f:
         # save tile data
-        export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(
-            MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+
+        c_header = C_HEADER.replace(
+            FILENAME_REPLACE_PATTERN, raw_filename.upper()
         )
+        f.write(c_header)
+
+        export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(
+            FILENAME_REPLACE_PATTERN, raw_filename.upper()
+        )
+        
         f.write(export_array_prologue)
         flat_list = [val for row in grid for val in row]
         for i, val in enumerate(flat_list):
             f.write(f"{val}")
             if i < len(flat_list) - 1:
                 f.write(", ")
-                if (i + 1) % TILE_SIZE == 0:
-                    f.write("\n\t")
         f.write(EXPORT_ARRAY_ENDING)
 
         # save system palette color
         export_array_system_palette_prologue = (
             EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(
-                MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+                FILENAME_REPLACE_PATTERN, raw_filename.upper()
             )
         )
         f.write(export_array_system_palette_prologue)
@@ -245,6 +253,7 @@ def export_as_array(filename):
             if i < len(selected_colors_idx) - 1:
                 f.write(", ")
         f.write(EXPORT_ARRAY_SYSTEM_PALETTE_ENDING)
+        f.write(C_HEADER_END)
     print(f"Saved tile to {full_path}")
 
 
@@ -261,7 +270,7 @@ def load_from_file(filename):
             restored_content = f.read()
 
             export_array_prologue = EXPORT_ARRAY_BEGINNING.replace(
-                MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+                FILENAME_REPLACE_PATTERN, raw_filename.upper()
             )
             tile_start = restored_content.find(export_array_prologue) + len(
                 export_array_prologue
@@ -277,12 +286,11 @@ def load_from_file(filename):
             tile_list = [int(x) for x in cleaned_tile_raw.split(",") if x != ""]
 
             # Extract the palette array
-            palette_content = restored_content[tile_end:].replace(
-                EXPORT_ARRAY_ENDING, ""
-            )
+            
+            palette_content = restored_content[tile_end+len(EXPORT_ARRAY_ENDING):]
             export_array_system_palette_prologue = (
                 EXPORT_ARRAY_SYSTEM_PALETTE_BEGINNING.replace(
-                    MAGIC_FILENAME_REPLACE_PATTERN, raw_filename
+                    FILENAME_REPLACE_PATTERN, raw_filename.upper()
                 )
             )
             palette_start = palette_content.find(
@@ -321,11 +329,13 @@ running = True
 mouse_down = False
 load_from_file(DEFAULT_H_FILENAME)
 
+
 def draw_prompt(question):
     screen.fill((0, 0, 0))
     text = font.render(f"{question} (Y/N)", True, (255, 255, 255))
     screen.blit(text, (40, 80))
     pygame.display.flip()
+
 
 def ask_yes_no(question):
     draw_prompt(question)
@@ -339,6 +349,8 @@ def ask_yes_no(question):
                     return True
                 elif event.key == pygame.K_n:
                     return False
+
+
 while running:
     screen.fill(BG_COLOR)
     draw_nes_palette()
@@ -359,13 +371,13 @@ while running:
             else:
                 text_active = False
             if save_button.collidepoint((x, y)):
-                if ask_yes_no(f"Save \"{input_text}\"?"):
+                if ask_yes_no(f'Save "{input_text}"?'):
                     export_as_array(input_text)
             elif load_button.collidepoint((x, y)):
-                if ask_yes_no(f"Load \"{input_text}\"?"):
+                if ask_yes_no(f'Load "{input_text}"?'):
                     load_from_file(input_text)
             elif clear_button.collidepoint((x, y)):
-                if ask_yes_no(f"Clear \"{input_text}\"?"):
+                if ask_yes_no(f'Clear "{input_text}"?'):
                     clear_screen()
             elif y < NES_PALETTE_ROWS * NES_PALETTE_COLOR_SIZE:
                 sel = handle_nes_palette_click((x, y))
@@ -400,10 +412,10 @@ while running:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_s and pygame.key.get_mods() & pygame.KMOD_LCTRL:
-                if ask_yes_no(f"Save \"{input_text}\"?"):
+                if ask_yes_no(f'Save "{input_text}"?'):
                     export_as_array(input_text)
             elif event.key == pygame.K_l and pygame.key.get_mods() & pygame.KMOD_LCTRL:
-                if ask_yes_no(f"Load \"{input_text}\"?"):
+                if ask_yes_no(f'Load "{input_text}"?'):
                     load_from_file(input_text)
             if text_active:
                 if event.key == pygame.K_BACKSPACE:
@@ -411,7 +423,7 @@ while running:
                 elif event.key == pygame.K_RETURN:
                     text_active = False
                 else:
-                    if event.unicode.isalnum() or event.unicode == '_':
+                    if event.unicode.isalnum() or event.unicode == "_":
                         input_text += event.unicode
     clock.tick(60)
 

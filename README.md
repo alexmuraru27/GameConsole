@@ -1,20 +1,20 @@
 - [GameConsole](#gameconsole)
-	- [Development Board](#development-board)
-	- [Naming Conventions](#naming-conventions)
-	- [Pinning](#pinning)
-		- [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
-		- [DAC (Audio)](#dac-audio)
-		- [SPI1 (Display ILI9341)](#spi1-display-ili9341)
-		- [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
-		- [GPIO (Button Joysticks)](#gpio-button-joysticks)
-		- [SD-CARD (Builtin)](#sd-card-builtin)
-	- [Tile Creator](#tile-creator)
-		- [Script](#script)
-		- [Deps](#deps)
-		- [User inputs:](#user-inputs)
-		- [Usage](#usage)
-	- [API \& Internal Documentation](#api--internal-documentation)
-	- [Game Creation Setup](#game-creation-setup)
+  - [Development Board](#development-board)
+  - [Naming Conventions](#naming-conventions)
+  - [Pinning](#pinning)
+    - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
+    - [DAC (Audio)](#dac-audio)
+    - [SPI1 (Display ILI9341)](#spi1-display-ili9341)
+    - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
+    - [GPIO (Button Joysticks)](#gpio-button-joysticks)
+    - [SD-CARD (Builtin)](#sd-card-builtin)
+  - [Tile Creator](#tile-creator)
+    - [Script](#script)
+    - [Deps](#deps)
+    - [User inputs:](#user-inputs)
+    - [Usage](#usage)
+  - [API \& Internal Documentation](#api--internal-documentation)
+  - [Game Creation Setup](#game-creation-setup)
 
 
 # GameConsole
@@ -204,6 +204,13 @@ To create a new game for the GameConsole platform, follow these steps:
      DEFINE_ASSET_16(audio_duration, ASSET_ID_AUDIO_DURATION, ASSET_TYPE_AUDIO_DURATION, { /* duration data here */ });
      ```
 	 Important: All assets stored with `DEFINE_ASSET` macros are lazy loaded on runtime via the `assetLoader` api functions. By doing this you can have more assets that can fit in the console text/data memory at once.
+
+    In case of tile data generated with the `tile_creator` you can use the output define directly into the `DEFINE_ASSET_8` macro
+
+    ```c
+   DEFINE_ASSET_8(font_a, ASSET_ID_FONT_A, ASSET_TYPE_TILE, (DEFINE_FONT_A_TILE));
+    ```
+
 
 6. **Build and Deploy**
    - Build your game using the provided Makefile.

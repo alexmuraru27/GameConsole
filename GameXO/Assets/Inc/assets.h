@@ -1,9 +1,9 @@
 #ifndef __ASSETS_H
 #define __ASSETS_H
 
-#define ASSET_MAGIC {'G', 'A', 'M', 'E'}
+#define ASSET_MAGIC {'A', 'S', 'E', 'T'}
 #define ASSET_VERSION 1U
-#define ASSET_COUNT 42U
+#define ASSET_COUNT 45U
 
 // Asset ID
 #define ASSET_ID_SEQ_DATA 1U
@@ -48,6 +48,9 @@
 #define ASSET_ID_AUDIO_MARIO_DURATION 40U
 #define ASSET_ID_BACKGROUND_CORNER 41U
 #define ASSET_ID_BACKGROUND_BAR 42U
+#define ASSET_ID_SPRITE_X 43U
+#define ASSET_ID_SPRITE_O 44U
+#define ASSET_ID_SPRITE_SELECTION 45U
 
 // Asset Type
 #define ASSET_TYPE_TEST_DATA_1 1U

@@ -17,6 +17,44 @@ static uint32_t s_num_binary_files = 0U;
 static uint32_t s_current_highlighted_game = 0U;
 static bool s_is_to_redraw_game_menu = false;
 
+const uint8_t s_font_star[64U] = {DEFINE_FONT_STAR_TILE};
+const uint8_t s_font_a[64U] = {DEFINE_FONT_A_TILE};
+const uint8_t s_font_b[64U] = {DEFINE_FONT_B_TILE};
+const uint8_t s_font_c[64U] = {DEFINE_FONT_C_TILE};
+const uint8_t s_font_d[64U] = {DEFINE_FONT_D_TILE};
+const uint8_t s_font_e[64U] = {DEFINE_FONT_E_TILE};
+const uint8_t s_font_f[64U] = {DEFINE_FONT_F_TILE};
+const uint8_t s_font_g[64U] = {DEFINE_FONT_G_TILE};
+const uint8_t s_font_h[64U] = {DEFINE_FONT_H_TILE};
+const uint8_t s_font_i[64U] = {DEFINE_FONT_I_TILE};
+const uint8_t s_font_j[64U] = {DEFINE_FONT_J_TILE};
+const uint8_t s_font_k[64U] = {DEFINE_FONT_K_TILE};
+const uint8_t s_font_l[64U] = {DEFINE_FONT_L_TILE};
+const uint8_t s_font_m[64U] = {DEFINE_FONT_M_TILE};
+const uint8_t s_font_n[64U] = {DEFINE_FONT_N_TILE};
+const uint8_t s_font_o[64U] = {DEFINE_FONT_O_TILE};
+const uint8_t s_font_p[64U] = {DEFINE_FONT_P_TILE};
+const uint8_t s_font_q[64U] = {DEFINE_FONT_Q_TILE};
+const uint8_t s_font_r[64U] = {DEFINE_FONT_R_TILE};
+const uint8_t s_font_s[64U] = {DEFINE_FONT_S_TILE};
+const uint8_t s_font_t[64U] = {DEFINE_FONT_T_TILE};
+const uint8_t s_font_u[64U] = {DEFINE_FONT_U_TILE};
+const uint8_t s_font_v[64U] = {DEFINE_FONT_V_TILE};
+const uint8_t s_font_w[64U] = {DEFINE_FONT_W_TILE};
+const uint8_t s_font_x[64U] = {DEFINE_FONT_X_TILE};
+const uint8_t s_font_y[64U] = {DEFINE_FONT_Y_TILE};
+const uint8_t s_font_z[64U] = {DEFINE_FONT_Z_TILE};
+const uint8_t s_font_0[64U] = {DEFINE_FONT_0_TILE};
+const uint8_t s_font_1[64U] = {DEFINE_FONT_1_TILE};
+const uint8_t s_font_2[64U] = {DEFINE_FONT_2_TILE};
+const uint8_t s_font_3[64U] = {DEFINE_FONT_3_TILE};
+const uint8_t s_font_4[64U] = {DEFINE_FONT_4_TILE};
+const uint8_t s_font_5[64U] = {DEFINE_FONT_5_TILE};
+const uint8_t s_font_6[64U] = {DEFINE_FONT_6_TILE};
+const uint8_t s_font_7[64U] = {DEFINE_FONT_7_TILE};
+const uint8_t s_font_8[64U] = {DEFINE_FONT_8_TILE};
+const uint8_t s_font_9[64U] = {DEFINE_FONT_9_TILE};
+
 typedef enum
 {
     TILE_FONT_STAR = 1U,
@@ -147,187 +185,6 @@ static TILES charToTile(char font)
     }
 }
 
-static const uint8_t getFontSize()
-{
-    return sizeof(font_star_data);
-}
-
-static const uint8_t *getFontData(const char font)
-{
-    char font_converted = font;
-    if (font >= 'a' && font <= 'z')
-    {
-        font_converted = font - 'a' + 'A';
-    }
-    switch (font_converted)
-    {
-    case '*':
-        return font_star_data;
-    case '0':
-        return font_0_data;
-    case '1':
-        return font_1_data;
-    case '2':
-        return font_2_data;
-    case '3':
-        return font_3_data;
-    case '4':
-        return font_4_data;
-    case '5':
-        return font_5_data;
-    case '6':
-        return font_6_data;
-    case '7':
-        return font_7_data;
-    case '8':
-        return font_8_data;
-    case '9':
-        return font_9_data;
-    case 'A':
-        return font_a_data;
-    case 'B':
-        return font_b_data;
-    case 'C':
-        return font_c_data;
-    case 'D':
-        return font_d_data;
-    case 'E':
-        return font_e_data;
-    case 'F':
-        return font_f_data;
-    case 'G':
-        return font_g_data;
-    case 'H':
-        return font_h_data;
-    case 'I':
-        return font_i_data;
-    case 'J':
-        return font_j_data;
-    case 'K':
-        return font_k_data;
-    case 'L':
-        return font_l_data;
-    case 'M':
-        return font_m_data;
-    case 'N':
-        return font_n_data;
-    case 'O':
-        return font_o_data;
-    case 'P':
-        return font_p_data;
-    case 'Q':
-        return font_q_data;
-    case 'R':
-        return font_r_data;
-    case 'S':
-        return font_s_data;
-    case 'T':
-        return font_t_data;
-    case 'U':
-        return font_u_data;
-    case 'V':
-        return font_v_data;
-    case 'W':
-        return font_w_data;
-    case 'X':
-        return font_x_data;
-    case 'Y':
-        return font_y_data;
-    case 'Z':
-        return font_z_data;
-    default:
-        return NULL;
-    }
-}
-
-static const uint8_t *getFontPalette(const char font)
-{
-    char font_converted = font;
-    if (font >= 'a' && font <= 'z')
-    {
-        font_converted = font - 'a' + 'A';
-    }
-    switch (font_converted)
-    {
-    case '*':
-        return font_star_palette;
-    case '0':
-        return font_0_palette;
-    case '1':
-        return font_1_palette;
-    case '2':
-        return font_2_palette;
-    case '3':
-        return font_3_palette;
-    case '4':
-        return font_4_palette;
-    case '5':
-        return font_5_palette;
-    case '6':
-        return font_6_palette;
-    case '7':
-        return font_7_palette;
-    case '8':
-        return font_8_palette;
-    case '9':
-        return font_9_palette;
-    case 'A':
-        return font_a_palette;
-    case 'B':
-        return font_b_palette;
-    case 'C':
-        return font_c_palette;
-    case 'D':
-        return font_d_palette;
-    case 'E':
-        return font_e_palette;
-    case 'F':
-        return font_f_palette;
-    case 'G':
-        return font_g_palette;
-    case 'H':
-        return font_h_palette;
-    case 'I':
-        return font_i_palette;
-    case 'J':
-        return font_j_palette;
-    case 'K':
-        return font_k_palette;
-    case 'L':
-        return font_l_palette;
-    case 'M':
-        return font_m_palette;
-    case 'N':
-        return font_n_palette;
-    case 'O':
-        return font_o_palette;
-    case 'P':
-        return font_p_palette;
-    case 'Q':
-        return font_q_palette;
-    case 'R':
-        return font_r_palette;
-    case 'S':
-        return font_s_palette;
-    case 'T':
-        return font_t_palette;
-    case 'U':
-        return font_u_palette;
-    case 'V':
-        return font_v_palette;
-    case 'W':
-        return font_w_palette;
-    case 'X':
-        return font_x_palette;
-    case 'Y':
-        return font_y_palette;
-    case 'Z':
-        return font_z_palette;
-    default:
-        return NULL;
-    }
-}
-
 static uint8_t centerStringXOffset(const char *string)
 {
     const uint8_t string_length = strlen(string);
@@ -383,48 +240,49 @@ static void drawString(uint8_t x, uint8_t y, const char *str)
 
 static void fillPatternTable()
 {
-    rendererPatternTableSetTile(TILE_FONT_STAR, getFontData('*'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_A, getFontData('a'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_B, getFontData('b'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_C, getFontData('c'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_D, getFontData('d'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_E, getFontData('e'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_F, getFontData('f'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_G, getFontData('g'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_H, getFontData('h'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_I, getFontData('i'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_J, getFontData('j'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_K, getFontData('k'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_L, getFontData('l'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_M, getFontData('m'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_N, getFontData('n'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_O, getFontData('o'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_P, getFontData('p'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_Q, getFontData('q'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_R, getFontData('r'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_S, getFontData('s'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_T, getFontData('t'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_U, getFontData('u'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_V, getFontData('v'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_W, getFontData('w'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_X, getFontData('x'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_Y, getFontData('y'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_Z, getFontData('z'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_0, getFontData('0'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_1, getFontData('1'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_2, getFontData('2'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_3, getFontData('3'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_4, getFontData('4'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_5, getFontData('5'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_6, getFontData('6'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_7, getFontData('7'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_8, getFontData('8'), getFontSize());
-    rendererPatternTableSetTile(TILE_FONT_9, getFontData('9'), getFontSize());
+    rendererPatternTableSetTile(TILE_FONT_STAR, s_font_star, 64U);
+    rendererPatternTableSetTile(TILE_FONT_A, s_font_a, 64U);
+    rendererPatternTableSetTile(TILE_FONT_B, s_font_b, 64U);
+    rendererPatternTableSetTile(TILE_FONT_C, s_font_c, 64U);
+    rendererPatternTableSetTile(TILE_FONT_D, s_font_d, 64U);
+    rendererPatternTableSetTile(TILE_FONT_E, s_font_e, 64U);
+    rendererPatternTableSetTile(TILE_FONT_F, s_font_f, 64U);
+    rendererPatternTableSetTile(TILE_FONT_G, s_font_g, 64U);
+    rendererPatternTableSetTile(TILE_FONT_H, s_font_h, 64U);
+    rendererPatternTableSetTile(TILE_FONT_I, s_font_i, 64U);
+    rendererPatternTableSetTile(TILE_FONT_J, s_font_j, 64U);
+    rendererPatternTableSetTile(TILE_FONT_K, s_font_k, 64U);
+    rendererPatternTableSetTile(TILE_FONT_L, s_font_l, 64U);
+    rendererPatternTableSetTile(TILE_FONT_M, s_font_m, 64U);
+    rendererPatternTableSetTile(TILE_FONT_N, s_font_n, 64U);
+    rendererPatternTableSetTile(TILE_FONT_O, s_font_o, 64U);
+    rendererPatternTableSetTile(TILE_FONT_P, s_font_p, 64U);
+    rendererPatternTableSetTile(TILE_FONT_Q, s_font_q, 64U);
+    rendererPatternTableSetTile(TILE_FONT_R, s_font_r, 64U);
+    rendererPatternTableSetTile(TILE_FONT_S, s_font_s, 64U);
+    rendererPatternTableSetTile(TILE_FONT_T, s_font_t, 64U);
+    rendererPatternTableSetTile(TILE_FONT_U, s_font_u, 64U);
+    rendererPatternTableSetTile(TILE_FONT_V, s_font_v, 64U);
+    rendererPatternTableSetTile(TILE_FONT_W, s_font_w, 64U);
+    rendererPatternTableSetTile(TILE_FONT_X, s_font_x, 64U);
+    rendererPatternTableSetTile(TILE_FONT_Y, s_font_y, 64U);
+    rendererPatternTableSetTile(TILE_FONT_Z, s_font_z, 64U);
+    rendererPatternTableSetTile(TILE_FONT_0, s_font_0, 64U);
+    rendererPatternTableSetTile(TILE_FONT_1, s_font_1, 64U);
+    rendererPatternTableSetTile(TILE_FONT_2, s_font_2, 64U);
+    rendererPatternTableSetTile(TILE_FONT_3, s_font_3, 64U);
+    rendererPatternTableSetTile(TILE_FONT_4, s_font_4, 64U);
+    rendererPatternTableSetTile(TILE_FONT_5, s_font_5, 64U);
+    rendererPatternTableSetTile(TILE_FONT_6, s_font_6, 64U);
+    rendererPatternTableSetTile(TILE_FONT_7, s_font_7, 64U);
+    rendererPatternTableSetTile(TILE_FONT_8, s_font_8, 64U);
+    rendererPatternTableSetTile(TILE_FONT_9, s_font_9, 64U);
 }
 
 static void fillFramePalette()
 {
-    rendererFramePaletteSetBackgroundMultiple(FONT_PALETTE_IDX, getFontPalette(FONT_CHAR_PALETTE)[1U], getFontPalette(FONT_CHAR_PALETTE)[2U], getFontPalette(FONT_CHAR_PALETTE)[3U]);
+    uint8_t palettes[4U] = {DEFINE_FONT_A_PALETTE};
+    rendererFramePaletteSetBackgroundMultiple(FONT_PALETTE_IDX, palettes[1U], palettes[2U], palettes[3U]);
 }
 
 void mainMenuInit(void)

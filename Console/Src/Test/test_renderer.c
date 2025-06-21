@@ -6,25 +6,37 @@
 #include "bricks3.h"
 #include "bricks4.h"
 #include "bricks5.h"
+
+const uint8_t s_pacman_ghost_data[64U] = {DEFINE_PACMAN_GHOST_TILE};
+
+const uint8_t s_bricks_1_data[64U] = {DEFINE_BRICKS1_TILE};
+const uint8_t s_bricks_2_data[64U] = {DEFINE_BRICKS2_TILE};
+const uint8_t s_bricks_3_data[64U] = {DEFINE_BRICKS3_TILE};
+const uint8_t s_bricks_4_data[64U] = {DEFINE_BRICKS4_TILE};
+const uint8_t s_bricks_5_data[64U] = {DEFINE_BRICKS5_TILE};
+
+const uint8_t s_pacman_ghost_palette[4U] = {DEFINE_PACMAN_GHOST_PALETTE};
+const uint8_t s_bricks_palette[4U] = {DEFINE_BRICKS1_PALETTE};
+
 static void testRendererInitBricks()
 {
-    rendererPatternTableSetTile(1U, pacman_ghost_data, sizeof(pacman_ghost_data));
-    rendererFramePaletteSetSpriteMultiple(0U, pacman_ghost_palette[1U], pacman_ghost_palette[2U], pacman_ghost_palette[3U]);
+    rendererPatternTableSetTile(1U, s_pacman_ghost_data, sizeof(s_pacman_ghost_data));
+    rendererFramePaletteSetSpriteMultiple(0U, s_pacman_ghost_palette[1U], s_pacman_ghost_palette[2U], s_pacman_ghost_palette[3U]);
     rendererOamSetTileIdx(0U, 1U);
     rendererOamSetPaletteIdx(0U, 0U);
     rendererOamSetFlipH(0U, true);
     rendererOamSetPriorityLow(0U, true);
 
     // backgrounds
-    rendererPatternTableSetTile(2U, bricks1_data, sizeof(bricks1_data));
-    rendererPatternTableSetTile(3U, bricks2_data, sizeof(bricks2_data));
-    rendererPatternTableSetTile(4U, bricks3_data, sizeof(bricks3_data));
-    rendererPatternTableSetTile(5U, bricks4_data, sizeof(bricks4_data));
-    rendererPatternTableSetTile(6U, bricks5_data, sizeof(bricks5_data));
+    rendererPatternTableSetTile(2U, s_bricks_1_data, sizeof(s_bricks_1_data));
+    rendererPatternTableSetTile(3U, s_bricks_2_data, sizeof(s_bricks_2_data));
+    rendererPatternTableSetTile(4U, s_bricks_3_data, sizeof(s_bricks_3_data));
+    rendererPatternTableSetTile(5U, s_bricks_4_data, sizeof(s_bricks_4_data));
+    rendererPatternTableSetTile(6U, s_bricks_5_data, sizeof(s_bricks_5_data));
 
     // background frame palette
     const uint8_t brick_pallete_idx = 1U;
-    rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx, bricks1_palette[1U], bricks1_palette[2U], bricks1_palette[3U]);
+    rendererFramePaletteSetBackgroundMultiple(brick_pallete_idx, s_bricks_palette[1U], s_bricks_palette[2U], s_bricks_palette[3U]);
 
     // tile [2,0] flipped in both directions
     rendererAttributeTableSetFlipH(2U, 0U, true);

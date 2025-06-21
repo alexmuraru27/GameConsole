@@ -9,6 +9,36 @@ int main(void)
     if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
     {
         api_hdr_ptr->api.debugString("Hello from GameXO :D\r\n");
+
+        AssetMetaData asset_2_metadata;
+        uint32_t res = 0;
+        res = api_hdr_ptr->api.assetLoaderGetAssetMetadata(ASSET_ID_FONT_A, &asset_2_metadata);
+        if (!res)
+        {
+            uint8_t asset_2_data[asset_2_metadata.memory_size];
+            res = api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_ID_FONT_A, asset_2_data);
+            api_hdr_ptr->api.debugString("\r\n ");
+            if (!res)
+            {
+                for (uint8_t i = 0U; i < asset_2_metadata.memory_size; i++)
+                {
+                    api_hdr_ptr->api.debugBinary(asset_2_data[i], 8);
+                    api_hdr_ptr->api.debugChar(' ');
+                    if (i % 2 == 1U)
+                    {
+                        api_hdr_ptr->api.debugString("\r\n ");
+                    }
+                }
+            }
+            else
+            {
+                api_hdr_ptr->api.debugString("\r\n asset2 data fail");
+            }
+        }
+        else
+        {
+            api_hdr_ptr->api.debugString("\r\n asset2 size fail");
+        }
     }
 }
 
