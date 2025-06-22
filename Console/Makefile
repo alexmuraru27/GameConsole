@@ -66,11 +66,11 @@ C_INCLUDES =  \
 -IInc/Renderer \
 -IInc/Loader \
 -IInc/MainMenu \
+-IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
+-IDrivers/CMSIS/Include \
 -I../Tiles \
 -I../Shared/Inc \
--I../Shared/Inc/TileUtils \
--I../Drivers/CMSIS/Device/ST/STM32F4xx/Include \
--I../Drivers/CMSIS/Include
+-I../Shared/Inc/TileUtils
 
 
 # compile gcc flags
