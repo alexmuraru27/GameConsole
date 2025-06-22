@@ -11,4 +11,4 @@ int main(void)
     }
 }
 
-DECLARE_GAME_BINARY_HEADER(game_header, main);
+DECLARE_GAME_BINARY_HEADER(main);

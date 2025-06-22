@@ -140,8 +140,7 @@ static void peripheralsInit()
     adcInit();
     joystickInit();
     buzzerInit();
-    // TODO reenable this at some point - I will get killed if i play this in the night everytime i reboot the board
-    // playBootSong();
+    playBootSong();
     rendererInit();
     f_mount(&s_fatfs, "0:", 1U);
 }

@@ -189,7 +189,7 @@ typedef struct
 } GameBinaryHeader;
 
 // MAGIC = GAME in ASCII
-#define DECLARE_GAME_BINARY_HEADER(header_var_name, entry_func)         \
+#define DECLARE_GAME_BINARY_HEADER(entry_func)                          \
     extern uint32_t __game_header_start, __game_header_end;             \
     extern uint32_t __game_text_start, __game_text_end;                 \
     extern uint32_t __game_ro_data_start, __game_ro_data_end;           \
@@ -197,7 +197,7 @@ typedef struct
     extern uint32_t __game_data_no_init_start, __game_data_no_init_end; \
     extern uint32_t __game_code_assets_start, __game_code_assets_end;   \
     __attribute__((section(".game_header")))                            \
-    const GameBinaryHeader header_var_name = {                          \
+    const GameBinaryHeader game_header_variable_47414D45 = {            \
         .magic = 0x47414D45,                                            \
         .header_start = (uint32_t)&__game_header_start,                 \
         .header_end = (uint32_t)&__game_header_end,                     \
