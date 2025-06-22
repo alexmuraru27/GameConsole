@@ -11,14 +11,14 @@
 #define INVALID_TRACK 255
 typedef struct
 {
-    uint16_t *frequencies_hz; // note frequency in hz (0 for silence)
-    uint16_t *durations_ms;   // duration in milliseconds
-    uint16_t notes;           // Number of notes
-    bool is_playing;          // Playback status
-    bool is_looped;           // If the track should be looped
-    void (*callback)(void);   // Callback fptr
-    uint32_t note_idx;        // Index of current note being played
-    uint32_t ms_counter;      // Counts milliseconds for current note
+    const uint16_t *frequencies_hz; // note frequency in hz (0 for silence)
+    const uint16_t *durations_ms;   // duration in milliseconds
+    uint16_t notes;                 // Number of notes
+    bool is_playing;                // Playback status
+    bool is_looped;                 // If the track should be looped
+    void (*callback)(void);         // Callback fptr
+    uint32_t note_idx;              // Index of current note being played
+    uint32_t ms_counter;            // Counts milliseconds for current note
 } TrackData;
 
 static CCMRAM TrackData s_track_data_queue[SOUND_TRACKS];
@@ -201,7 +201,7 @@ void buzzerInterruptHandler(void)
     }
 }
 
-bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, uint16_t *const frequencies, uint16_t *const durations_ms, const uint16_t notes, void (*on_done_callback)(void))
+bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, const uint16_t *const frequencies, const uint16_t *const durations_ms, const uint16_t notes, void (*on_done_callback)(void))
 {
     if (track_number < SOUND_TRACKS && frequencies != NULL && durations_ms != NULL && notes != 0U)
     {
@@ -217,7 +217,7 @@ bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, ui
     return false;
 }
 
-bool buzzerPlay(const uint8_t track_number, const bool is_looped, uint16_t *const frequencies, uint16_t *const durations_ms, const uint16_t notes)
+bool buzzerPlay(const uint8_t track_number, const bool is_looped, const uint16_t *const frequencies, const uint16_t *const durations_ms, const uint16_t notes)
 {
     return buzzerPlayWithCallback(track_number, is_looped, frequencies, durations_ms, notes, NULL);
 }

@@ -116,10 +116,22 @@ static void gameConsoleExposeApi()
     *API_PTR = api_header;
 }
 
+const uint16_t s_boot_melody[] = {
+    NOTE_D4, NOTE_FS4, NOTE_A4, NOTE_D5, NOTE_FS5, NOTE_A5,
+    NOTE_D6, NOTE_A5, NOTE_FS5, NOTE_D5, NOTE_A4};
+
+const uint16_t s_boot_tempo[] = {
+    450, 400, 350, 300, 250, 200,
+    150, 200, 250, 300, 600};
+
+static void playBootSong()
+{
+    buzzerPlay(0, false, s_boot_melody, s_boot_tempo, sizeof(s_boot_melody) / sizeof(uint16_t));
+}
+
 static FATFS s_fatfs;
 static void peripheralsInit()
 {
-    f_mount(&s_fatfs, "0:", 1U);
     dmaInit();
     gpioInit();
     usartInit();
@@ -128,7 +140,10 @@ static void peripheralsInit()
     adcInit();
     joystickInit();
     buzzerInit();
+    // TODO reenable this at some point - I will get killed if i play this in the night everytime i reboot the board
+    // playBootSong();
     rendererInit();
+    f_mount(&s_fatfs, "0:", 1U);
 }
 
 void gameConsoleInit()
