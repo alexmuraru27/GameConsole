@@ -148,10 +148,9 @@ To create a new game for the GameConsole platform, follow these steps:
    - This gives you access to the Console API and asset macros.
 
 3. **Declare the API Header Pointer**
-   - Add the following to your main file:
+   - Add the following to your main file in global scope:
      ```c
-     extern ConsoleAPIHeader __game_console_api_start; // Provided by the loader
-     ConsoleAPIHeader *api_hdr_ptr = (ConsoleAPIHeader *)&__game_console_api_start;
+     DECLARE_API_HEADER_PTR(api_hdr_ptr);
      ```
    - This allows you to call any API function, e.g.:
      ```c
@@ -161,30 +160,7 @@ To create a new game for the GameConsole platform, follow these steps:
 4. **Define the Game Header**
    - At the end of your main file, define the `GameBinaryHeader` in `(".game_header")` dedicated section:
      ```c
-     extern uint32_t __game_header_start, __game_header_end;
-     extern uint32_t __game_text_start, __game_text_end;
-     extern uint32_t __game_ro_data_start, __game_ro_data_end;
-     extern uint32_t __game_data_init_start, __game_data_init_end;
-     extern uint32_t __game_data_no_init_start, __game_data_no_init_end;
-     extern uint32_t __game_code_assets_start, __game_code_assets_end;
-
-     __attribute__((section(".game_header")))
-     const GameBinaryHeader game_header = {
-         .magic = 0x47414D45, // 'GAME'
-         .header_start = (uint32_t)&__game_header_start,
-         .header_end = (uint32_t)&__game_header_end,
-         .text_start = (uint32_t)&__game_text_start,
-         .text_end = (uint32_t)&__game_text_end,
-         .ro_data_start = (uint32_t)&__game_ro_data_start,
-         .ro_data_end = (uint32_t)&__game_ro_data_end,
-         .data_start = (uint32_t)&__game_data_init_start,
-         .data_end = (uint32_t)&__game_data_init_end,
-         .bss_start = (uint32_t)&__game_data_no_init_start,
-         .bss_end = (uint32_t)&__game_data_no_init_end,
-         .assets_start = (uint32_t)&__game_code_assets_start,
-         .assets_end = (uint32_t)&__game_code_assets_end,
-         .entry_point = (uint32_t)&main
-     };
+     DEFINE_GAME_BINARY_HEADER(game_header, main);
      ```
    - This header is required for the loader recognize the memory layout of the game, and load its necessary data.
 
@@ -216,4 +192,21 @@ To create a new game for the GameConsole platform, follow these steps:
    - Build your game using the provided Makefile.
    - Deploy the resulting `.bin` file to the SD card main directory
 
+7. **E.g. of main file**
+  ```C
+  #include "game_console_api.h"
+  #include "assets.h"
+
+  DECLARE_API_HEADER_PTR(api_hdr_ptr);
+
+  int main(void)
+  {
+      if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
+      {
+          api_hdr_ptr->api.debugString("Hello from GameXO :D\r\n");
+      }
+  }
+
+  DECLARE_GAME_BINARY_HEADER(game_header, main);
+  ```
 ---

@@ -96,11 +96,11 @@ $(BUILD_DIR):
 	mkdir $@
 
 
-flash: all
+flash: $(BUILD_DIR)/$(TARGET).elf
 	@echo "GameXO — nothing to flash -> .bin loaded at runtime"
 
 
-deploy:
+deploy: $(BUILD_DIR)/$(TARGET).bin
 	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_DRIVE)/
 	sync
 	@echo "$(TARGET).bin copied to SD card $(SD_DRIVE)"

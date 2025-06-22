@@ -77,7 +77,8 @@
         "xtr1common": "c",
         "gamexo_selection.h": "c",
         "bricks1.h": "c",
-        "gamexo_bar.h": "c"
+        "gamexo_bar.h": "c",
+        "assets.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
