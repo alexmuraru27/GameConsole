@@ -66,7 +66,7 @@ uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_meta
     return ASSET_LOADER_RET_ASSET_NOT_FOUND;
 }
 
-uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
+uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *const buffer, const uint8_t buffer_size_bytes)
 {
     uint8_t res;
     GameBinaryHeader game_header;
@@ -105,6 +105,12 @@ uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer)
 
         if (asset_metadata.id == asset_id)
         {
+            if (asset_metadata.memory_size > buffer_size_bytes)
+            {
+                // the asset doesn't fit in the memory buffer requested
+                return FR_DENIED;
+            }
+
             uint8_t asset_read_buffer[128U];
             UINT bytes_read = 0U;
             uint32_t dest_addr = (uint32_t)buffer;

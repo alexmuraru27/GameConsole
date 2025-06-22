@@ -1,0 +1,89 @@
+#include "level_manager.h"
+#include "game_console_api.h"
+#include "assets.h"
+
+DECLARE_API_HEADER_PTR(api_ptr);
+
+static void fillPatternTable()
+{
+    const uint8_t asset_ids[] = {ASSET_ID_FONT_A,
+                                 ASSET_ID_FONT_B,
+                                 ASSET_ID_FONT_C,
+                                 ASSET_ID_FONT_D,
+                                 ASSET_ID_FONT_E,
+                                 ASSET_ID_FONT_F,
+                                 ASSET_ID_FONT_G,
+                                 ASSET_ID_FONT_H,
+                                 ASSET_ID_FONT_I,
+                                 ASSET_ID_FONT_J,
+                                 ASSET_ID_FONT_K,
+                                 ASSET_ID_FONT_L,
+                                 ASSET_ID_FONT_M,
+                                 ASSET_ID_FONT_N,
+                                 ASSET_ID_FONT_O,
+                                 ASSET_ID_FONT_P,
+                                 ASSET_ID_FONT_Q,
+                                 ASSET_ID_FONT_R,
+                                 ASSET_ID_FONT_S,
+                                 ASSET_ID_FONT_T,
+                                 ASSET_ID_FONT_U,
+                                 ASSET_ID_FONT_V,
+                                 ASSET_ID_FONT_W,
+                                 ASSET_ID_FONT_X,
+                                 ASSET_ID_FONT_Y,
+                                 ASSET_ID_FONT_Z,
+                                 ASSET_ID_FONT_0,
+                                 ASSET_ID_FONT_1,
+                                 ASSET_ID_FONT_2,
+                                 ASSET_ID_FONT_3,
+                                 ASSET_ID_FONT_4,
+                                 ASSET_ID_FONT_5,
+                                 ASSET_ID_FONT_6,
+                                 ASSET_ID_FONT_7,
+                                 ASSET_ID_FONT_8,
+                                 ASSET_ID_FONT_9,
+                                 ASSET_ID_FONT_STAR,
+                                 ASSET_ID_SPRITE_X,
+                                 ASSET_ID_SPRITE_O,
+                                 ASSET_ID_SPRITE_SELECTION};
+
+    uint8_t tile_buffer[64U];
+    uint32_t res = 0U;
+    for (uint16_t idx = 0U; idx < sizeof(asset_ids) / sizeof(uint8_t); idx++)
+    {
+        res = api_ptr->api.assetLoaderGetAssetData(asset_ids[idx], tile_buffer, sizeof(tile_buffer) / sizeof(uint8_t));
+        if (!res)
+        {
+            api_ptr->api.rendererPatternTableSetTile(asset_ids[idx], tile_buffer, 64U);
+        }
+    }
+}
+
+static void fillFramePalette()
+{
+    // WHITE
+    api_ptr->api.rendererFramePaletteSetBackgroundMultiple(FRAME_PALETTE_IDX_BG_FONT, 0x20, 0x20, 0x20);
+
+    // GRAY
+    api_ptr->api.rendererFramePaletteSetBackgroundMultiple(FRAME_PALETTE_IDX_BG_BACKGROUND, 0x2D, 0x2D, 0x2D);
+
+    // GREEN
+    api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_SELECTION, 0x1B, 0x1B, 0x1B);
+
+    // BLUE
+    api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_X, 0x02, 0x02, 0x02);
+
+    // BROWN
+    api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_O, 0x06, 0x06, 0x06);
+}
+
+void levelManagerInit(void)
+{
+    api_ptr->api.rendererInit();
+
+    fillPatternTable();
+    fillFramePalette();
+
+    api_ptr->api.rendererNameTableSetTile(5U, 6U, ASSET_ID_FONT_A);
+    api_ptr->api.rendererAttributeTableSetPalette(5U, 6U, FRAME_PALETTE_IDX_BG_FONT);
+}

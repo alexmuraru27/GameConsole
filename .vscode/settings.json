@@ -78,7 +78,8 @@
         "gamexo_selection.h": "c",
         "bricks1.h": "c",
         "gamexo_bar.h": "c",
-        "assets.h": "c"
+        "assets.h": "c",
+        "level_manager.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
