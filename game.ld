@@ -95,7 +95,7 @@ SECTIONS
     KEEP (*(.assets.data))
     __game_code_assets_end = .;
     . = ALIGN(4);
-  } >GAME_RAM_ASSETS
+  } >GAME_ASSETS
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
