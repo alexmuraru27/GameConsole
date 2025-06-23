@@ -99,6 +99,7 @@ typedef struct
     uint8_t (*joystickGetRAnalogX)(void);
     uint8_t (*joystickGetLAnalogY)(void);
     uint8_t (*joystickGetLAnalogX)(void);
+    bool (*joystickIsAnyButtonPressed)(void);
 
     // RENDERING
     void (*rendererInit)(void);
@@ -157,7 +158,6 @@ typedef struct
 } ConsoleAPI;
 
 #define API_MAGIC 0xDEADBEEFU
-#define API_VERSION 1
 
 typedef struct
 {
@@ -168,7 +168,7 @@ typedef struct
 
 #define DECLARE_API_HEADER_PTR(var_name)              \
     extern ConsoleAPIHeader __game_console_api_start; \
-    ConsoleAPIHeader *var_name = (ConsoleAPIHeader *)&__game_console_api_start
+    static ConsoleAPIHeader *var_name = (ConsoleAPIHeader *)&__game_console_api_start
 
 typedef struct
 {

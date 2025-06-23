@@ -233,3 +233,8 @@ JoystickAnalogValue joystickGetLAnalogX(void)
     }
     return joyLAnalogX;
 }
+
+bool joystickIsAnyButtonPressed(void)
+{
+    return ((s_joystick_data & JOYSTICK_DATA_BTN_MASK) != 0U);
+}

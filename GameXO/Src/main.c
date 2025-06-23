@@ -1,9 +1,9 @@
 #include "game_console_api.h"
 #include "assets.h"
-#include "level_manager.h"
+#include "game_state_manager.h"
 
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
-#define FPS 50
+#define FPS 30
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
 bool is_debug_fps = false;
@@ -25,21 +25,22 @@ static void syncFrame()
 
 int main(void)
 {
-    if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
+    if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == 1U)
     {
-        api_hdr_ptr->api.debugString("Hello from GameXO :D\r\n");
-
-        levelManagerInit();
-
+        gameStateManagerInit();
         while (true)
         {
-            // update();
+            // UPDATE
+            gameStateManagerUpdate();
+
+            // RENDER
             api_hdr_ptr->api.rendererRender();
 
+            // SYNC frame -> 50fps
             syncFrame();
-
             if (api_hdr_ptr->api.joystickGetSpecialBtn2())
             {
+                // Special Button 2 returns to console OS
                 break;
             }
         }

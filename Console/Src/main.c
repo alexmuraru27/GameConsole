@@ -8,7 +8,7 @@
 #include "main_menu.h"
 
 bool is_debug_fps = false;
-#define FPS 50
+#define FPS 30
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
 

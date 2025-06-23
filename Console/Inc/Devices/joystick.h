@@ -26,5 +26,6 @@ JoystickAnalogValue joystickGetRAnalogY(void);
 JoystickAnalogValue joystickGetRAnalogX(void);
 JoystickAnalogValue joystickGetLAnalogY(void);
 JoystickAnalogValue joystickGetLAnalogX(void);
+bool joystickIsAnyButtonPressed(void);
 
 #endif /* __JOYSTICK_H */

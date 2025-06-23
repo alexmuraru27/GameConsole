@@ -83,18 +83,6 @@ DEFINE_ASSET_8(font_9, ASSET_ID_FONT_9, ASSET_TYPE_TILE, (DEFINE_FONT_9_TILE));
 
 DEFINE_ASSET_8(font_star, ASSET_ID_FONT_STAR, ASSET_TYPE_TILE, (DEFINE_FONT_STAR_TILE));
 
-DEFINE_ASSET_16(audio_mario_data, ASSET_ID_AUDIO_MARIO_DATA, ASSET_TYPE_AUDIO_DATA, (NOTE_E7, NOTE_E7, 0, NOTE_E7, 0, NOTE_C7, NOTE_E7, 0, NOTE_G7, 0, 0, 0, NOTE_G6, 0, 0, 0,
-
-                                                                                     NOTE_C7, 0, 0, NOTE_G6, 0, 0, NOTE_E6, 0, 0, NOTE_A6, 0, NOTE_B6, 0, NOTE_AS6, NOTE_A6, 0,
-
-                                                                                     NOTE_G6, NOTE_E7, NOTE_G7, NOTE_A7, 0, NOTE_F7, NOTE_G7, 0, NOTE_E7, 0, NOTE_C7, NOTE_D7, NOTE_B6, 0, 0,
-
-                                                                                     NOTE_C7, 0, 0, NOTE_G6, 0, 0, NOTE_E6, 0, 0, NOTE_A6, 0, NOTE_B6, 0, NOTE_AS6, NOTE_A6, 0,
-
-                                                                                     NOTE_G6, NOTE_E7, NOTE_G7, NOTE_A7, 0, NOTE_F7, NOTE_G7, 0, NOTE_E7, 0, NOTE_C7, NOTE_D7, NOTE_B6, 0, 0));
-
-DEFINE_ASSET_16(audio_mario_duration, ASSET_ID_AUDIO_MARIO_DURATION, ASSET_TYPE_AUDIO_DURATION, (120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 90, 90, 90, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 90, 90, 90, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, 120, ));
-
 DEFINE_ASSET_8(grid_corner, ASSET_ID_BACKGROUND_CORNER, ASSET_TYPE_TILE, (DEFINE_GAMEXO_CORNER_TILE));
 
 DEFINE_ASSET_8(grid_bar, ASSET_ID_BACKGROUND_BAR, ASSET_TYPE_TILE, (DEFINE_GAMEXO_BAR_TILE));

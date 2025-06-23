@@ -19,6 +19,7 @@ OPT = -Og
 # C sources
 C_SOURCES =  \
 Src/main.c \
+Src/game_state_manager.c \
 Src/level_manager.c \
 Assets/Src/assets.c \
 Src/syscalls.c
