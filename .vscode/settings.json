@@ -79,7 +79,10 @@
         "bricks1.h": "c",
         "gamexo_bar.h": "c",
         "assets.h": "c",
-        "level_manager.h": "c"
+        "level_manager.h": "c",
+        "tic_tac_toe_logic.h": "c",
+        "gamexo_corner.h": "c",
+        "gamexo_v_bar.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

@@ -54,6 +54,7 @@ static void gameConsoleExposeApi()
             .joystickGetRAnalogX = &joystickGetRAnalogX,
             .joystickGetLAnalogY = &joystickGetLAnalogY,
             .joystickGetLAnalogX = &joystickGetLAnalogX,
+            .joystickIsAnyButtonPressed = &joystickIsAnyButtonPressed,
             // RENDERING
             .rendererInit = &rendererInit,
             .rendererPatternTableClear = &rendererPatternTableClear,

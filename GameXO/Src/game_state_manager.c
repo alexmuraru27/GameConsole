@@ -13,9 +13,7 @@ typedef enum
 
 DECLARE_API_HEADER_PTR(s_api_ptr);
 static GameState s_game_state = {GAME_STATE_INIT};
-static bool s_game_state_player_is_x = {true};
 static bool s_is_state_transition = {true};
-static const uint32_t S_BUTTON_DEBOUNCE_TIME_MS = 500U;
 
 static void fillPatternTable()
 {
@@ -58,7 +56,10 @@ static void fillPatternTable()
                                  ASSET_ID_FONT_STAR,
                                  ASSET_ID_SPRITE_X,
                                  ASSET_ID_SPRITE_O,
-                                 ASSET_ID_SPRITE_SELECTION};
+                                 ASSET_ID_SPRITE_SELECTION,
+                                 ASSET_ID_BACKGROUND_CORNER,
+                                 ASSET_ID_BACKGROUND_V_BAR,
+                                 ASSET_ID_BACKGROUND_H_BAR};
 
     uint8_t tile_buffer[64U];
     uint32_t res = 0U;
@@ -104,7 +105,6 @@ void gameStateManagerInit(void)
 
 static void handleStateInit()
 {
-    s_game_state_player_is_x = true;
     s_is_state_transition = true;
     s_game_state = GAME_STATE_CHOOSE_SYMBOL;
     levelManagerInit();
@@ -112,22 +112,12 @@ static void handleStateInit()
 
 static void handleStateChooseSymbol()
 {
-    static uint32_t last_pressed_time = 0U;
-    levelManagerChooseSymbol(s_is_state_transition, s_game_state_player_is_x);
+    const bool is_symbol_selected = levelManagerChooseSymbol(s_is_state_transition);
     if (s_is_state_transition)
     {
         s_is_state_transition = false;
     }
-
-    // joystick L/R
-    if ((s_api_ptr->api.joystickGetRBtnLeft() || s_api_ptr->api.joystickGetRBtnRight()) && (last_pressed_time + S_BUTTON_DEBOUNCE_TIME_MS < s_api_ptr->api.getSysTime()))
-    {
-        last_pressed_time = s_api_ptr->api.getSysTime();
-        s_game_state_player_is_x = !s_game_state_player_is_x;
-    }
-
-    // joystick down selects
-    if (s_api_ptr->api.joystickGetRBtnDown())
+    if (is_symbol_selected)
     {
         s_game_state = GAME_STATE_PLAYING;
         s_is_state_transition = true;
@@ -136,7 +126,7 @@ static void handleStateChooseSymbol()
 
 static void handleStatePlaying()
 {
-    const bool is_game_in_progress = levelManagerPlay(s_is_state_transition, s_game_state_player_is_x);
+    const bool is_game_in_progress = levelManagerPlay(s_is_state_transition);
 
     if (s_is_state_transition)
     {
@@ -145,21 +135,21 @@ static void handleStatePlaying()
 
     if (!is_game_in_progress)
     {
-        s_game_state = GAME_STATE_PLAYING;
+        s_game_state = GAME_STATE_END;
         s_is_state_transition = true;
     }
 }
 
 static void handleStateEnd()
 {
-    levelManagerEnd(s_is_state_transition, s_game_state_player_is_x);
+    const bool is_game_ended = levelManagerEnd(s_is_state_transition);
 
     if (s_is_state_transition)
     {
         s_is_state_transition = false;
     }
 
-    if (s_api_ptr->api.joystickIsAnyButtonPressed())
+    if (is_game_ended)
     {
         s_game_state = GAME_STATE_INIT;
         s_is_state_transition = true;

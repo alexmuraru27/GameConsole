@@ -184,31 +184,37 @@ void rendererInit(void)
 void rendererPatternTableClear()
 {
     memset(&s_pattern_table, 0U, sizeof(s_pattern_table));
+    rendererSetDirtyCompleteRedraw();
 }
 
 void rendererNameTableClear()
 {
     memset(&s_name_table, 0U, sizeof(s_name_table));
+    rendererSetDirtyCompleteRedraw();
 }
 
 void rendererAttributeTableClear()
 {
     memset(&s_attribute_table, 0U, sizeof(s_attribute_table));
+    rendererSetDirtyCompleteRedraw();
 }
 
 void rendererOamClear()
 {
     memset(&s_oam, 0U, sizeof(s_oam));
+    rendererSetDirtyCompleteRedraw();
 }
 
 void rendererFramePaletteSpriteClear()
 {
     memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
+    rendererSetDirtyCompleteRedraw();
 }
 
 void rendererFramePaletteBgClear()
 {
     memset(&s_frame_palette_sprite, 0U, sizeof(s_frame_palette_sprite));
+    rendererSetDirtyCompleteRedraw();
 }
 
 static void dirtyOamSet(uint8_t oam_idx)
@@ -545,6 +551,7 @@ void rendererRender(void)
         }
     }
 
+    // TODO - set OAM to dirty when a tile that touches it is set to dirty
     // 3. render OAM with priority=0 -> front of high prio BG
     for (uint8_t i = 0U; i < RENDERER_OAM_SIZE; i++)
     {

@@ -1,7 +1,8 @@
 #include "assets.h"
 #include "game_console_api.h"
 #include "fonts.h"
-#include "gamexo_bar.h"
+#include "gamexo_v_bar.h"
+#include "gamexo_h_bar.h"
 #include "gamexo_corner.h"
 #include "gamexo_o.h"
 #include "gamexo_x.h"
@@ -85,7 +86,9 @@ DEFINE_ASSET_8(font_star, ASSET_ID_FONT_STAR, ASSET_TYPE_TILE, (DEFINE_FONT_STAR
 
 DEFINE_ASSET_8(grid_corner, ASSET_ID_BACKGROUND_CORNER, ASSET_TYPE_TILE, (DEFINE_GAMEXO_CORNER_TILE));
 
-DEFINE_ASSET_8(grid_bar, ASSET_ID_BACKGROUND_BAR, ASSET_TYPE_TILE, (DEFINE_GAMEXO_BAR_TILE));
+DEFINE_ASSET_8(grid_v_bar, ASSET_ID_BACKGROUND_V_BAR, ASSET_TYPE_TILE, (DEFINE_GAMEXO_V_BAR_TILE));
+
+DEFINE_ASSET_8(grid_h_bar, ASSET_ID_BACKGROUND_H_BAR, ASSET_TYPE_TILE, (DEFINE_GAMEXO_H_BAR_TILE));
 
 DEFINE_ASSET_8(sprite_o, ASSET_ID_SPRITE_O, ASSET_TYPE_TILE, (DEFINE_GAMEXO_O_TILE));
 

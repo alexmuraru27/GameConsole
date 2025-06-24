@@ -5,9 +5,9 @@
 #include "stdbool.h"
 void levelManagerInit();
 
-void levelManagerChooseSymbol(bool is_level_transition, bool is_player_x);
+bool levelManagerChooseSymbol(bool is_level_transition);
 // Returns true if game is in progress
-bool levelManagerPlay(bool is_level_transition, bool is_player_x);
-void levelManagerEnd(bool is_level_transition, bool is_player_x);
+bool levelManagerPlay(bool is_level_transition);
+bool levelManagerEnd(bool is_level_transition);
 
 #endif /* __LEVEL_MANAGER_H */
