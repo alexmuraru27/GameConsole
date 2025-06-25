@@ -655,29 +655,33 @@ uint8_t rendererOamGetXPos(const uint8_t oam_idx)
 
 void rendererOamSetXYPos(const uint8_t oam_idx, uint8_t x_pos, uint8_t y_pos)
 {
-    if ((oam_idx < RENDERER_OAM_SIZE) && ((x_pos != rendererOamGetXPos(oam_idx)) || (y_pos != rendererOamGetYPos(oam_idx))))
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
-        // clip the values to fit in screen
-        if (x_pos > RENDERER_COORD_MAX_X)
-        {
-            x_pos = RENDERER_COORD_MAX_X;
-        }
-        if (y_pos > RENDERER_COORD_MAX_Y)
-        {
-            y_pos = RENDERER_COORD_MAX_Y;
-        }
-        // trigger dirty old position
-        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
-        // X Pos
-        s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
-        s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
-
-        // Y Pos
-        s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
-        s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
         dirtyOamSet(oam_idx);
-        // trigger dirty new position
-        setDirtyBgTilesTouchedBySprite(x_pos, y_pos);
+
+        if ((x_pos != rendererOamGetXPos(oam_idx)) || (y_pos != rendererOamGetYPos(oam_idx)))
+        {
+            // clip the values to fit in screen
+            if (x_pos > RENDERER_COORD_MAX_X)
+            {
+                x_pos = RENDERER_COORD_MAX_X;
+            }
+            if (y_pos > RENDERER_COORD_MAX_Y)
+            {
+                y_pos = RENDERER_COORD_MAX_Y;
+            }
+            // trigger dirty old position
+            setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+            // X Pos
+            s_oam[oam_idx] &= ~(RENDERER_OAM_X_MASK << RENDERER_OAM_X_POS);
+            s_oam[oam_idx] |= ((x_pos & RENDERER_OAM_X_MASK) << RENDERER_OAM_X_POS);
+
+            // Y Pos
+            s_oam[oam_idx] &= ~(RENDERER_OAM_Y_MASK << RENDERER_OAM_Y_POS);
+            s_oam[oam_idx] |= ((y_pos & RENDERER_OAM_Y_MASK) << RENDERER_OAM_Y_POS);
+            // trigger dirty new position
+            setDirtyBgTilesTouchedBySprite(x_pos, y_pos);
+        }
     }
 }
 
@@ -692,19 +696,24 @@ bool rendererOamGetFlipV(const uint8_t oam_idx)
 
 void rendererOamSetFlipV(const uint8_t oam_idx, const bool is_flip_v)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && (is_flip_v != rendererOamGetFlipV(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
-        if (is_flip_v)
-        {
-            s_oam[oam_idx] |= (RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
-        }
-        else
+        dirtyOamSet(oam_idx);
+
+        if ((is_flip_v != rendererOamGetFlipV(oam_idx)))
         {
 
-            s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
+            if (is_flip_v)
+            {
+                s_oam[oam_idx] |= (RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
+            }
+            else
+            {
+
+                s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_V_MASK << RENDERER_OAM_FLIP_V_POS);
+            }
+            setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
         }
-        dirtyOamSet(oam_idx);
-        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -719,19 +728,24 @@ bool rendererOamGetFlipH(const uint8_t oam_idx)
 
 void rendererOamSetFlipH(const uint8_t oam_idx, const bool is_flip_h)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && (is_flip_h != rendererOamGetFlipH(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
-        if (is_flip_h)
-        {
-            s_oam[oam_idx] |= (RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
-        }
-        else
+        dirtyOamSet(oam_idx);
+
+        if ((is_flip_h != rendererOamGetFlipH(oam_idx)))
         {
 
-            s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
+            if (is_flip_h)
+            {
+                s_oam[oam_idx] |= (RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
+            }
+            else
+            {
+
+                s_oam[oam_idx] &= ~(RENDERER_OAM_FLIP_H_MASK << RENDERER_OAM_FLIP_H_POS);
+            }
+            setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
         }
-        dirtyOamSet(oam_idx);
-        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
     }
 }
 
@@ -746,18 +760,23 @@ bool rendererOamGetPriorityLow(const uint8_t oam_idx)
 
 void rendererOamSetPriorityLow(const uint8_t oam_idx, const bool is_priority_low)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && (is_priority_low != rendererOamGetPriorityLow(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
-        if (is_priority_low)
-        {
-            s_oam[oam_idx] |= (RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
-        }
-        else
-        {
-            s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
-        }
         dirtyOamSet(oam_idx);
-        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+
+        if ((is_priority_low != rendererOamGetPriorityLow(oam_idx)))
+        {
+
+            if (is_priority_low)
+            {
+                s_oam[oam_idx] |= (RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
+            }
+            else
+            {
+                s_oam[oam_idx] &= ~(RENDERER_OAM_PRIORITY_LOW_MASK << RENDERER_OAM_PRIORITY_LOW_POS);
+            }
+            setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        }
     }
 }
 
@@ -772,11 +791,14 @@ uint8_t rendererOamGetPaletteIdx(const uint8_t oam_idx)
 
 void rendererOamSetPaletteIdx(const uint8_t oam_idx, const uint8_t palette_idx)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE && (palette_idx != rendererOamGetPaletteIdx(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE && palette_idx < RENDERER_FRAME_PALETTE_SIZE)
     {
-        s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
-        s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
         dirtyOamSet(oam_idx);
+        if ((palette_idx != rendererOamGetPaletteIdx(oam_idx)))
+        {
+            s_oam[oam_idx] &= ~(RENDERER_OAM_PALETTE_IDX_MASK << RENDERER_OAM_PALETTE_IDX_POS);
+            s_oam[oam_idx] |= ((palette_idx & RENDERER_OAM_PALETTE_IDX_MASK) << RENDERER_OAM_PALETTE_IDX_POS);
+        }
     }
 }
 
@@ -791,12 +813,15 @@ uint8_t rendererOamGetTileIdx(const uint8_t oam_idx)
 
 void rendererOamSetTileIdx(const uint8_t oam_idx, const uint8_t tile_idx)
 {
-    if (oam_idx < RENDERER_OAM_SIZE && (tile_idx != rendererOamGetTileIdx(oam_idx)))
+    if (oam_idx < RENDERER_OAM_SIZE)
     {
-        s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
-        s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
         dirtyOamSet(oam_idx);
-        setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        if (tile_idx != rendererOamGetTileIdx(oam_idx))
+        {
+            s_oam[oam_idx] &= ~(RENDERER_OAM_TILE_IDX_MASK << RENDERER_OAM_TILE_IDX_POS);
+            s_oam[oam_idx] |= ((tile_idx & RENDERER_OAM_TILE_IDX_MASK) << RENDERER_OAM_TILE_IDX_POS);
+            setDirtyBgTilesTouchedBySprite(rendererOamGetXPos(oam_idx), rendererOamGetYPos(oam_idx));
+        }
     }
 }
 
