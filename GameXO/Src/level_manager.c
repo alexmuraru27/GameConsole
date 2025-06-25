@@ -2,6 +2,7 @@
 #include "game_console_api.h"
 #include "assets.h"
 #include "tic_tac_toe_logic.h"
+#include "sound.h"
 
 DECLARE_API_HEADER_PTR(s_api_ptr);
 
@@ -302,34 +303,49 @@ bool levelManagerEnd(bool is_level_transition)
     {
         s_is_user_input_disabled = true;
         s_last_pressed_time = s_api_ptr->api.getSysTime();
-    }
 
-    uint8_t end_text_y_offset = S_END_TEXT_OFFSET_Y;
-    if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_X)
-    {
-        uint8_t end_text_x_offset = centerStringXOffset(5U);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_X, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        end_text_x_offset++;
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_N, FRAME_PALETTE_IDX_BG_FONT, false, false);
-    }
-    else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_O)
-    {
-        uint8_t end_text_x_offset = centerStringXOffset(5U);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        end_text_x_offset++;
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_N, FRAME_PALETTE_IDX_BG_FONT, false, false);
-    }
-    else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_DRAW)
-    {
-        uint8_t end_text_x_offset = centerStringXOffset(4U);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_D, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_R, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_A, FRAME_PALETTE_IDX_BG_FONT, false, false);
-        setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
+        // END Game text
+        uint8_t end_text_y_offset = S_END_TEXT_OFFSET_Y;
+        if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_X)
+        {
+            uint8_t end_text_x_offset = centerStringXOffset(5U);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_X, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            end_text_x_offset++;
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_N, FRAME_PALETTE_IDX_BG_FONT, false, false);
+        }
+        else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_O)
+        {
+            uint8_t end_text_x_offset = centerStringXOffset(5U);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            end_text_x_offset++;
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_O, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_N, FRAME_PALETTE_IDX_BG_FONT, false, false);
+        }
+        else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_DRAW)
+        {
+            uint8_t end_text_x_offset = centerStringXOffset(4U);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_D, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_R, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_A, FRAME_PALETTE_IDX_BG_FONT, false, false);
+            setTileAndPalette(end_text_x_offset++, end_text_y_offset, ASSET_ID_FONT_W, FRAME_PALETTE_IDX_BG_FONT, false, false);
+        }
+
+        // End game sound
+        if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_DRAW)
+        {
+            playSound(ASSET_ID_DRAW_SOUND, ASSET_ID_DRAW_SOUND_DURATION);
+        }
+        else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_X && s_is_player_symbol_x)
+        {
+            playSound(ASSET_ID_WIN_SOUND, ASSET_ID_WIN_SOUND_DURATION);
+        }
+        else
+        {
+            playSound(ASSET_ID_LOOSE_SOUND, ASSET_ID_LOOSE_SOUND_DURATION);
+        }
     }
 
     if (s_is_user_input_disabled)

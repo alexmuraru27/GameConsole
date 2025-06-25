@@ -39,6 +39,7 @@ static void gameConsoleExposeApi()
             .buzzerPause = &buzzerPause,
             .buzzerResume = &buzzerResume,
             .buzzerStop = &buzzerStop,
+            .buzzerStopAll = &buzzerStopAll,
             // JOYSTICKS
             .joystickGetRBtnUp = &joystickGetRBtnUp,
             .joystickGetRBtnRight = &joystickGetRBtnRight,

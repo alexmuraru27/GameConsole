@@ -78,6 +78,7 @@ bool buzzerPlayWithCallback(uint8_t track_number, bool is_looped, const uint16_t
 bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
+void buzzerStopAll();
 
 // Interrupt Handler
 void buzzerInterruptHandler(void);

@@ -22,6 +22,7 @@ Src/main.c \
 Src/game_state_manager.c \
 Src/level_manager.c \
 Src/tic_tac_toe_logic.c\
+Src/sound.c\
 Assets/Src/assets.c \
 Src/syscalls.c
 

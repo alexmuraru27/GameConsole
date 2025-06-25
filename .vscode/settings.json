@@ -82,7 +82,9 @@
         "level_manager.h": "c",
         "tic_tac_toe_logic.h": "c",
         "gamexo_corner.h": "c",
-        "gamexo_v_bar.h": "c"
+        "gamexo_v_bar.h": "c",
+        "gamexo_o.h": "c",
+        "game_state_manager.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

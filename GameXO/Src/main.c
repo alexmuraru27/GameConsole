@@ -1,6 +1,7 @@
 #include "game_console_api.h"
 #include "assets.h"
 #include "game_state_manager.h"
+#include "sound.h"
 
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
 #define FPS 30
@@ -28,6 +29,7 @@ int main(void)
     if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == 1U)
     {
         gameStateManagerInit();
+        playSound(ASSET_ID_WELCOME_SOUND, ASSET_ID_WELCOME_SOUND_DURATION);
         while (true)
         {
             // UPDATE

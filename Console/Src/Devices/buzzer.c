@@ -171,6 +171,14 @@ bool buzzerStop(const uint8_t track_number)
     return false;
 }
 
+void buzzerStopAll()
+{
+    for (uint8_t track_number = 0U; track_number < SOUND_TRACKS; track_number++)
+    {
+        buzzerStop(track_number);
+    }
+}
+
 bool buzzerResume(uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS && (s_track_data_queue[track_number].durations_ms != NULL) && (s_track_data_queue[track_number].frequencies_hz != NULL))
