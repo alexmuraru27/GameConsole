@@ -8,6 +8,7 @@
     - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
     - [GPIO (Button Joysticks)](#gpio-button-joysticks)
     - [SD-CARD (Builtin)](#sd-card-builtin)
+    - [I2C EEPROM](#i2c-eeprom)
   - [Tile Creator](#tile-creator)
     - [Script](#script)
     - [Deps](#deps)
@@ -77,6 +78,10 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 4. PC12 (CLK)
 5. PC8 (DAT0)
 6. PC9 (DAT1)
+
+### I2C EEPROM
+1. PB8 (I2C1_SCL)
+2. PB9 (I2C2_SDA)
 
 
 ## Tile Creator
