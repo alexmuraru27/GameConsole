@@ -73,16 +73,16 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 10. PB12 (Special Button 2)
 
 ### SD-CARD (Builtin)
-1. PC10 (DAT2)
-2. PC11 (CD/DAT3)
-3. PD2 (CMD)
-4. PC12 (CLK)
-5. PC8 (DAT0)
-6. PC9 (DAT1)
+1. PC10 (DAT2 - AF12 PU)
+2. PC11 (CD/DAT3 - AF12 PU)
+3. PD2 (CMD - AF12)
+4. PC12 (CLK - AF12)
+5. PC8 (DAT0 - AF12 PU)
+6. PC9 (DAT1 - AF12 PU)
 
 ### I2C1 EEPROM Console Settings Storage
-1. PB8 (I2C1_SCL)
-2. PB9 (I2C2_SDA)
+1. PB8 (I2C1_SCL - AF4 PU)
+2. PB9 (I2C2_SDA - AF4 PU)
 
 ### USART3 (Network Communication - Baud 921600) 
 1. PD8 (TX - AF7)

@@ -194,6 +194,10 @@ static void peripheralsClockEnable(void)
     RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
     RCC->APB1ENR |= RCC_APB1ENR_TIM7EN;
+    // i2c1
+    RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+    // usart3
+    RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
 
     // ######## APB2 ########
     // Pass clock to SPI1

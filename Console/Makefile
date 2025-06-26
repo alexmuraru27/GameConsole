@@ -30,9 +30,11 @@ Src/Peripherals/spi.c \
 Src/Peripherals/timer.c \
 Src/Peripherals/adc.c \
 Src/Peripherals/sdio.c \
+Src/Peripherals/i2c.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
+Src/Devices/external_eeprom.c \
 Src/FatFs/diskio.c \
 Src/FatFs/diskio_integration.c \
 Src/FatFs/ff.c \

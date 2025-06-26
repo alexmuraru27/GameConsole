@@ -14,6 +14,7 @@
 #include "ff.h"
 #include "string.h"
 #include "asset_loader.h"
+#include "i2c.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -144,6 +145,7 @@ static void peripheralsInit()
     buzzerInit();
     playBootSong();
     rendererInit();
+    i2cInit();
     f_mount(&s_fatfs, "0:", 1U);
 }
 
