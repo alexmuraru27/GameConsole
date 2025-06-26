@@ -43,6 +43,7 @@ Src/MainMenu/main_menu.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
+Src/Network/network.c \
 Src/Renderer/renderer.c
 
 # ASM sources
@@ -62,6 +63,7 @@ C_INCLUDES =  \
 -IInc/Test \
 -IInc/Peripherals \
 -IInc/Devices \
+-IInc/Network \
 -IInc/FatFs \
 -IInc/Renderer \
 -IInc/Loader \
@@ -69,8 +71,9 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
 -I../Tiles \
--I../Shared/Inc \
--I../Shared/Inc/TileUtils
+-I../Shared \
+-I../Shared/TileUtils \
+-I../Shared/Esp01s
 
 
 # compile gcc flags
