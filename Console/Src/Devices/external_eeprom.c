@@ -11,6 +11,11 @@ void externalEepromInit(const uint32_t device_address)
 
 uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
 {
+    if (mem_addr > EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR)
+    {
+        return I2C_ERROR;
+    }
+
     I2C_Status_t status;
     status = i2cStart();
     if (status != I2C_OK)
@@ -61,6 +66,11 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const 
 
 uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
 {
+    if (mem_addr > EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR)
+    {
+        return I2C_ERROR;
+    }
+
     I2C_Status_t status;
     status = i2cStart();
     if (status != I2C_OK)
@@ -128,5 +138,55 @@ uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const u
             }
         }
     }
+    return I2C_OK;
+}
+
+uint8_t externalEepromClear()
+{
+    I2C_Status_t status;
+    status = i2cStart();
+    if (status != I2C_OK)
+    {
+        return status;
+    }
+
+    status = i2cSendAddress(s_device_address, I2C_WRITE);
+    if (status != I2C_OK)
+    {
+        i2cStop();
+        return status;
+    }
+
+    // send eeprom high memory address
+    status = i2cWrite(0U);
+    if (status != I2C_OK)
+    {
+        i2cStop();
+        return status;
+    }
+
+    // send eeprom low memory address
+    status = i2cWrite(0U);
+    if (status != I2C_OK)
+    {
+        i2cStop();
+        return status;
+    }
+
+    // send data
+    for (uint16_t i = 0U; i <= EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR; i++)
+    {
+        status = i2cWrite(0U);
+        if (status != I2C_OK)
+        {
+            i2cStop();
+            return status;
+        }
+    }
+
+    i2cStop();
+
+    // delay as per message catalog Write Cycle Time (tWR): 5ms maximum
+    delay(5U);
     return I2C_OK;
 }

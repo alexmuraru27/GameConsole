@@ -65,6 +65,13 @@ typedef struct
 
 typedef struct
 {
+    uint8_t game_name[12U]; // SFN 8+3 + 1 dot
+    uint16_t size;
+    uint8_t data[];
+} __attribute__((packed)) GameSettings;
+
+typedef struct
+{
     // SYSTIME
     uint32_t (*getSysTime)(void);
     void (*delay)(uint32_t sys_time_delta);

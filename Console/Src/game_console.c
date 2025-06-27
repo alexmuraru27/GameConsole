@@ -17,6 +17,7 @@
 #include "i2c.h"
 #include "external_eeprom.h"
 #include "spi.h"
+#include "settings_storage.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -155,6 +156,7 @@ static void devicesInit()
     externalEepromInit(EXTERNAL_EEPROM_AT24C256_ADDRESS);
     playBootSong();
     f_mount(&s_fatfs, "0:", 1U);
+    settingsStorageInit();
 }
 
 void gameConsoleInit()

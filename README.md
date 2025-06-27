@@ -17,6 +17,8 @@
     - [Usage](#usage)
   - [API \& Internal Documentation](#api--internal-documentation)
   - [Game Creation Setup](#game-creation-setup)
+  - [EEPROM Mapping](#eeprom-mapping)
+    - [AT24C256](#at24c256)
 
 
 # GameConsole
@@ -220,3 +222,14 @@ To create a new game for the GameConsole platform, follow these steps:
   DECLARE_GAME_BINARY_HEADER(game_header, main);
   ```
 ---
+
+## EEPROM Mapping
+### AT24C256
+
+ | Address Range | Size  | Purpose                  |
+ | ------------- | ----- | ------------------------ |
+ | 0x0000-0x00FF | 256B  | System header            |
+ | 0x0100-0x04FF | 1024B | Console settings         |
+ | 0x0500-0x05FF | 256B  | Game allocation table    |
+ | 0x0600-0x07FF | 512B  | Game directory           |
+ | 0x0800-0x7FFF | 30KB  | Dynamic game data region |
