@@ -75,7 +75,7 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 ### SD-CARD (Builtin)
 1. PC10 (DAT2 - AF12 PU)
 2. PC11 (CD/DAT3 - AF12 PU)
-3. PD2 (CMD - AF12)
+3. PD2 (CMD - AF12 PU)
 4. PC12 (CLK - AF12)
 5. PC8 (DAT0 - AF12 PU)
 6. PC9 (DAT1 - AF12 PU)

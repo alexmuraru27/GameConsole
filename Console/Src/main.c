@@ -7,7 +7,6 @@
 #include "string.h"
 #include "main_menu.h"
 
-bool is_debug_fps = false;
 #define FPS 30
 #define FRAME_PERIOD (1000U / FPS)
 uint32_t s_last_frame_time = 0U;
@@ -24,11 +23,6 @@ static void syncFrame()
     // Busy-wait until it's time for the next frame
     while ((getSysTime() - s_last_frame_time) < FRAME_PERIOD)
       ;
-  }
-  if (is_debug_fps)
-  {
-    debugInt(1000 / (getSysTime() - s_last_frame_time));
-    debugString("\r\n");
   }
   s_last_frame_time = getSysTime(); // Keep consistent frame timing
 }
@@ -47,6 +41,7 @@ int main(void)
 {
   gameConsoleInit();
   mainMenuInit();
+
   while (1)
   {
     update();

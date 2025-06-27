@@ -167,9 +167,6 @@ void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height
     // select display
     gpioSpi1CsLow();
 
-    // init SPI
-    spiInit();
-
     // HW reset
     ili9341Reset();
 

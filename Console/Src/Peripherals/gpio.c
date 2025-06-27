@@ -15,6 +15,11 @@ static void initGpioUsart2()
     GPIOA->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED2_Pos) | (3U << GPIO_OSPEEDR_OSPEED3_Pos);
 }
 
+static void initGpioUsart3()
+{
+    // TODO initGpioUsart3
+}
+
 static void initGpioSpi1()
 {
     // 1. PA5 (SCK - AF5)
@@ -170,12 +175,37 @@ static void initSdio()
     GPIOD->PUPDR |= (1 << 4); // Pull-up (CRITICAL for Black Board)
 }
 
+static void initI2C1()
+{
+    // 1. PB8 (I2C1_SCL - AF4)
+    // 2. PB9 (I2C2_SDA - AF4)
+
+    // Set AF mode
+    GPIOB->MODER &= ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk);
+    GPIOB->MODER |= (2U << GPIO_MODER_MODE8_Pos) | (2U << GPIO_MODER_MODE9_Pos);
+
+    // Very high speed
+    GPIOB->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED8_Pos) | (3U << GPIO_OSPEEDR_OSPEED9_Pos);
+
+    // AF4
+    GPIOB->AFR[1] &= ~(GPIO_AFRH_AFRH0 | GPIO_AFRH_AFRH1);
+    GPIOB->AFR[1] |= ((4U << GPIO_AFRH_AFSEL8_Pos) | (4U << GPIO_AFRH_AFSEL9_Pos));
+
+    // Open drain
+    GPIOB->OTYPER |= (1U << GPIO_OTYPER_OT8_Pos) | (1U << GPIO_OTYPER_OT9_Pos);
+
+    // Pullups
+    GPIOB->PUPDR |= (1U << GPIO_PUPDR_PUPD8_Pos) | (1U << GPIO_PUPDR_PUPD9_Pos);
+}
+
 void gpioInit(void)
 {
     initGpioUsart2();
+    initGpioUsart3();
     initGpioSpi1();
     initGpioJoystick();
     initGpioAdc1();
     initGpioBuzzer();
     initSdio();
+    initI2C1();
 }

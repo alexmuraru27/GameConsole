@@ -15,6 +15,8 @@
 #include "string.h"
 #include "asset_loader.h"
 #include "i2c.h"
+#include "external_eeprom.h"
+#include "spi.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -135,22 +137,29 @@ static void playBootSong()
 static FATFS s_fatfs;
 static void peripheralsInit()
 {
-    dmaInit();
     gpioInit();
+    dmaInit();
     usartInit();
     timerInit();
-    ili9341Init(3U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    spiInit();
     adcInit();
+    i2cInit();
+}
+
+static void devicesInit()
+{
+    ili9341Init(3U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    rendererInit();
     joystickInit();
     buzzerInit();
+    externalEepromInit(EXTERNAL_EEPROM_AT24C256_ADDRESS);
     playBootSong();
-    rendererInit();
-    i2cInit();
     f_mount(&s_fatfs, "0:", 1U);
 }
 
 void gameConsoleInit()
 {
     peripheralsInit();
+    devicesInit();
     gameConsoleExposeApi();
 }

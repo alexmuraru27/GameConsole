@@ -85,7 +85,8 @@
         "gamexo_v_bar.h": "c",
         "gamexo_o.h": "c",
         "game_state_manager.h": "c",
-        "external_eeprom.h": "c"
+        "external_eeprom.h": "c",
+        "i2c.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
