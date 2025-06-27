@@ -5,6 +5,8 @@
 #include "string.h"
 
 FIL s_active_file;
+FILINFO s_active_fileinfo;
+
 bool s_is_file_opened = false;
 
 static bool isBinaryFile(const char *filename)
@@ -71,7 +73,20 @@ uint32_t loaderGetBinaryFilesNumberInDirectory(void)
 
 FIL *loaderGetFile()
 {
-    return &s_active_file;
+    if (s_is_file_opened)
+    {
+        return &s_active_file;
+    }
+    return NULL;
+}
+
+FILINFO *loaderGetFileInfo()
+{
+    if (s_is_file_opened)
+    {
+        return &s_active_fileinfo;
+    }
+    return NULL;
 }
 
 FRESULT loaderCloseFile()
@@ -119,6 +134,7 @@ FRESULT loaderOpenFile(const uint32_t binary_index)
             if (binary_file_index == binary_index)
             {
                 res = f_open(&s_active_file, finfo.fname, FA_READ);
+                s_active_fileinfo = finfo;
                 if (res == FR_OK)
                 {
                     s_is_file_opened = true;

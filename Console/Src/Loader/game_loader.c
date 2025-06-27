@@ -115,6 +115,7 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
         // __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
         void (*game_entry)(void) = (void (*)(void))s_game_header.entry_point;
         game_entry();
+        loaderCloseFile();
 
         // TODO restore OS stack pointer after game return
     }

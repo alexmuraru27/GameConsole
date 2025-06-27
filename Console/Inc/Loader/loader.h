@@ -6,6 +6,7 @@
 
 FRESULT loaderOpenFile(uint32_t binary_index);
 FIL *loaderGetFile();
+FILINFO *loaderGetFileInfo();
 FRESULT loaderCloseFile();
 bool loaderIsFileOpened();
 uint32_t loaderGetMaxFilenameSize(void);
