@@ -63,12 +63,11 @@ typedef struct
 #define DEFINE_ASSET_32(name, asset_id, asset_type, asset_data) \
     _DEFINE_ASSET(name, AssetData32, uint32_t, asset_id, asset_type, asset_data)
 
+#define CONSOLE_SETTINGS_VERSION 1U
 typedef struct
 {
-    uint8_t game_name[12U]; // SFN 8+3 + 1 dot
-    uint16_t size;
-    uint8_t data[];
-} __attribute__((packed)) GameSettings;
+    uint8_t audio_enabled;
+} __attribute__((packed)) ConsoleSettings;
 
 typedef struct
 {

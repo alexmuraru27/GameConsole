@@ -47,6 +47,7 @@ Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
 Src/Network/network.c \
 Src/SettingsStorage/settings_storage.c \
+Src/SettingsStorage/console_settings_storage.c \
 Src/Renderer/renderer.c
 
 # ASM sources
