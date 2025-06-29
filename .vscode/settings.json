@@ -87,7 +87,9 @@
         "game_state_manager.h": "c",
         "external_eeprom.h": "c",
         "i2c.h": "c",
-        "settings_storage.h": "c"
+        "settings_storage.h": "c",
+        "game_binary_header_api.h": "c",
+        "function_interface.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

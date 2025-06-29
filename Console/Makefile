@@ -77,6 +77,7 @@ C_INCLUDES =  \
 -IDrivers/CMSIS/Include \
 -I../Tiles \
 -I../Shared \
+-I../Shared/Api \
 -I../Shared/TileUtils \
 -I../Shared/Esp01s
 

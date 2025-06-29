@@ -40,6 +40,7 @@ C_INCLUDES =  \
 -IAssets/Inc \
 -I../Tiles \
 -I../Shared \
+-I../Shared/Api \
 -I../Shared/TileUtils
 
 
