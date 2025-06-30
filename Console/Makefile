@@ -45,6 +45,7 @@ Src/MainMenu/main_menu.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
+Src/Crc/crc.c \
 Src/Network/network.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
@@ -69,6 +70,7 @@ C_INCLUDES =  \
 -IInc/Devices \
 -IInc/Network \
 -IInc/FatFs \
+-IInc/Crc \
 -IInc/Renderer \
 -IInc/Loader \
 -IInc/MainMenu \

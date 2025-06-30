@@ -89,7 +89,9 @@
         "i2c.h": "c",
         "settings_storage.h": "c",
         "game_binary_header_api.h": "c",
-        "function_interface.h": "c"
+        "function_interface.h": "c",
+        "network_constants.h": "c",
+        "crc.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }
