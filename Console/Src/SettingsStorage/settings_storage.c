@@ -2,6 +2,10 @@
 #include "external_eeprom.h"
 #include "assert.h"
 #include "crc.h"
+#include "string.h"
+#include "stddef.h"
+
+#define SETTINGS_STORAGE_MAGIC_VERSION 0x1234U
 
 #define SETTINGS_STORAGE_TOTAL_SIZE_BYTES 32768U
 #define SETTINGS_STORAGE_TOTAL_SIZE_KB 32U
@@ -35,7 +39,7 @@ static_assert(
 
 typedef enum
 {
-    SETTINGS_DIRECTORY_ATTRIBUTE_DELETED = 0U,
+    SETTINGS_DIRECTORY_ATTRIBUTE_FREE = 0U,
     SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE = 1U,
 } SettingsDirectoryAttribute;
 
@@ -68,46 +72,215 @@ typedef struct
 static_assert(sizeof(SettingsEntity) * SETTINGS_STORAGE_DATA_BLOCKS <= SETTINGS_STORAGE_REGION_SIZE_SETTINGS_DATA, "SettingsEntity * SETTINGS_STORAGE_DATA_BLOCKS  size is not <= SETTINGS_STORAGE_REGION_SIZE_SETTINGS_DATA");
 static_assert(sizeof(SettingsEntity) <= SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS, "SettingsEntity  size is not <= SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS");
 
-SettingsStorageStatus settingsStorageInit(void)
+static SystemHeader s_system_header;
+static bool s_initialized = false;
+
+static SettingsStorageStatus findDirectoryEntry(const uint8_t *const id_name, SettingsDirectoryEntry *const entry, uint16_t *const entry_index)
 {
-    return SETTINGS_STORAGE_OK;
+    SettingsDirectoryEntry temp_entry;
+
+    for (uint16_t i = 0U; i < SETTINGS_STORAGE_DATA_BLOCKS; i++)
+    {
+        const uint16_t addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY + (i * sizeof(SettingsDirectoryEntry));
+
+        if (externalEepromRead(addr, (uint8_t *)&temp_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+        {
+            return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        }
+
+        const uint16_t calculated_crc = crc16_calculate((uint8_t *)&temp_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
+        if (calculated_crc != temp_entry.crc16)
+        {
+            // skip corrupted entries -> there will be a cleanup function
+            continue;
+        }
+
+        if (temp_entry.attributes == SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE &&
+            memcmp(temp_entry.directory_id, id_name, SETTINGS_STORAGE_ID_MAX_SIZE) == 0U)
+        {
+            if (entry != NULL)
+            {
+                *entry = temp_entry;
+            }
+            if (entry_index != NULL)
+            {
+                *entry_index = i;
+            }
+            return SETTINGS_STORAGE_STATUS_OK;
+        }
+    }
+
+    return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+}
+
+static SettingsStorageStatus findFreeDirectorySlot(uint16_t *const slot_index)
+{
+    SettingsDirectoryEntry temp_entry;
+    for (uint16_t i = 0U; i < SETTINGS_STORAGE_DATA_BLOCKS; i++)
+    {
+        const uint16_t addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY + (i * sizeof(SettingsDirectoryEntry));
+
+        if (externalEepromRead(addr, (uint8_t *)&temp_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+        {
+            return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        }
+
+        if (temp_entry.attributes == SETTINGS_DIRECTORY_ATTRIBUTE_FREE)
+        {
+            *slot_index = i;
+            return SETTINGS_STORAGE_STATUS_OK;
+        }
+    }
+
+    return SETTINGS_STORAGE_STATUS_STORAGE_FULL;
+}
+
+SettingsStorageStatus sanityCleanup(void)
+{
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+    uint16_t active_count = 0U;
+
+    for (uint16_t i = 0U; i < SETTINGS_STORAGE_DATA_BLOCKS; i++)
+    {
+        SettingsDirectoryEntry dir_entry;
+
+        const uint16_t dir_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY + (i * sizeof(SettingsDirectoryEntry));
+
+        if (externalEepromRead(dir_addr, (uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+        {
+            return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        }
+
+        if (dir_entry.attributes == SETTINGS_DIRECTORY_ATTRIBUTE_FREE)
+        {
+            continue;
+        }
+
+        bool is_entry_corrupted = false;
+        const uint16_t dir_calculated_crc = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
+        if (dir_calculated_crc != dir_entry.crc16)
+        {
+            is_entry_corrupted = true;
+        }
+        else
+        {
+            SettingsEntity data_entity;
+            const uint16_t data_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DATA + (i * SETTINGS_STORAGE_BLOCK_SIZE);
+
+            if (externalEepromRead(data_addr, (uint8_t *)&data_entity, sizeof(SettingsEntity)) != 0U)
+            {
+                return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+            }
+
+            const uint16_t data_calculated_crc = crc16_calculate((uint8_t *)&data_entity, sizeof(SettingsEntity) - sizeof(uint16_t));
+            if (data_calculated_crc != data_entity.crc16)
+            {
+                is_entry_corrupted = true;
+            }
+        }
+
+        if (is_entry_corrupted)
+        {
+            dir_entry.attributes = SETTINGS_DIRECTORY_ATTRIBUTE_FREE;
+            memset(dir_entry.directory_id, 0U, SETTINGS_STORAGE_ID_MAX_SIZE);
+            dir_entry.crc16 = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
+            if (externalEepromWrite(dir_addr, (uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+            {
+                return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+            }
+
+            SettingsEntity empty_entity;
+            memset(&empty_entity, 0U, sizeof(SettingsEntity));
+            uint16_t data_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DATA + (i * SETTINGS_STORAGE_BLOCK_SIZE);
+            if (externalEepromWrite(data_addr, (uint8_t *)&empty_entity, sizeof(SettingsEntity)) != 0U)
+            {
+                return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+            }
+        }
+        else
+        {
+            active_count++;
+        }
+    }
+
+    s_system_header.version = SETTINGS_STORAGE_MAGIC_VERSION;
+    s_system_header.number_settings = active_count;
+    s_system_header.crc16 = crc16_calculate((uint8_t *)&s_system_header, sizeof(SystemHeader) - sizeof(uint16_t));
+
+    if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER,
+                            (uint8_t *)&s_system_header, sizeof(SystemHeader)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    return SETTINGS_STORAGE_STATUS_OK;
+}
+
+SettingsStorageStatus settingsStorageInit()
+{
+    if (externalEepromRead(SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER, (uint8_t *)&s_system_header, sizeof(SystemHeader)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    const uint16_t calculated_crc = crc16_calculate((uint8_t *)&s_system_header, (sizeof(SystemHeader) - sizeof(uint16_t)));
+    if ((calculated_crc != s_system_header.crc16) || (s_system_header.version != SETTINGS_STORAGE_MAGIC_VERSION))
+    {
+        s_system_header.version = SETTINGS_STORAGE_MAGIC_VERSION;
+        s_system_header.number_settings = 0U;
+        s_system_header.crc16 = crc16_calculate((uint8_t *)&s_system_header,
+                                                sizeof(SystemHeader) - sizeof(uint16_t));
+
+        if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER,
+                                (uint8_t *)&s_system_header, sizeof(SystemHeader)) != 0U)
+        {
+            return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        }
+    }
+
+    s_initialized = true;
+
+    return sanityCleanup();
 }
 
 SettingsStorageStatus settingsStorageClear(void)
 {
     if (externalEepromClear())
     {
-        return SETTINGS_STORAGE_EEPROM_ERROR;
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
     }
-    return SETTINGS_STORAGE_OK;
+    return settingsStorageInit();
 }
 
 SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uint16_t struct_version, const uint8_t *const data, uint16_t size)
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, const uint16_t expected_struct_version, uint8_t *const data, uint16_t *size)
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageGameDelete(const uint8_t *const id_name)
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageConsoleSettingsWrite(const uint16_t struct_version, const uint8_t *const data, const uint16_t size)
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageConsoleSettingsRead(const uint16_t expected_struct_version, uint8_t *const data, uint16_t *const size)
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageConsoleSettingsDelete()
 {
-    return SETTINGS_STORAGE_OK;
+    return SETTINGS_STORAGE_STATUS_OK;
 }
