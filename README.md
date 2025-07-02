@@ -1,6 +1,7 @@
 - [GameConsole](#gameconsole)
   - [Development Board](#development-board)
   - [Hardware needed](#hardware-needed)
+  - [Console board schematic](#console-board-schematic)
   - [Naming Conventions](#naming-conventions)
   - [Pinning](#pinning)
     - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
@@ -37,6 +38,8 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 8. AT24C256 I2C EEPROM module
 9. 1 microSD card FAT32 formatted
 
+## Console board schematic
+ `./HW/Console_Schematic.pdf`
 
 ## Naming Conventions 
 
