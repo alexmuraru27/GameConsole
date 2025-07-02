@@ -1,5 +1,6 @@
 - [GameConsole](#gameconsole)
   - [Development Board](#development-board)
+  - [Hardware needed](#hardware-needed)
   - [Naming Conventions](#naming-conventions)
   - [Pinning](#pinning)
     - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
@@ -24,6 +25,18 @@
 # GameConsole
 ## Development Board
 https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
+
+## Hardware needed
+1. STM32F407VET6 development board
+2. ILI9341 240x320 2.4" SPI display
+3. Passive Buzzer
+4. 10 push buttons
+5. 2 analog joysticks with 2 axes
+6. USB to TTL
+7. ESP-01
+8. AT24C256 I2C EEPROM module
+9. 1 microSD card FAT32 formatted
+
 
 ## Naming Conventions 
 
