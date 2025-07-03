@@ -183,7 +183,7 @@ uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const u
 
 uint8_t externalEepromClear()
 {
-    const uint8_t data[EXTERNAL_EEPROM_AT24C256_PAGE_SIZE] = {0U};
+    uint8_t data[EXTERNAL_EEPROM_AT24C256_PAGE_SIZE] = {0U};
     I2C_Status_t status;
     for (uint16_t i = 0U; i <= EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR / EXTERNAL_EEPROM_AT24C256_PAGE_SIZE; i++)
     {

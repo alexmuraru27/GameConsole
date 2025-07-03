@@ -3,7 +3,6 @@
 #include "stdbool.h"
 #include "stdint.h"
 
-#define SETTINGS_STORAGE_ID_MAX_SIZE 12U
 typedef enum
 {
     SETTINGS_STORAGE_STATUS_OK = 0U,
@@ -19,9 +18,9 @@ SettingsStorageStatus settingsStorageInit(void);
 SettingsStorageStatus settingsStorageClear(void);
 
 // Storage for the games
-SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, uint16_t struct_version, const uint8_t *data, uint16_t size);
-SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, uint16_t expected_struct_version, uint8_t *data, uint16_t *size);
-SettingsStorageStatus settingsStorageGameDelete(const uint8_t *id_name);
+SettingsStorageStatus settingsStorageGameWrite(uint32_t game_identifier, uint16_t struct_version, const uint8_t *data, uint16_t size);
+SettingsStorageStatus settingsStorageGameRead(uint32_t game_identifier, uint16_t expected_struct_version, uint8_t *data, uint16_t *size);
+SettingsStorageStatus settingsStorageGameDelete(uint32_t game_identifier);
 
 // Storage for the console
 SettingsStorageStatus settingsStorageConsoleSettingsWrite(uint16_t struct_version, const uint8_t *data, uint16_t size);

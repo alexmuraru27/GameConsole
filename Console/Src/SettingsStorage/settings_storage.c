@@ -54,9 +54,9 @@ static_assert(sizeof(SystemHeader) <= SETTINGS_STORAGE_REGION_SIZE_SYS_HEADER, "
 
 typedef struct
 {
-    uint8_t directory_id[SETTINGS_STORAGE_ID_MAX_SIZE];
-    uint8_t attributes; // SettingsDirectoryAttribute ENUM (deleted-active)
-    uint16_t crc16;     // directory entry validation
+    uint32_t game_identifier; // uint32_t hash of game? or something unique
+    uint8_t attributes;       // SettingsDirectoryAttribute ENUM (deleted-active)
+    uint16_t crc16;           // directory entry validation
 } __attribute__((packed)) SettingsDirectoryEntry;
 
 static_assert(sizeof(SettingsDirectoryEntry) * SETTINGS_STORAGE_DATA_BLOCKS <= SETTINGS_STORAGE_REGION_SIZE_SETTINGS_DIRECTORY, "SettingsDirectoryEntry * SETTINGS_STORAGE_DATA_BLOCKS  size is not <= SETTINGS_STORAGE_REGION_SIZE_GAME_DIRECTORY");
@@ -75,7 +75,7 @@ static_assert(sizeof(SettingsEntity) == SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SET
 static SystemHeader s_system_header;
 static bool s_initialized = false;
 
-static SettingsStorageStatus findDirectoryEntry(const uint8_t *const id_name, SettingsDirectoryEntry *const entry, uint16_t *const entry_index)
+static SettingsStorageStatus findDirectoryEntry(const uint32_t game_identifier, SettingsDirectoryEntry *const entry, uint16_t *const entry_index)
 {
     SettingsDirectoryEntry temp_entry;
 
@@ -95,11 +95,8 @@ static SettingsStorageStatus findDirectoryEntry(const uint8_t *const id_name, Se
             continue;
         }
 
-        const uint32_t id_name_len = strlen((const char *)id_name);
-        uint16_t max_size = (id_name_len < SETTINGS_STORAGE_ID_MAX_SIZE) ? id_name_len : SETTINGS_STORAGE_ID_MAX_SIZE;
-
         if (temp_entry.attributes == SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE &&
-            memcmp(temp_entry.directory_id, id_name, max_size) == 0U)
+            temp_entry.game_identifier == game_identifier)
         {
             if (entry != NULL)
             {
@@ -188,7 +185,7 @@ SettingsStorageStatus sanityCleanup(void)
         if (is_entry_corrupted)
         {
             dir_entry.attributes = SETTINGS_DIRECTORY_ATTRIBUTE_FREE;
-            memset(dir_entry.directory_id, 0U, SETTINGS_STORAGE_ID_MAX_SIZE);
+            dir_entry.game_identifier = 0U;
             dir_entry.crc16 = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
             if (externalEepromWrite(dir_addr, (uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry)) != 0U)
             {
@@ -258,7 +255,7 @@ SettingsStorageStatus settingsStorageClear(void)
     return settingsStorageInit();
 }
 
-SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uint16_t struct_version, const uint8_t *const data, uint16_t size)
+SettingsStorageStatus settingsStorageGameWrite(const uint32_t game_identifier, const uint16_t struct_version, const uint8_t *const data, uint16_t size)
 {
     if (!s_initialized)
     {
@@ -271,7 +268,7 @@ SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uin
     }
 
     uint16_t existing_slot;
-    SettingsStorageStatus status = findDirectoryEntry(id_name, NULL, &existing_slot);
+    SettingsStorageStatus status = findDirectoryEntry(game_identifier, NULL, &existing_slot);
 
     uint16_t slot_index;
     if (status == SETTINGS_STORAGE_STATUS_OK)
@@ -313,7 +310,7 @@ SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uin
     }
 
     SettingsDirectoryEntry dir_entry;
-    memcpy(dir_entry.directory_id, id_name, SETTINGS_STORAGE_ID_MAX_SIZE);
+    dir_entry.game_identifier = game_identifier;
     dir_entry.attributes = SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE;
     dir_entry.crc16 = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
 
@@ -326,7 +323,7 @@ SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uin
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
-SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, const uint16_t expected_struct_version, uint8_t *const data, uint16_t *size)
+SettingsStorageStatus settingsStorageGameRead(const uint32_t game_identifier, const uint16_t expected_struct_version, uint8_t *const data, uint16_t *size)
 {
     if (!s_initialized)
     {
@@ -334,7 +331,7 @@ SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, const uint
     }
 
     uint16_t slot_index;
-    SettingsStorageStatus status = findDirectoryEntry(id_name, NULL, &slot_index);
+    SettingsStorageStatus status = findDirectoryEntry(game_identifier, NULL, &slot_index);
     if (status != SETTINGS_STORAGE_STATUS_OK)
     {
         return status;
@@ -364,7 +361,7 @@ SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, const uint
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
-SettingsStorageStatus settingsStorageGameDelete(const uint8_t *const id_name)
+SettingsStorageStatus settingsStorageGameDelete(const uint32_t game_identifier)
 {
     if (!s_initialized)
     {
@@ -373,7 +370,7 @@ SettingsStorageStatus settingsStorageGameDelete(const uint8_t *const id_name)
 
     SettingsDirectoryEntry dir_entry;
     uint16_t slot_index;
-    SettingsStorageStatus status = findDirectoryEntry(id_name, &dir_entry, &slot_index);
+    SettingsStorageStatus status = findDirectoryEntry(game_identifier, &dir_entry, &slot_index);
     if (status != SETTINGS_STORAGE_STATUS_OK)
     {
         return status;
