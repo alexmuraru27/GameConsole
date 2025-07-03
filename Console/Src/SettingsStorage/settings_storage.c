@@ -257,6 +257,69 @@ SettingsStorageStatus settingsStorageClear(void)
 
 SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uint16_t struct_version, const uint8_t *const data, uint16_t size)
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+
+    if (size > MAX_DATA_SIZE)
+    {
+        return SETTINGS_STORAGE_STATUS_STORAGE_FULL;
+    }
+
+    uint16_t existing_slot;
+    SettingsStorageStatus status = findDirectoryEntry(id_name, NULL, &existing_slot);
+
+    uint16_t slot_index;
+    if (status == SETTINGS_STORAGE_STATUS_OK)
+    {
+        slot_index = existing_slot;
+    }
+    else if (status == SETTINGS_STORAGE_STATUS_NOT_FOUND)
+    {
+        status = findFreeDirectorySlot(&slot_index);
+        if (status != SETTINGS_STORAGE_STATUS_OK)
+        {
+            return status;
+        }
+
+        s_system_header.number_settings++;
+        s_system_header.crc16 = crc16_calculate((uint8_t *)&s_system_header, sizeof(SystemHeader) - sizeof(uint16_t));
+
+        if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER,
+                                (uint8_t *)&s_system_header, sizeof(SystemHeader)) != 0U)
+        {
+            return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        }
+    }
+    else
+    {
+        return status;
+    }
+
+    SettingsEntity entity;
+    entity.version = struct_version;
+    entity.data_size = size;
+    memcpy(entity.data, data, size);
+    entity.crc16 = crc16_calculate((uint8_t *)&entity, sizeof(SettingsEntity) - sizeof(uint16_t));
+
+    const uint16_t data_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DATA + (slot_index * SETTINGS_STORAGE_BLOCK_SIZE);
+    if (externalEepromWrite(data_addr, (uint8_t *)&entity, sizeof(SettingsEntity)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    SettingsDirectoryEntry dir_entry;
+    memcpy(dir_entry.directory_id, id_name, SETTINGS_STORAGE_ID_MAX_SIZE);
+    dir_entry.attributes = SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE;
+    dir_entry.crc16 = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
+
+    const uint16_t dir_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY + (slot_index * sizeof(SettingsDirectoryEntry));
+    if (externalEepromWrite(dir_addr, (uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
