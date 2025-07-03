@@ -15,7 +15,7 @@
 // 0x0200-0x03FF   | 512B  | Settings directory
 // 0x0400-0x07FF   | 1024B | Console settings
 // 0x0800-0x7FFF   | 30KB  | Settings data region
-#define MAX_DATA_SIZE 1014U
+#define MAX_DATA_SIZE 1018U
 
 #define SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER 0U
 #define SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY 0x0200
@@ -70,7 +70,7 @@ typedef struct
 } __attribute__((packed)) SettingsEntity;
 
 static_assert(sizeof(SettingsEntity) * SETTINGS_STORAGE_DATA_BLOCKS <= SETTINGS_STORAGE_REGION_SIZE_SETTINGS_DATA, "SettingsEntity * SETTINGS_STORAGE_DATA_BLOCKS  size is not <= SETTINGS_STORAGE_REGION_SIZE_SETTINGS_DATA");
-static_assert(sizeof(SettingsEntity) <= SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS, "SettingsEntity  size is not <= SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS");
+static_assert(sizeof(SettingsEntity) == SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS, "SettingsEntity  size is not = SETTINGS_STORAGE_REGION_SIZE_CONSOLE_SETTINGS");
 
 static SystemHeader s_system_header;
 static bool s_initialized = false;
@@ -95,8 +95,11 @@ static SettingsStorageStatus findDirectoryEntry(const uint8_t *const id_name, Se
             continue;
         }
 
+        const uint32_t id_name_len = strlen((const char *)id_name);
+        uint16_t max_size = (id_name_len < SETTINGS_STORAGE_ID_MAX_SIZE) ? id_name_len : SETTINGS_STORAGE_ID_MAX_SIZE;
+
         if (temp_entry.attributes == SETTINGS_DIRECTORY_ATTRIBUTE_ACTIVE &&
-            memcmp(temp_entry.directory_id, id_name, SETTINGS_STORAGE_ID_MAX_SIZE) == 0U)
+            memcmp(temp_entry.directory_id, id_name, max_size) == 0U)
         {
             if (entry != NULL)
             {

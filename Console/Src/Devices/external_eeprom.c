@@ -1,6 +1,7 @@
 #include "external_eeprom.h"
 #include "i2c.h"
 #include "sysclock.h"
+#include "stddef.h"
 
 static uint32_t s_device_address = 0U;
 
@@ -9,9 +10,9 @@ void externalEepromInit(const uint32_t device_address)
     s_device_address = device_address;
 }
 
-uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
+static uint8_t externalEepromWritePage(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
 {
-    if (mem_addr > EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR)
+    if (data == NULL || length == 0U || length > EXTERNAL_EEPROM_AT24C256_PAGE_SIZE)
     {
         return I2C_ERROR;
     }
@@ -46,7 +47,7 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const 
         return status;
     }
 
-    // send data
+    // send data (max 64 bytes per page)
     for (uint16_t i = 0U; i < length; i++)
     {
         status = i2cWrite(data[i]);
@@ -58,9 +59,48 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const 
     }
 
     i2cStop();
+    return I2C_OK;
+}
 
-    // delay as per message catalog Write Cycle Time (tWR): 5ms maximum
-    delay(5U);
+uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
+{
+    if (data == NULL || length == 0U || mem_addr > EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR)
+    {
+        return I2C_ERROR;
+    }
+
+    uint16_t bytes_written = 0U;
+    uint16_t current_addr = mem_addr;
+
+    while (bytes_written < length)
+    {
+        // calculate bytes per page
+        const uint16_t page_offset = current_addr % EXTERNAL_EEPROM_AT24C256_PAGE_SIZE;
+        const uint16_t bytes_remaining_in_page = EXTERNAL_EEPROM_AT24C256_PAGE_SIZE - page_offset;
+        const uint16_t bytes_remaining_total = length - bytes_written;
+        const uint16_t bytes_to_write = (bytes_remaining_total < bytes_remaining_in_page) ? bytes_remaining_total : bytes_remaining_in_page;
+
+        // write in this page
+        uint8_t status = I2C_OK;
+        if (bytes_to_write > 0U)
+        {
+            status = externalEepromWritePage(current_addr,
+                                             &data[bytes_written],
+                                             bytes_to_write);
+        }
+
+        if (status != I2C_OK)
+        {
+            return status;
+        }
+
+        bytes_written += bytes_to_write;
+        current_addr += bytes_to_write;
+
+        // delay as per message catalog Write Cycle Time (tWR): 5ms maximum
+        delay(5U);
+    }
+
     return I2C_OK;
 }
 
