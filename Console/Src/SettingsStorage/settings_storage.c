@@ -325,11 +325,78 @@ SettingsStorageStatus settingsStorageGameWrite(const uint8_t *id_name, const uin
 
 SettingsStorageStatus settingsStorageGameRead(const uint8_t *id_name, const uint16_t expected_struct_version, uint8_t *const data, uint16_t *size)
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+
+    uint16_t slot_index;
+    SettingsStorageStatus status = findDirectoryEntry(id_name, NULL, &slot_index);
+    if (status != SETTINGS_STORAGE_STATUS_OK)
+    {
+        return status;
+    }
+
+    SettingsEntity entity;
+    const uint16_t data_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DATA + (slot_index * SETTINGS_STORAGE_BLOCK_SIZE);
+    if (externalEepromRead(data_addr, (uint8_t *)&entity, sizeof(SettingsEntity)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    const uint16_t calculated_crc = crc16_calculate((uint8_t *)&entity, sizeof(SettingsEntity) - sizeof(uint16_t));
+    if (calculated_crc != entity.crc16)
+    {
+        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
+    }
+
+    if (entity.version != expected_struct_version)
+    {
+        return SETTINGS_STORAGE_STATUS_STRUCT_VERSION_MISMATCH;
+    }
+
+    memcpy(data, entity.data, entity.data_size);
+    *size = entity.data_size;
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageGameDelete(const uint8_t *const id_name)
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+
+    SettingsDirectoryEntry dir_entry;
+    uint16_t slot_index;
+    SettingsStorageStatus status = findDirectoryEntry(id_name, &dir_entry, &slot_index);
+    if (status != SETTINGS_STORAGE_STATUS_OK)
+    {
+        return status;
+    }
+
+    dir_entry.attributes = SETTINGS_DIRECTORY_ATTRIBUTE_FREE;
+    dir_entry.crc16 = crc16_calculate((uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry) - sizeof(uint16_t));
+
+    const uint16_t dir_addr = SETTINGS_STORAGE_EEPROM_ADDR_START_GAME_DIRECTORY + (slot_index * sizeof(SettingsDirectoryEntry));
+    if (externalEepromWrite(dir_addr, (uint8_t *)&dir_entry, sizeof(SettingsDirectoryEntry)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    if (s_system_header.number_settings > 0U)
+    {
+        s_system_header.number_settings--;
+    }
+    s_system_header.crc16 = crc16_calculate((uint8_t *)&s_system_header, sizeof(SystemHeader) - sizeof(uint16_t));
+
+    if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_SYS_HEADER,
+                            (uint8_t *)&s_system_header, sizeof(SystemHeader)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
