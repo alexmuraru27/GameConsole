@@ -402,15 +402,76 @@ SettingsStorageStatus settingsStorageGameDelete(const uint8_t *const id_name)
 
 SettingsStorageStatus settingsStorageConsoleSettingsWrite(const uint16_t struct_version, const uint8_t *const data, const uint16_t size)
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+
+    if (size > MAX_DATA_SIZE)
+    {
+        return SETTINGS_STORAGE_STATUS_STORAGE_FULL;
+    }
+
+    SettingsEntity entity;
+    entity.version = struct_version;
+    entity.data_size = size;
+    memcpy(entity.data, data, size);
+    entity.crc16 = crc16_calculate((uint8_t *)&entity, sizeof(SettingsEntity) - sizeof(uint16_t));
+
+    if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_CONSOLE_SETTINGS,
+                            (uint8_t *)&entity, sizeof(SettingsEntity)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageConsoleSettingsRead(const uint16_t expected_struct_version, uint8_t *const data, uint16_t *const size)
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+    SettingsEntity entity;
+    if (externalEepromRead(SETTINGS_STORAGE_EEPROM_ADDR_START_CONSOLE_SETTINGS,
+                           (uint8_t *)&entity, sizeof(SettingsEntity)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
+    uint16_t calculated_crc = crc16_calculate((uint8_t *)&entity, sizeof(SettingsEntity) - sizeof(uint16_t));
+    if (calculated_crc != entity.crc16)
+    {
+        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
+    }
+
+    if (entity.version != expected_struct_version)
+    {
+        return SETTINGS_STORAGE_STATUS_STRUCT_VERSION_MISMATCH;
+    }
+
+    memcpy(data, entity.data, entity.data_size);
+    *size = entity.data_size;
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
 
 SettingsStorageStatus settingsStorageConsoleSettingsDelete()
 {
+    if (!s_initialized)
+    {
+        return SETTINGS_STORAGE_STATUS_NOT_FOUND;
+    }
+
+    SettingsEntity entity;
+    memset(&entity, 0U, sizeof(SettingsEntity));
+
+    if (externalEepromWrite(SETTINGS_STORAGE_EEPROM_ADDR_START_CONSOLE_SETTINGS,
+                            (uint8_t *)&entity, sizeof(SettingsEntity)) != 0U)
+    {
+        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+    }
+
     return SETTINGS_STORAGE_STATUS_OK;
 }
