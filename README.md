@@ -39,7 +39,9 @@ https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 9. 1 microSD card FAT32 formatted
 
 ## Console board schematic
- `./HW/Console_Schematic.pdf`
+Hardware design resources  `./HW/`
+
+![PCB Design](HW/PCB_DESIGN.png)
 
 ## Naming Conventions 
 
