@@ -11,7 +11,7 @@
     - [GPIO (Button Joysticks)](#gpio-button-joysticks)
     - [SD-CARD (Builtin)](#sd-card-builtin)
     - [I2C1 EEPROM Console Settings Storage](#i2c1-eeprom-console-settings-storage)
-    - [USART3 (Network Communication - Baud 921600)](#usart3-network-communication---baud-921600)
+    - [ESP01 - USART3 (Network Communication - Baud 921600)](#esp01---usart3-network-communication---baud-921600)
   - [Tile Creator](#tile-creator)
     - [Script](#script)
     - [Deps](#deps)
@@ -99,15 +99,19 @@ Hardware design resources  `./HW/`
 4. PC12 (CLK - AF12)
 5. PC8 (DAT0 - AF12 PU)
 6. PC9 (DAT1 - AF12 PU)
+7. PD3 (SD card detected - PU)
 
 ### I2C1 EEPROM Console Settings Storage
 1. PB8 (I2C1_SCL - AF4 PU)
 2. PB9 (I2C2_SDA - AF4 PU)
 
-### USART3 (Network Communication - Baud 921600) 
-1. PD8 (TX - AF7)
-2. PD9 (RX - AF7)
-3. PD10 (EN\ ESP8266)
+### ESP01 - USART3 (Network Communication - Baud 921600) 
+1. PD8 (TX - AF7) - USART3
+2. PD9 (RX - AF7) - USART3
+3. PD10 (EN\ ESP8266 - normal GPIO)
+4. PB10 (RST - normal GPIO)
+5. PC6 (IO 0 - normal GPIO)
+6. PC13 (IO 2 - normal GPIO)
 
 ## Tile Creator
 
