@@ -9,6 +9,7 @@
   - [SD-CARD (Builtin)](#sd-card-builtin)
   - [I2C1 EEPROM Console Settings Storage](#i2c1-eeprom-console-settings-storage)
   - [ESP01 - USART3 (Network Communication - Baud 921600)](#esp01---usart3-network-communication---baud-921600)
+- [EEPROM address](#eeprom-address)
 
 ## Hardware needed
 1. STM32F407VET6 development board
@@ -80,3 +81,8 @@ Hardware design resources  `projectRoot/docu/HW/`
 4. PB10 (RST - normal GPIO)
 5. PC6 (IO 0 - normal GPIO)
 6. PC13 (IO 2 - normal GPIO)
+
+
+
+## EEPROM address
+AT24C256_ADDRESS 0x50U (80)
