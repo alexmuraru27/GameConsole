@@ -22,9 +22,9 @@
 9. 1 microSD card reader and microSD card FAT32 formatted
 
 ## Console board schematic
-Hardware design resources  `./docu/HW/`
+Hardware design resources  `projectRoot/docu/HW/`
 
-![PCB Design](docu/HW/PCB_DESIGN.png)
+![PCB Design](HW/PCB_DESIGN.png)
 
 ## Pinning
 ### USART2 (Debug Interface - Baud 921600) 
