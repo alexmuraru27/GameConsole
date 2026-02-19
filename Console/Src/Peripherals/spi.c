@@ -1,4 +1,4 @@
-#include "SPI.h"
+#include "spi.h"
 #include "stm32f407xx.h"
 
 void spiInit(void)

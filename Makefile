@@ -14,7 +14,9 @@ all: $(BUILD_DIR)
 
 flash:  $(BUILD_DIR)
 	$(MAKE) -C Console flash
-	$(MAKE) -C GameXO deploy SD_DRIVE=/i
+
+deploy: $(BUILD_DIR)
+	$(MAKE) -C GameXO deploy
 
 $(BUILD_DIR):
 	mkdir $@		

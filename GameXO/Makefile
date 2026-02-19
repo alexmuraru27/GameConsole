@@ -106,9 +106,9 @@ flash: $(BUILD_DIR)/$(TARGET).elf
 
 
 deploy: $(BUILD_DIR)/$(TARGET).bin
-	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_DRIVE)/
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_CARD_PATH)/
 	sync
-	@echo "$(TARGET).bin copied to SD card $(SD_DRIVE)"
+	@echo "$(TARGET).bin copied to SD card $(SD_CARD_PATH)"
 #######################################
 # clean up
 #######################################

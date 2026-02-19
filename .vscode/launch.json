@@ -19,8 +19,8 @@
             "type": "cortex-debug",
             "servertype": "openocd",
             "configFiles": [
-                "C:/openocd/scripts/interface/stlink.cfg",
-                "C:/openocd/scripts/target/stm32f4x.cfg"
+                "interface/stlink.cfg",
+                "target/stm32f4x.cfg"
             ],
             "searchDir": [],
             "runToEntryPoint": "main",

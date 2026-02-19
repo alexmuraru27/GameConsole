@@ -1,9 +1,13 @@
+######################################
+# GAME_DEPLOY_DIR
+######################################
+SD_CARD_PATH = /mnt/sd
 
 ######################################
 # OPENOCD
 ######################################
-OPENOCD = "C:/openocd/bin/openocd.exe"
-OPENOCD_CFG = -f C:/openocd/scripts/interface/stlink.cfg -f C:/openocd/scripts/target/stm32f4x.cfg
+OPENOCD = "openocd"
+OPENOCD_CFG = -f interface/stlink.cfg -f target/stm32f4x.cfg
 
 ######################################
 # building variables
