@@ -17,12 +17,3 @@ void swoInit(uint32_t swoFreqHz)
 
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
-
-int _write(int file, char *ptr, int len)
-{
-    for (int i = 0; i < len; i++)
-    {
-        ITM_SendChar(*ptr++);
-    }
-    return len;
-}

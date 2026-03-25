@@ -29,6 +29,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/times.h>
+#include <stm32f407xx.h>
 
 /* Variables */
 extern int __io_putchar(int ch) __attribute__((weak));
@@ -76,14 +77,11 @@ __attribute__((weak)) int _read(int file, char *ptr, int len)
   return len;
 }
 
-__attribute__((weak)) int _write(int file, char *ptr, int len)
+int _write(int file, char *ptr, int len)
 {
-  (void)file;
-  int DataIdx;
-
-  for (DataIdx = 0; DataIdx < len; DataIdx++)
+  for (int i = 0; i < len; i++)
   {
-    __io_putchar(*ptr++);
+    ITM_SendChar(*ptr++);
   }
   return len;
 }
