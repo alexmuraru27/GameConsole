@@ -1,7 +1,6 @@
 - [Hardware needed](#hardware-needed)
 - [Console board schematic](#console-board-schematic)
 - [Pinning](#pinning)
-  - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
   - [TIM3 (Audio/Buzzer)](#tim3-audiobuzzer)
   - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
   - [GPIO (Button Joysticks)](#gpio-button-joysticks)
@@ -27,9 +26,6 @@ Hardware design resources  `projectRoot/docu/HW/`
 ![PCB Design](HW/PCB_DESIGN.png)
 
 ## Pinning
-### USART2 (Debug Interface - Baud 921600) 
-1. PA2 (TX - AF7)
-2. PA3 (RX - AF7)
 
 ### TIM3 (Audio/Buzzer)
 1. PB5 (TIM3_CH2 - AF2)

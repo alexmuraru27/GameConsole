@@ -1,7 +1,7 @@
 #include "diskio_integration.h"
 #include "sdio.h"
 #include "sysclock.h"
-#include "usart.h"
+#include "stdio.h"
 
 #define SECTOR_SIZE 512
 #define FAT32_SIGNATURE 0xAA55
@@ -128,15 +128,15 @@ uint8_t sdReadSingleBlock(uint32_t block_addr, uint8_t *buffer)
         {
             if (status & SDIO_STA_DTIMEOUT)
             {
-                debugString("SDIO timeout\r\n");
+                printf("SDIO timeout\r\n");
             }
             if (status & SDIO_STA_DCRCFAIL)
             {
-                debugString("SDIO CRC fail\r\n");
+                printf("SDIO CRC fail\r\n");
             }
             if (status & SDIO_STA_RXOVERR)
             {
-                debugString("SDIO RX overrun\r\n");
+                printf("SDIO RX overrun\r\n");
             }
             return SD_ERROR;
         }
@@ -177,7 +177,7 @@ uint8_t sdReadSingleBlock(uint32_t block_addr, uint8_t *buffer)
 
     if (timeout == 0)
     {
-        debugString("Read timeout\r\n");
+        printf("Read timeout\r\n");
         return SD_TIMEOUT;
     }
 

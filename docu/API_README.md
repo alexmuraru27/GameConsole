@@ -73,12 +73,6 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - `getSysTime()`: Returns system uptime in ms.
 - `delay(ms)`: Busy-wait delay.
 
-### Debug/USART
-- `debugChar(char)`: Send a character over debug UART.
-- `debugString(const char*)`: Send a string over debug UART.
-- `debugInt(int)`: Send an integer as text.
-- `debugHex(uint8_t)`: Send a byte as hex.
-- `debugBinary(uint8_t)`: Send a byte as binary.
 
 ### Sound (Buzzer)
 - `buzzerGetMaxTracks()`: Get number of sound tracks.

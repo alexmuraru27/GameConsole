@@ -7,13 +7,6 @@ typedef struct
     uint32_t (*getSysTime)(void);
     void (*delay)(uint32_t sys_time_delta);
 
-    // USART DEBUG
-    void (*debugChar)(char c);
-    void (*debugString)(const char *str);
-    void (*debugInt)(uint32_t num);
-    void (*debugHex)(uint32_t num);
-    void (*debugBinary)(uint32_t num, uint8_t width);
-
     // SOUND
     uint8_t (*buzzerGetMaxTracks)();
     bool (*buzzerPlay)(uint8_t track_number, bool is_looped, const uint16_t *const frequencies_hz, const uint16_t *const durations_ms, uint16_t notes_number);

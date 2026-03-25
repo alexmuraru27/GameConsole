@@ -1,6 +1,5 @@
 #include <stm32f407xx.h>
 #include "sysclock.h"
-#include "usart.h"
 #include "renderer.h"
 #include "game_console.h"
 #include "stddef.h"

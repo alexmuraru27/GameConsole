@@ -2,6 +2,7 @@
 #include "assets.h"
 #include "game_state_manager.h"
 #include "sound.h"
+#include "stdio.h"
 
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
 #define FPS 30
@@ -18,8 +19,8 @@ static void syncFrame()
     }
     if (is_debug_fps)
     {
-        api_hdr_ptr->api.debugInt(1000 / (api_hdr_ptr->api.getSysTime() - s_last_frame_time));
-        api_hdr_ptr->api.debugString("\r\n");
+        printf("%lu", 1000 / (api_hdr_ptr->api.getSysTime() - s_last_frame_time));
+        printf("\r\n");
     }
     s_last_frame_time = api_hdr_ptr->api.getSysTime();
 }

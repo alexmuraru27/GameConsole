@@ -1,6 +1,6 @@
 #include "test_buzzer.h"
 #include "buzzer.h"
-#include "usart.h"
+#include "stdio.h"
 
 uint16_t melody[] = {
     NOTE_E7, NOTE_E7, 0, NOTE_E7,
@@ -159,14 +159,14 @@ uint16_t explosion_durations[] = {
 
 void track0FinishedCallback()
 {
-    debugString("track0FinishedCallback\r\n");
+    printf("track0FinishedCallback\r\n");
 }
 
 bool isTrack1Playing = false;
 void track1FinishedCallback()
 {
     isTrack1Playing = false;
-    debugString("track1FinishedCallback\r\n");
+    printf("track1FinishedCallback\r\n");
 }
 
 void testBuzzerTrack0(void)

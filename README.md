@@ -112,7 +112,7 @@ To create a new game for the GameConsole platform, follow these steps:
      ```
    - This allows you to call any API function, e.g.:
      ```c
-     api_hdr_ptr->api.debugString("Hello from my game!\r\n");
+     printf("Hello from my game!\r\n");
      ```
 
 4. **Define the Game Header**
@@ -160,7 +160,7 @@ To create a new game for the GameConsole platform, follow these steps:
   {
       if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
       {
-          api_hdr_ptr->api.debugString("Hello from GameXO :D\r\n");
+          printf("Hello from GameXO :D\r\n");
       }
   }
 

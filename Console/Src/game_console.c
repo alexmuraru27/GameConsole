@@ -30,12 +30,6 @@ static void gameConsoleExposeApi()
             .getSysTime = &getSysTime,
             .delay = &delay,
 
-            // USART DEBUG
-            .debugChar = &debugChar,
-            .debugString = &debugString,
-            .debugInt = &debugInt,
-            .debugHex = &debugHex,
-            .debugBinary = &debugBinary,
             // SOUND
             .buzzerGetMaxTracks = &buzzerGetMaxTracks,
             .buzzerPlay = &buzzerPlay,

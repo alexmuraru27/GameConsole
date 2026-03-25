@@ -7,7 +7,6 @@
 #include "string.h"
 #include "joystick.h"
 #include "sysclock.h"
-#include "usart.h"
 
 #define FONT_PALETTE_IDX 1U
 #define FONT_CHAR_PALETTE '0'
