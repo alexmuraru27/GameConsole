@@ -2,7 +2,7 @@
 - [Console board schematic](#console-board-schematic)
 - [Pinning](#pinning)
   - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
-  - [DAC (Audio)](#dac-audio)
+  - [TIM3 (Audio/Buzzer)](#tim3-audiobuzzer)
   - [SPI1 (Display ILI9341)](#spi1-display-ili9341)
   - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
   - [GPIO (Button Joysticks)](#gpio-button-joysticks)
@@ -32,9 +32,9 @@ Hardware design resources  `projectRoot/docu/HW/`
 1. PA2 (TX - AF7)
 2. PA3 (RX - AF7)
 
-### DAC (Audio) 
-1. PA4 (DAC1_OUT - Buzzer)
-   
+### TIM3 (Audio/Buzzer)
+1. PB5 (TIM3_CH2 - AF2)
+
 ### SPI1 (Display ILI9341) 
 1. PA5 (SCK - AF5)  - Yellow
 2. PA6 (MISO - AF5) - Red
@@ -72,7 +72,7 @@ Hardware design resources  `projectRoot/docu/HW/`
 
 ### I2C1 EEPROM Console Settings Storage
 1. PB8 (I2C1_SCL - AF4 PU)
-2. PB9 (I2C2_SDA - AF4 PU)
+2. PB9 (I2C1_SDA - AF4 PU)
 
 ### ESP01 - USART3 (Network Communication - Baud 921600) 
 1. PD8 (TX - AF7) - USART3
