@@ -26,7 +26,6 @@ Src/Peripherals/sysclock.c \
 Src/Peripherals/usart.c \
 Src/Peripherals/gpio.c \
 Src/Peripherals/dma.c \
-Src/Peripherals/spi.c \
 Src/Peripherals/timer.c \
 Src/Peripherals/adc.c \
 Src/Peripherals/sdio.c \

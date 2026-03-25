@@ -217,7 +217,7 @@ The `Console` directory is organized into several submodules, each with its own 
 - **Purpose:** Asset and game loading from storage. Handles asset metadata, data transfer, and game selection.
 
 ### Peripherals
-- **Files:** `adc.[ch]`, `dma.[ch]`, `gpio.[ch]`, `sdio.[ch]`, `spi.[ch]`, `sysclock.[ch]`, `timer.[ch]`, `usart.[ch]`
+- **Files:** `adc.[ch]`, `dma.[ch]`, `gpio.[ch]`, `sdio.[ch]`, `sysclock.[ch]`, `timer.[ch]`, `usart.[ch]`
 - **Purpose:** Abstraction for microcontroller peripherals. Used by higher-level modules for hardware access.
 
 ### FatFs

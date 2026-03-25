@@ -16,7 +16,6 @@
 #include "asset_loader.h"
 #include "i2c.h"
 #include "external_eeprom.h"
-#include "spi.h"
 #include "settings_storage.h"
 #include "swo.h"
 
@@ -144,7 +143,6 @@ static void peripheralsInit()
     dmaInit();
     usartInit();
     timerInit();
-    spiInit();
     adcInit();
     i2cInit();
 }

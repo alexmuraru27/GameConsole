@@ -7,10 +7,6 @@
 //  -    USART2_RX: Ch4 S5
 //  -    USART2_TX: Ch4 S6
 
-// SPI1 DMA2
-//  -    TX:  Ch3 S5
-//  -    RX:  Ch3 S2
-
 // SDIO DMA2: Ch4 S3
 
 // ADC1 DMA2: Ch0, S0

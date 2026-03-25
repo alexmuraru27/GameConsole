@@ -1,5 +1,4 @@
 #include "ILI9341.h"
-#include "spi.h"
 #include "stm32f407xx.h"
 #include "sysclock.h"
 #include "stdbool.h"
@@ -42,42 +41,48 @@ static uint16_t s_window_y_offset;
 
 static void ili9341Reset()
 {
-    gpioSpi1RstLow();
-    delay(1);
-    gpioSpi1RstHigh();
+    // TODO FSMC display
+    // gpioSpi1RstLow();
+    // delay(1);
+    // gpioSpi1RstHigh();
 }
 
 static void setDCtoCommandMode()
 {
-    while (SPI1->SR & SPI_SR_BSY)
-        ;
-    gpioSpi1DcLow();
+    // TODO FSMC display
+    // while (SPI1->SR & SPI_SR_BSY)
+    //     ;
+    // gpioSpi1DcLow();
 }
 
 static void setDCtoDataMode()
 {
-    while (SPI1->SR & SPI_SR_BSY)
-        ;
-    gpioSpi1DcHigh();
+    // TODO FSMC display
+    // while (SPI1->SR & SPI_SR_BSY)
+    //     ;
+    // gpioSpi1DcHigh();
 }
 
 static void ili9341WriteCommand(uint8_t cmd)
 {
-    setDCtoCommandMode();
-    spiWrite(cmd);
+    // TODO FSMC display
+    // setDCtoCommandMode();
+    // spiWrite(cmd);
 }
 
 static void ili9341WriteDataBuffer(uint8_t *buff, uint32_t buff_size)
 {
-    for (uint32_t i = 0U; i < buff_size; ++i)
-    {
-        spiWrite(buff[i]);
-    }
+    // TODO FSMC display
+    // for (uint32_t i = 0U; i < buff_size; ++i)
+    // {
+    //     spiWrite(buff[i]);
+    // }
 }
 
 static void ili9341WriteData(uint8_t data)
 {
-    spiWrite(data);
+    // TODO FSMC display
+    // spiWrite(data);
 }
 
 static void ili9341SetAddrWindowScreen(const uint16_t x1, const uint16_t y1, const uint16_t w,
@@ -165,7 +170,8 @@ void ili9341FillScreen(uint16_t color)
 void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height)
 {
     // select display
-    gpioSpi1CsLow();
+    // TODO FSMC display
+    // gpioSpi1CsLow();
 
     // HW reset
     ili9341Reset();

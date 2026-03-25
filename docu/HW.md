@@ -3,7 +3,6 @@
 - [Pinning](#pinning)
   - [USART2 (Debug Interface - Baud 921600)](#usart2-debug-interface---baud-921600)
   - [TIM3 (Audio/Buzzer)](#tim3-audiobuzzer)
-  - [SPI1 (Display ILI9341)](#spi1-display-ili9341)
   - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
   - [GPIO (Button Joysticks)](#gpio-button-joysticks)
   - [SD-CARD (Builtin)](#sd-card-builtin)
@@ -13,7 +12,7 @@
 
 ## Hardware needed
 1. STM32F407VET6 development board
-2. ILI9341 240x320 2.4" SPI display
+2. ILI9341 240x320 3.2" FSMC 16bit 8080 display 
 3. Passive Buzzer
 4. 10 push buttons
 5. 2 analog joysticks with 2 axes
@@ -34,14 +33,6 @@ Hardware design resources  `projectRoot/docu/HW/`
 
 ### TIM3 (Audio/Buzzer)
 1. PB5 (TIM3_CH2 - AF2)
-
-### SPI1 (Display ILI9341) 
-1. PA5 (SCK - AF5)  - Yellow
-2. PA6 (MISO - AF5) - Red
-3. PA7 (MOSI - AF5) - Green
-4. PA9 (DC - Normal GPIO AF) - Blue
-5. PC7 (RST - Normal GPIO AF)- Purple
-6. PB6 (CS - Normal GPIO AF) - Gray
 
 ### ADC1 (Analog Joysticks)
 1. PC0 (ADC123_IN10 - Left Joystick X axis)
