@@ -6,6 +6,7 @@
 #include "stddef.h"
 #include "string.h"
 #include "main_menu.h"
+#include "stdio.h"
 
 #define FPS 30
 #define FRAME_PERIOD (1000U / FPS)
@@ -42,8 +43,15 @@ int main(void)
   gameConsoleInit();
   mainMenuInit();
 
+  printf("Boot OK\n");
+  int i = 0;
   while (1)
   {
+    if (i % 200)
+    {
+      printf("Sync %d\n", i);
+    }
+    i++;
     update();
     render();
 

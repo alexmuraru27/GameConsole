@@ -18,6 +18,7 @@
 #include "external_eeprom.h"
 #include "spi.h"
 #include "settings_storage.h"
+#include "swo.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -138,6 +139,7 @@ static void playBootSong()
 static FATFS s_fatfs;
 static void peripheralsInit()
 {
+    swoInit(1000000);
     gpioInit();
     dmaInit();
     usartInit();

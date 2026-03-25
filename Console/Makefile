@@ -49,6 +49,7 @@ Src/Crc/crc.c \
 Src/Network/network.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
+Src/Swo/swo.c \
 Src/Renderer/renderer.c
 
 # ASM sources
@@ -74,6 +75,7 @@ C_INCLUDES =  \
 -IInc/Renderer \
 -IInc/Loader \
 -IInc/MainMenu \
+-IInc/Swo \
 -IInc/SettingsStorage \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
