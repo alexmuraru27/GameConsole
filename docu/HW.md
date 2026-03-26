@@ -6,6 +6,7 @@
   - [FSMC 16-bit (Display ILI9341 - 8080 Parallel)](#fsmc-16-bit-display-ili9341---8080-parallel)
   - [ADC1 (Analog Joysticks)](#adc1-analog-joysticks)
   - [GPIO (Button Joysticks)](#gpio-button-joysticks)
+  - [GPIO (Debug Pins)](#gpio-debug-pins)
   - [SD-CARD (Builtin)](#sd-card-builtin)
   - [I2C1 EEPROM Console Settings Storage](#i2c1-eeprom-console-settings-storage)
   - [ESP01 - USART1 (Network Communication - Baud 921600)](#esp01---usart1-network-communication---baud-921600)
@@ -102,6 +103,10 @@ Hardware design resources  `projectRoot/docu/HW/`
 6. PC13 (IO2 - normal GPIO)
 
 
+
+### GPIO (Debug Pins)
+1. PB1 (Debug Pin 1)
+2. PB2 (Debug Pin 2)
 
 ## EEPROM address
 AT24C256_ADDRESS 0x50U (80)
