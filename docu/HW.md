@@ -19,7 +19,7 @@
 4. 10 push buttons
 5. 2 analog joysticks with 2 axes
 6. ESP-01
-7. AT24C256 I2C EEPROM module
+7. AT24C512 64kb I2C EEPROM module
 8. 1 microSD card reader and microSD card FAT32 formatted
 
 ## Console board schematic
@@ -109,4 +109,4 @@ Hardware design resources  `projectRoot/docu/HW/`
 2. PB2 (Debug Pin 2)
 
 ## EEPROM address
-AT24C256_ADDRESS 0x50U (80)
+AT24C512_ADDRESS 0x50U (80)
