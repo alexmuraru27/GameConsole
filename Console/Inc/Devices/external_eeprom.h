@@ -2,9 +2,9 @@
 #define __EXTERNAL_EEPROM_H
 #include "stdint.h"
 
-#define EXTERNAL_EEPROM_AT24C256_PAGE_SIZE 64U // AT24C256 page size
-#define EXTERNAL_EEPROM_AT24C256_ADDRESS 0x50U
-#define EXTERNAL_EEPROM_AT24C256_MAX_MEMORY_ADDR 32767U
+#define EXTERNAL_EEPROM_AT24C512_PAGE_SIZE 128U
+#define EXTERNAL_EEPROM_AT24C512_ADDRESS 0x50U
+#define EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR 65535U
 
 void externalEepromInit(uint32_t device_address);
 uint8_t externalEepromWrite(uint16_t mem_addr, uint8_t *data, uint16_t length);

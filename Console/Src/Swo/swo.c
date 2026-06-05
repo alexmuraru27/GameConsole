@@ -4,6 +4,11 @@ void swoInit(uint32_t swoFreqHz)
 {
     uint32_t SWOPrescaler = (RCC_MAX_FREQUENCY / swoFreqHz) - 1;
 
+    /* Enable SWO output pin (TRACESWO). Without this the TPI cannot
+     * drive the ITM FIFO never drains, and every printf spin-waits. */
+    DBGMCU->CR |= DBGMCU_CR_TRACE_IOEN;
+    DBGMCU->CR &= ~DBGMCU_CR_TRACE_MODE; /* 00 = asynchronous SWO */
+
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     TPI->ACPR = SWOPrescaler;
     TPI->SPPR = 2;

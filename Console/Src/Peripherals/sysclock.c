@@ -198,6 +198,10 @@ static void peripheralsClockEnable(void)
     // usart3
     RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
 
+    // ######## AHB3 ########
+    // Pass clock to FSMC
+    RCC->AHB3ENR |= RCC_AHB3ENR_FSMCEN;
+
     // ######## APB2 ########
     // Pass clock to ADC1
     RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;

@@ -220,6 +220,7 @@ bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, co
         s_track_data_queue[track_number].callback = on_done_callback;
         s_track_data_queue[track_number].is_looped = is_looped;
         s_track_data_queue[track_number].is_playing = true;
+        updatePWM(track_number);
         return true;
     }
     return false;

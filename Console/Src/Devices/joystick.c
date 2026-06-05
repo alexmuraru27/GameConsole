@@ -1,6 +1,7 @@
 #include "joystick.h"
 #include "adc.h"
 #include <stm32f407xx.h>
+#include <stdio.h>
 
 #define JOYSTICK_DATA_R_BTN_DUP_POS 0U
 #define JOYSTICK_DATA_R_BTN_DUP_MASK (1U << JOYSTICK_DATA_R_BTN_DUP_POS)
@@ -40,11 +41,6 @@
 #define JOYSTICK_DATA_L_ANALOG_X_MASK (3U << JOYSTICK_DATA_L_ANALOG_X_POS)
 #define JOYSTICK_DATA_ANALOG_MASK (JOYSTICK_DATA_R_ANALOG_Y_MASK | JOYSTICK_DATA_R_ANALOG_X_MASK | JOYSTICK_DATA_L_ANALOG_Y_MASK | JOYSTICK_DATA_L_ANALOG_X_MASK)
 
-#define JOYSTICK_DATA_BTN_POS 0U
-#define JOYSTICK_DATA_BTN_IDR_POS 7U
-
-#define JOYSTICK_DATA_SPECIAL_BTN_POS 8U
-#define JOYSTICK_DATA_SPECIAL_BTN_IDR_POS 11U
 
 #define ANALOG_THRESHOLD 1500U
 #define ANALOG_LOWER_THRESHOLD (2048U - ANALOG_THRESHOLD)
@@ -54,6 +50,7 @@
 // 4 axes = 8 bits -> 00 off, 01 low axis, 02 max axis
 // [0000 0000][0 0 0 0 0 0 2_L_AnalogX] [2_L_AnalogY 2_R_AnalogX 2_R_AnalogY Special1 Special2] [L_DLeft L_DDown L_DRight L_DUp R_DLeft R_DDown R_DRight R_DUp]
 static volatile uint32_t s_joystick_data = 0U;
+static volatile uint32_t s_joystick_prev_btn = 0U;
 static volatile uint16_t *s_buffer_addr = 0U;
 static const uint32_t s_axis_mask[] = {
     JOYSTICK_DATA_L_ANALOG_X_MASK,
@@ -80,15 +77,21 @@ void joystickReadData(void)
     // Clear the dpad and special buttons
     s_joystick_data = 0U;
 
-    // Set dpad buttons
-    // Optimised like this due to input pins being in consecutive order starting from
-    // PE7 to PE14
-    s_joystick_data |= (~((GPIOE->IDR >> JOYSTICK_DATA_BTN_IDR_POS) << JOYSTICK_DATA_BTN_POS) & JOYSTICK_DATA_BTN_MASK);
+    // Set dpad buttons from GPIOA (active low, pull-up)
+    const uint32_t idr_a = ~GPIOA->IDR;
+    s_joystick_data |= (((idr_a >> 0U)  & 1U) << JOYSTICK_DATA_R_BTN_DUP_POS)    |  // PA0  -> R_Up
+                       (((idr_a >> 1U)  & 1U) << JOYSTICK_DATA_R_BTN_DRIGHT_POS)  |  // PA1  -> R_Right
+                       (((idr_a >> 5U)  & 1U) << JOYSTICK_DATA_R_BTN_DDOWN_POS)   |  // PA5  -> R_Down
+                       (((idr_a >> 6U)  & 1U) << JOYSTICK_DATA_R_BTN_DLEFT_POS)   |  // PA6  -> R_Left
+                       (((idr_a >> 7U)  & 1U) << JOYSTICK_DATA_L_BTN_DUP_POS)     |  // PA7  -> L_Up
+                       (((idr_a >> 8U)  & 1U) << JOYSTICK_DATA_L_BTN_DRIGHT_POS)  |  // PA8  -> L_Right
+                       (((idr_a >> 11U) & 1U) << JOYSTICK_DATA_L_BTN_DDOWN_POS)   |  // PA11 -> L_Down
+                       (((idr_a >> 12U) & 1U) << JOYSTICK_DATA_L_BTN_DLEFT_POS);     // PA12 -> L_Left
 
-    // Set special buttons
-    // Optimised like this due to input pins being in consecutive order starting from
-    // PB11 to PB12
-    s_joystick_data |= (~((GPIOB->IDR >> JOYSTICK_DATA_SPECIAL_BTN_IDR_POS) << JOYSTICK_DATA_SPECIAL_BTN_POS) & JOYSTICK_DATA_SPECIAL_BTN_MASK);
+    // Special buttons: PB11 -> Sp1 (launch), PB12 -> Sp2 (exit), active-low
+    const uint32_t idr_b = GPIOB->IDR;
+    if (!(idr_b & (1U << 11U))) { s_joystick_data |= JOYSTICK_DATA_SPECIAL_BTN_1_MASK; }
+    if (!(idr_b & (1U << 12U))) { s_joystick_data |= JOYSTICK_DATA_SPECIAL_BTN_2_MASK; }
 
     // Analog values
     if (s_buffer_addr)
@@ -102,6 +105,26 @@ void joystickReadData(void)
                 s_joystick_data |= (((val < ANALOG_LOWER_THRESHOLD) ? RawJoystickAnalogValueLow : RawJoystickAnalogValueHigh) << s_axis_shift[i]) & s_axis_mask[i];
             }
         }
+    }
+
+    const uint32_t all_btn_mask = JOYSTICK_DATA_BTN_MASK | JOYSTICK_DATA_SPECIAL_BTN_MASK;
+    const uint32_t new_btn = s_joystick_data & all_btn_mask;
+    const uint32_t changed = new_btn ^ s_joystick_prev_btn;
+    if (changed)
+    {
+        static const char *const btn_names[] = {
+            "R_Up", "R_Right", "R_Down", "R_Left",
+            "L_Up", "L_Right", "L_Down", "L_Left",
+            "Special1", "Special2"
+        };
+        for (uint8_t i = 0U; i < 10U; ++i)
+        {
+            if (changed & (1U << i))
+            {
+                printf("BTN %s %s\n", btn_names[i], (new_btn & (1U << i)) ? "PRESS" : "RELEASE");
+            }
+        }
+        s_joystick_prev_btn = new_btn;
     }
 }
 

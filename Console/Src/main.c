@@ -46,9 +46,9 @@ int main(void)
   int i = 0;
   while (1)
   {
-    if (i % 200)
+    if (i % (FPS * 10) == 0)
     {
-      printf("Sync %d\n", i);
+      printf("Heartbeat %ds\n", i / FPS);
     }
     i++;
     update();

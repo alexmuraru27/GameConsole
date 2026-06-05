@@ -18,6 +18,7 @@
 #include "external_eeprom.h"
 #include "settings_storage.h"
 #include "swo.h"
+#include "stdio.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
@@ -129,28 +130,48 @@ static void playBootSong()
     buzzerPlay(0, false, s_boot_melody, s_boot_tempo, sizeof(s_boot_melody) / sizeof(uint16_t));
 }
 
+static const uint16_t s_step_notes[] = {
+    NOTE_C4, NOTE_D4, NOTE_E4, NOTE_F4, NOTE_G4,
+    NOTE_A4, NOTE_B4, NOTE_C5, NOTE_D5, NOTE_E5};
+static const uint16_t s_step_tempo[] = {80};
+
+static void beep_step(uint8_t step)
+{
+    buzzerPlay(0, false, &s_step_notes[step], s_step_tempo, 1);
+    delay(150);
+}
+
 static FATFS s_fatfs;
 static void peripheralsInit()
 {
-    swoInit(1000000);
+    swoInit(2000000);
     gpioInit();
-    dmaInit();
-    usartInit();
     timerInit();
+    buzzerInit();
+    beep_step(0);
+    dmaInit();
+    beep_step(1);
+    usartInit();
+    beep_step(2);
     adcInit();
+    beep_step(3);
     i2cInit();
 }
 
 static void devicesInit()
 {
-    ili9341Init(3U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    beep_step(4);
+    ili9341Init(1U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    beep_step(5);
     rendererInit();
+    beep_step(6);
     joystickInit();
-    buzzerInit();
-    externalEepromInit(EXTERNAL_EEPROM_AT24C256_ADDRESS);
-    playBootSong();
+    beep_step(7);
+    externalEepromInit(EXTERNAL_EEPROM_AT24C512_ADDRESS);
+    beep_step(8);
     f_mount(&s_fatfs, "0:", 1U);
     settingsStorageInit();
+    beep_step(9);
 }
 
 void gameConsoleInit()
@@ -158,4 +179,6 @@ void gameConsoleInit()
     peripheralsInit();
     devicesInit();
     gameConsoleExposeApi();
+    beep_step(10);
+    playBootSong();
 }
