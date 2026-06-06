@@ -16,7 +16,7 @@ void sdioInit(void)
     SDIO->POWER = SDIO_POWER_PWRCTRL_1; // Power cycle on
     delay(10U);
     SDIO->POWER = SDIO_POWER_PWRCTRL_1 | SDIO_POWER_PWRCTRL_0; // Power on + enable outputs
-    delay(50U);                                                // Critical delay for Black Board power stabilization
+    delay(50U);
 
     // Clear all flags
     SDIO->ICR = 0x5FF;
@@ -54,7 +54,7 @@ uint8_t sdSwitchTo4bitMode(const uint32_t rca)
 
 uint8_t sdioSendCommand(uint8_t cmd, uint32_t arg, uint8_t resp_type)
 {
-    uint32_t timeout = 2000000; // Increased timeout for Black Board
+    uint32_t timeout = 2000000;
     uint32_t cmd_reg = 0;
     uint32_t status;
 
@@ -126,12 +126,11 @@ uint8_t sdioSendCommand(uint8_t cmd, uint32_t arg, uint8_t resp_type)
     return SD_OK;
 }
 
-// Robust ACMD41 implementation specifically for Black Board issues
 uint8_t sdioSendRobustAcmd41(void)
 {
     uint32_t response;
     uint8_t ret;
-    uint32_t timeout_ms = 3000; // 3 second timeout for Black Board
+    uint32_t timeout_ms = 3000;
     uint32_t start_time = getSysTime();
     uint32_t attempt = 0;
 
@@ -179,7 +178,6 @@ uint8_t sdioSendRobustAcmd41(void)
             return SD_OK;
         }
 
-        // Wait before next attempt - important for Black Board
         delay(25); // 25ms delay between attempts
     }
     return SD_TIMEOUT;

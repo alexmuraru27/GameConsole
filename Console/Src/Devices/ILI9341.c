@@ -1,15 +1,16 @@
 #include "ILI9341.h"
 #include "stm32f407xx.h"
 #include "sysclock.h"
-#include "stdbool.h"
 #include "gpio.h"
+#include "dma.h"
+#include "stdio.h"
 
 // FSMC Bank1 Sub-bank1 (NE1, PD7):
 //   Command: A16=0 -> CPU address 0x60000000
 //   Data:    A16=1 -> CPU address 0x60000000 + (1<<17) = 0x60020000
 //   (in 16-bit mode FSMC_A[n] = HADDR[n+1], so A16 = HADDR[17])
 #define LCD_CMD_ADDR ((volatile uint16_t *)0x60000000U)
-#define LCD_DATA_ADDR ((volatile uint16_t *)0x60020000U)
+#define LCD_DATA_ADDR (FSMC_DATA_ADDRESS)
 
 #define ili9341WriteCommand(cmd) (*LCD_CMD_ADDR = (uint16_t)(cmd))
 #define ili9341WriteData(data) (*LCD_DATA_ADDR = (uint16_t)(data))
@@ -55,9 +56,9 @@ static void fsmcInit(void)
     // MTYP=00 (SRAM), MWID=01 (16-bit), MBKEN=1, WREN=1
     FSMC_Bank1->BTCR[0] = FSMC_BCR1_MBKEN | (1U << FSMC_BCR1_MWID_Pos) | FSMC_BCR1_WREN;
 
-    // BTR1: ADDSET=1 HCLK, DATAST=9 HCLK
-    // tWC = (ADDSET + DATAST + 2) / 168MHz = 12/168MHz ≈ 71ns  (ILI9341 min 66ns)
-    FSMC_Bank1->BTCR[1] = (1U << FSMC_BTR1_ADDSET_Pos) | (9U << FSMC_BTR1_DATAST_Pos);
+    // BTR1: ADDSET=1 HCLK, DATAST=3 HCLK
+    // tWC = (ADDSET + DATAST + 2) / 168MHz = 6/168MHz ≈ 36ns  (below ILI9341 min 66ns, works in practice)
+    FSMC_Bank1->BTCR[1] = (1U << FSMC_BTR1_ADDSET_Pos) | (3U << FSMC_BTR1_DATAST_Pos);
 }
 
 static void ili9341Reset(void)
@@ -80,7 +81,7 @@ static void ili9341SetAddrWindowScreen(const uint16_t x1, const uint16_t y1,
 {
     const uint16_t x2 = x1 + w - 1U;
     const uint16_t y2 = y1 + h - 1U;
-
+    fsmcDmaWait();
     ili9341WriteCommand(ILI9341_CASET);
     ili9341WriteData(x1 >> 8U);
     ili9341WriteData(x1 & 0xFFU);
@@ -270,23 +271,13 @@ void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
 void ili9341SetAddrWindow(const uint16_t x, const uint16_t y,
                           const uint16_t w, const uint16_t h)
 {
+    fsmcDmaWait();
     ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
 }
 
 void ili9341SendPixel(uint16_t color)
 {
     ili9341WriteData(color);
-}
-
-void ili9341FillWindow(uint16_t color)
-{
-    ili9341SetAddrWindowScreen(s_window_x_offset, s_window_y_offset,
-                               s_window_width, s_window_height);
-    uint32_t count = (uint32_t)s_window_width * s_window_height;
-    for (uint32_t i = 0U; i < count; ++i)
-    {
-        ili9341WriteData(color);
-    }
 }
 
 void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
@@ -300,27 +291,32 @@ void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
         return;
 
     ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
-    uint32_t count = (uint32_t)w * h;
-    for (uint32_t i = 0U; i < count; ++i)
-    {
-        ili9341WriteData(data[i]);
-    }
+    fsmcDmaSend(data, (uint32_t)w * h);
 }
 
-void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
-                          uint16_t color)
+void ili9341DrawScanlines(const uint8_t lines, const uint16_t lines_offset, const uint16_t array_size, const uint16_t *data)
 {
-    if ((x >= s_window_width) || (y >= s_window_height))
-        return;
-    if ((x + w - 1U) >= s_window_width)
-        w = s_window_width - x;
-    if ((y + h - 1U) >= s_window_height)
-        h = s_window_height - y;
-
-    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
-    uint32_t count = (uint32_t)w * h;
-    for (uint32_t i = 0U; i < count; ++i)
+    if (lines == 0)
     {
-        ili9341WriteData(color);
+        printf("DrawScanlines: lines=0\n");
+        return;
     }
+    if (lines_offset >= s_window_height)
+    {
+        printf("DrawScanlines: offset %u >= height %u\n", lines_offset, s_window_height);
+        return;
+    }
+    if ((lines_offset + lines) > s_window_height)
+    {
+        printf("DrawScanlines: offset %u + lines %u > height %u\n", lines_offset, lines, s_window_height);
+        return;
+    }
+    if (array_size != (uint32_t)s_window_width * lines)
+    {
+        printf("DrawScanlines: array_size %u != width %u * lines %u\n", array_size, s_window_width, lines);
+        return;
+    }
+
+    ili9341SetAddrWindowScreen(s_window_x_offset, s_window_y_offset + lines_offset, s_window_width, lines);
+    fsmcDmaSend(data, array_size);
 }

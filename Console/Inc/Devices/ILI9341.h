@@ -2,6 +2,8 @@
 #define __ILI9341_H
 #include <stdint.h>
 
+#define FSMC_DATA_ADDRESS ((volatile uint16_t *)0x60020000U)
+
 #define ILI9341_WIDTH 320
 #define ILI9341_HEIGHT 240
 
@@ -28,11 +30,12 @@
 #define RGB2COLOR(r, g, b) (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3))
 
 void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height);
-void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color);
-void ili9341FillWindow(uint16_t color);
 void ili9341FillScreen(uint16_t color);
-void ili9341FillRectangle(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
+void ili9341DrawScanlines(uint8_t lines, uint16_t lines_offset, uint16_t array_size, const uint16_t *data);
+
+// TODO Planned obsolete - console will do full screen repaint from the renderer buffers
 void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *data);
+void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color);
 void ili9341SetAddrWindow(const uint16_t x, const uint16_t y, const uint16_t w, const uint16_t h);
 void ili9341SendPixel(uint16_t color);
 #endif /* __ILI9341_H */

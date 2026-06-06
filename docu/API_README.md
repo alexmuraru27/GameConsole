@@ -274,7 +274,7 @@ See `README.md` for license and authorship.
 - **Key Functions:**
   - `ili9341Init(rotation, width, height)`: Initialize display.
   - `ili9341DrawPixel(x, y, color)`: Draw a pixel.
-  - `ili9341FillScreen(color)`, `ili9341FillRectangle(...)`: Fill areas.
+  - `ili9341FillScreen(color)`: Fill areas.
   - `ili9341DrawImage(x, y, w, h, data)`: Draw image.
 - **Usage Example:**
   ```c

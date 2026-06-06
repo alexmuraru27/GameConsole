@@ -15,6 +15,9 @@ all: $(BUILD_DIR)
 flash:  $(BUILD_DIR)
 	$(MAKE) -C Console flash
 
+flashswo: flash
+	./swo.sh
+
 deploy: $(BUILD_DIR)
 	$(MAKE) -C GameXO deploy
 

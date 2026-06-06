@@ -20,9 +20,6 @@ uint8_t sdInit(void)
     uint8_t ret;
     sdioInit();
 
-    // Extended delay for card stabilization (critical for Black Board)
-    delay(300U);
-
     // multiple CMD0s for better reliability
     for (int i = 0U; i < 3U; i++)
     {
@@ -89,7 +86,7 @@ uint8_t sdInit(void)
     sdSwitchTo4bitMode(s_sd_rca << 16U);
 
     // Switch to higher speed clock after successful initialization
-    // Divide by 4 = 12MHz (conservative for Black Board)
+    // Divide by 4 = 12MHz
     SDIO->CLKCR = (SDIO->CLKCR & ~0xFF) | 2U;
     delay(10U);
     return SD_OK;
@@ -97,7 +94,7 @@ uint8_t sdInit(void)
 
 uint8_t sdReadSingleBlock(uint32_t block_addr, uint8_t *buffer)
 {
-    uint32_t timeout = 3000000U; // Increased timeout for Black Board
+    uint32_t timeout = 3000000U;
     uint8_t ret;
     uint32_t *data_ptr = (uint32_t *)buffer;
     uint32_t status;

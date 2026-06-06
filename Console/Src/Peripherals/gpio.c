@@ -29,9 +29,9 @@ static void initGpioJoystick()
     GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD0 | GPIO_PUPDR_PUPD1 | GPIO_PUPDR_PUPD5 |
                       GPIO_PUPDR_PUPD6 | GPIO_PUPDR_PUPD7 | GPIO_PUPDR_PUPD8 |
                       GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12);
-    GPIOA->PUPDR |= (1U << GPIO_PUPDR_PUPD0_Pos)  | (1U << GPIO_PUPDR_PUPD1_Pos)  |
-                    (1U << GPIO_PUPDR_PUPD5_Pos)  | (1U << GPIO_PUPDR_PUPD6_Pos)  |
-                    (1U << GPIO_PUPDR_PUPD7_Pos)  | (1U << GPIO_PUPDR_PUPD8_Pos)  |
+    GPIOA->PUPDR |= (1U << GPIO_PUPDR_PUPD0_Pos) | (1U << GPIO_PUPDR_PUPD1_Pos) |
+                    (1U << GPIO_PUPDR_PUPD5_Pos) | (1U << GPIO_PUPDR_PUPD6_Pos) |
+                    (1U << GPIO_PUPDR_PUPD7_Pos) | (1U << GPIO_PUPDR_PUPD8_Pos) |
                     (1U << GPIO_PUPDR_PUPD11_Pos) | (1U << GPIO_PUPDR_PUPD12_Pos);
     GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD11 | GPIO_PUPDR_PUPD12);
     GPIOB->PUPDR |= (1U << GPIO_PUPDR_PUPD11_Pos) | (1U << GPIO_PUPDR_PUPD12_Pos);
@@ -168,7 +168,7 @@ static void initSdio()
     // Pull-up for data lines (NOT CLK)
     GPIOC->PUPDR |= (1 << GPIO_PUPDR_PUPD8_Pos) | (1 << GPIO_PUPDR_PUPD9_Pos) | (1 << GPIO_PUPDR_PUPD10_Pos) | (1 << GPIO_PUPDR_PUPD11_Pos);
     // Configure PD2 (CMD) with pull-up
-    GPIOD->PUPDR |= (1 << 4); // Pull-up (CRITICAL for Black Board)
+    GPIOD->PUPDR |= (1 << 4); // Pull-up
 }
 
 static void initI2C1()

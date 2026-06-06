@@ -149,7 +149,7 @@ static void peripheralsInit()
     timerInit();
     buzzerInit();
     beep_step(0);
-    dmaInit();
+    dmaInit((uint32_t)FSMC_DATA_ADDRESS);
     beep_step(1);
     usartInit();
     beep_step(2);
@@ -161,7 +161,7 @@ static void peripheralsInit()
 static void devicesInit()
 {
     beep_step(4);
-    ili9341Init(1U, rendererGetWidthPixels(), rendererGetHeightPixels());
+    ili9341Init(1U, ILI9341_WIDTH, ILI9341_HEIGHT);
     beep_step(5);
     rendererInit();
     beep_step(6);

@@ -1,8 +1,9 @@
 #include "dma.h"
 #include "adc.h"
 #include <stm32f407xx.h>
+#include <stdbool.h>
 
-// SDIO DMA2: Ch4 S3
+static bool s_fsmc_dma_active = false;
 
 // ADC1 DMA2: Ch0, S0
 static void adc1DmaInit(void)
@@ -25,7 +26,50 @@ static void adc1DmaInit(void)
     // enable DMA
     DMA2_Stream0->CR |= DMA_SxCR_EN;
 }
-void dmaInit(void)
+
+static void fsmcDmaInit(uint32_t fsmcDataAddress)
+{
+    // FSMC DMA: DMA2 S6Ch0 M2M, PAR=source (inc), M0AR=LCD data (fixed)
+    DMA2_Stream6->CR = 0;
+    while (DMA2_Stream6->CR & DMA_SxCR_EN)
+        ;
+
+    DMA2_Stream6->M0AR = fsmcDataAddress;
+    DMA2_Stream6->CR = (0U << DMA_SxCR_CHSEL_Pos) | // channel 0
+                       DMA_SxCR_PL_1 |              // priority high
+                       DMA_SxCR_MSIZE_0 |           // dest 16-bit
+                       DMA_SxCR_PSIZE_0 |           // source 16-bit
+                       DMA_SxCR_PINC |              // increment source
+                       (2U << DMA_SxCR_DIR_Pos);    // memory-to-memory
+}
+
+void fsmcDmaSend(const uint16_t *data, uint32_t count)
+{
+    DMA2_Stream6->CR &= ~DMA_SxCR_EN;
+    while (DMA2_Stream6->CR & DMA_SxCR_EN)
+        ;
+    DMA2->HIFCR = DMA_HIFCR_CTCIF6 | DMA_HIFCR_CHTIF6 | DMA_HIFCR_CTEIF6 |
+                  DMA_HIFCR_CDMEIF6 | DMA_HIFCR_CFEIF6;
+    DMA2_Stream6->PAR = (uint32_t)data;
+    DMA2_Stream6->NDTR = count;
+    DMA2_Stream6->CR |= DMA_SxCR_EN;
+    s_fsmc_dma_active = true;
+}
+
+void fsmcDmaWait(void)
+{
+    if (!s_fsmc_dma_active)
+    {
+        return;
+    }
+    while (!(DMA2->HISR & DMA_HISR_TCIF6))
+    {
+    }
+    s_fsmc_dma_active = false;
+}
+
+void dmaInit(uint32_t fsmcDataAddress)
 {
     adc1DmaInit();
+    fsmcDmaInit(fsmcDataAddress);
 }
