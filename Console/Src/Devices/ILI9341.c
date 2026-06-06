@@ -55,9 +55,9 @@ static void fsmcInit(void)
     // MTYP=00 (SRAM), MWID=01 (16-bit), MBKEN=1, WREN=1
     FSMC_Bank1->BTCR[0] = FSMC_BCR1_MBKEN | (1U << FSMC_BCR1_MWID_Pos) | FSMC_BCR1_WREN;
 
-    // BTR1: ADDSET=1 HCLK, DATAST=15 HCLK
-    // tWC = (ADDSET + DATAST + 2) / 168MHz ≈ 107ns  (ILI9341 min 66ns)
-    FSMC_Bank1->BTCR[1] = (1U << FSMC_BTR1_ADDSET_Pos) | (15U << FSMC_BTR1_DATAST_Pos);
+    // BTR1: ADDSET=1 HCLK, DATAST=9 HCLK
+    // tWC = (ADDSET + DATAST + 2) / 168MHz = 12/168MHz ≈ 71ns  (ILI9341 min 66ns)
+    FSMC_Bank1->BTCR[1] = (1U << FSMC_BTR1_ADDSET_Pos) | (9U << FSMC_BTR1_DATAST_Pos);
 }
 
 static void ili9341Reset(void)
