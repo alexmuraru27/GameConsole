@@ -140,6 +140,10 @@ static void initGpioBuzzer()
 
 static void initSdio()
 {
+    // PD3: SD card detect — input with pull-up (active-low: 0 = card present)
+    GPIOD->MODER &= ~GPIO_MODER_MODE3_Msk;
+    GPIOD->PUPDR &= ~GPIO_PUPDR_PUPD3_Msk;
+    GPIOD->PUPDR |= (1U << GPIO_PUPDR_PUPD3_Pos);
 
     // set to Alternate function mode
     GPIOC->MODER &= ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk | GPIO_MODER_MODE10_Msk | GPIO_MODER_MODE11_Msk | GPIO_MODER_MODE12_Msk);
@@ -192,6 +196,11 @@ static void initI2C1()
 
     // Pullups
     GPIOB->PUPDR |= (1U << GPIO_PUPDR_PUPD8_Pos) | (1U << GPIO_PUPDR_PUPD9_Pos);
+}
+
+bool sdCardPresent(void)
+{
+    return (GPIOD->IDR & GPIO_IDR_ID3_Msk) == 0U;
 }
 
 void gpioInit(void)
