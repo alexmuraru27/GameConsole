@@ -1,263 +1,254 @@
 #include "joystick.h"
 #include "adc.h"
-#include <stm32f407xx.h>
+#include "gpio.h"
+#include "sysclock.h"
 #include <stdio.h>
+// Button bits (within s_btn_data)
+typedef enum JoystickBtnBit
+{
+    JoystickBtnBitRUp = 0U,
+    JoystickBtnBitRRight = 1U,
+    JoystickBtnBitRDown = 2U,
+    JoystickBtnBitRLeft = 3U,
+    JoystickBtnBitLUp = 4U,
+    JoystickBtnBitLRight = 5U,
+    JoystickBtnBitLDown = 6U,
+    JoystickBtnBitLLeft = 7U,
+    JoystickBtnBitSpecial1 = 8U,
+    JoystickBtnBitSpecial2 = 9U,
+} JoystickBtnBit;
 
-#define JOYSTICK_DATA_R_BTN_DUP_POS 0U
-#define JOYSTICK_DATA_R_BTN_DUP_MASK (1U << JOYSTICK_DATA_R_BTN_DUP_POS)
-#define JOYSTICK_DATA_R_BTN_DRIGHT_POS 1U
-#define JOYSTICK_DATA_R_BTN_DRIGHT_MASK (1U << JOYSTICK_DATA_R_BTN_DRIGHT_POS)
-#define JOYSTICK_DATA_R_BTN_DDOWN_POS 2U
-#define JOYSTICK_DATA_R_BTN_DDOWN_MASK (1U << JOYSTICK_DATA_R_BTN_DDOWN_POS)
-#define JOYSTICK_DATA_R_BTN_DLEFT_POS 3U
-#define JOYSTICK_DATA_R_BTN_DLEFT_MASK (1U << JOYSTICK_DATA_R_BTN_DLEFT_POS)
-#define JOYSTICK_DATA_R_BTN_MASK (JOYSTICK_DATA_R_BTN_DUP_MASK | JOYSTICK_DATA_R_BTN_DRIGHT_MASK | JOYSTICK_DATA_R_BTN_DDOWN_MASK | JOYSTICK_DATA_R_BTN_DLEFT_MASK)
+#define BTN_COUNT 10U
 
-#define JOYSTICK_DATA_L_BTN_DUP_POS 4U
-#define JOYSTICK_DATA_L_BTN_DUP_MASK (1U << JOYSTICK_DATA_L_BTN_DUP_POS)
-#define JOYSTICK_DATA_L_BTN_DRIGHT_POS 5U
-#define JOYSTICK_DATA_L_BTN_DRIGHT_MASK (1U << JOYSTICK_DATA_L_BTN_DRIGHT_POS)
-#define JOYSTICK_DATA_L_BTN_DDOWN_POS 6U
-#define JOYSTICK_DATA_L_BTN_DDOWN_MASK (1U << JOYSTICK_DATA_L_BTN_DDOWN_POS)
-#define JOYSTICK_DATA_L_BTN_DLEFT_POS 7U
-#define JOYSTICK_DATA_L_BTN_DLEFT_MASK (1U << JOYSTICK_DATA_L_BTN_DLEFT_POS)
-#define JOYSTICK_DATA_L_BTN_MASK (JOYSTICK_DATA_L_BTN_DUP_MASK | JOYSTICK_DATA_L_BTN_DRIGHT_MASK | JOYSTICK_DATA_L_BTN_DDOWN_MASK | JOYSTICK_DATA_L_BTN_DLEFT_MASK)
+#define BTN_MASK_R_UP (1U << JoystickBtnBitRUp)
+#define BTN_MASK_R_RIGHT (1U << JoystickBtnBitRRight)
+#define BTN_MASK_R_DOWN (1U << JoystickBtnBitRDown)
+#define BTN_MASK_R_LEFT (1U << JoystickBtnBitRLeft)
+#define BTN_MASK_L_UP (1U << JoystickBtnBitLUp)
+#define BTN_MASK_L_RIGHT (1U << JoystickBtnBitLRight)
+#define BTN_MASK_L_DOWN (1U << JoystickBtnBitLDown)
+#define BTN_MASK_L_LEFT (1U << JoystickBtnBitLLeft)
+#define BTN_MASK_SPECIAL1 (1U << JoystickBtnBitSpecial1)
+#define BTN_MASK_SPECIAL2 (1U << JoystickBtnBitSpecial2)
+#define BTN_MASK_DPAD_R (BTN_MASK_R_UP | BTN_MASK_R_RIGHT | BTN_MASK_R_DOWN | BTN_MASK_R_LEFT)
+#define BTN_MASK_DPAD_L (BTN_MASK_L_UP | BTN_MASK_L_RIGHT | BTN_MASK_L_DOWN | BTN_MASK_L_LEFT)
+#define BTN_MASK_ALL (BTN_MASK_DPAD_R | BTN_MASK_DPAD_L | BTN_MASK_SPECIAL1 | BTN_MASK_SPECIAL2)
 
-#define JOYSTICK_DATA_BTN_MASK (JOYSTICK_DATA_R_BTN_MASK | JOYSTICK_DATA_L_BTN_MASK)
+// Analog bits (within s_analog_data, 2 bits per axis)
+typedef enum JoystickAnalogBit
+{
+    JoystickAnalogBitRY = 0U,
+    JoystickAnalogBitRX = 2U,
+    JoystickAnalogBitLY = 4U,
+    JoystickAnalogBitLX = 6U,
+} JoystickAnalogBit;
 
-#define JOYSTICK_DATA_SPECIAL_BTN_1_POS 8U
-#define JOYSTICK_DATA_SPECIAL_BTN_1_MASK (1U << JOYSTICK_DATA_SPECIAL_BTN_1_POS)
-#define JOYSTICK_DATA_SPECIAL_BTN_2_POS 9U
-#define JOYSTICK_DATA_SPECIAL_BTN_2_MASK (1U << JOYSTICK_DATA_SPECIAL_BTN_2_POS)
-#define JOYSTICK_DATA_SPECIAL_BTN_MASK (JOYSTICK_DATA_SPECIAL_BTN_1_MASK | JOYSTICK_DATA_SPECIAL_BTN_2_MASK)
+#define ANALOG_COUNT 4U
 
-#define JOYSTICK_DATA_R_ANALOG_Y_POS 10U
-#define JOYSTICK_DATA_R_ANALOG_Y_MASK (3U << JOYSTICK_DATA_R_ANALOG_Y_POS)
-#define JOYSTICK_DATA_R_ANALOG_X_POS 12U
-#define JOYSTICK_DATA_R_ANALOG_X_MASK (3U << JOYSTICK_DATA_R_ANALOG_X_POS)
-#define JOYSTICK_DATA_L_ANALOG_Y_POS 14U
-#define JOYSTICK_DATA_L_ANALOG_Y_MASK (3U << JOYSTICK_DATA_L_ANALOG_Y_POS)
-#define JOYSTICK_DATA_L_ANALOG_X_POS 16U
-#define JOYSTICK_DATA_L_ANALOG_X_MASK (3U << JOYSTICK_DATA_L_ANALOG_X_POS)
-#define JOYSTICK_DATA_ANALOG_MASK (JOYSTICK_DATA_R_ANALOG_Y_MASK | JOYSTICK_DATA_R_ANALOG_X_MASK | JOYSTICK_DATA_L_ANALOG_Y_MASK | JOYSTICK_DATA_L_ANALOG_X_MASK)
-
+#define ANALOG_MASK_RY (3U << JoystickAnalogBitRY)
+#define ANALOG_MASK_RX (3U << JoystickAnalogBitRX)
+#define ANALOG_MASK_LY (3U << JoystickAnalogBitLY)
+#define ANALOG_MASK_LX (3U << JoystickAnalogBitLX)
 
 #define ANALOG_THRESHOLD 1500U
 #define ANALOG_LOWER_THRESHOLD (2048U - ANALOG_THRESHOLD)
 #define ANALOG_HIGHER_THRESHOLD (2048U + ANALOG_THRESHOLD)
-// 8 buttons dpad - 8 bits
-// 2 special buttons - 2 bits
-// 4 axes = 8 bits -> 00 off, 01 low axis, 02 max axis
-// [0000 0000][0 0 0 0 0 0 2_L_AnalogX] [2_L_AnalogY 2_R_AnalogX 2_R_AnalogY Special1 Special2] [L_DLeft L_DDown L_DRight L_DUp R_DLeft R_DDown R_DRight R_DUp]
-static volatile uint32_t s_joystick_data = 0U;
-static volatile uint32_t s_joystick_prev_btn = 0U;
+#define DEBOUNCE_MS 5U
+
+typedef enum RawAnalogState
+{
+    RawAnalogStateMid = 0U,
+    RawAnalogStateLow = 1U,
+    RawAnalogStateHigh = 2U,
+} RawAnalogState;
+
+static volatile uint32_t s_btn_data = 0U;
+static uint8_t s_btn_raw[BTN_COUNT];
+static uint32_t s_btn_debounce_timer[BTN_COUNT];
+
+static volatile uint32_t s_analog_data = 0U;
+static uint8_t s_analog_raw[ANALOG_COUNT];
+static uint32_t s_analog_debounce_timer[ANALOG_COUNT];
+
 static volatile uint16_t *s_buffer_addr = 0U;
+
 static const uint32_t s_axis_mask[] = {
-    JOYSTICK_DATA_L_ANALOG_X_MASK,
-    JOYSTICK_DATA_L_ANALOG_Y_MASK,
-    JOYSTICK_DATA_R_ANALOG_X_MASK,
-    JOYSTICK_DATA_R_ANALOG_Y_MASK};
+    ANALOG_MASK_LX, ANALOG_MASK_LY,
+    ANALOG_MASK_RX, ANALOG_MASK_RY};
 
 static const uint8_t s_axis_shift[] = {
-    JOYSTICK_DATA_L_ANALOG_X_POS,
-    JOYSTICK_DATA_L_ANALOG_Y_POS,
-    JOYSTICK_DATA_R_ANALOG_X_POS,
-    JOYSTICK_DATA_R_ANALOG_Y_POS};
+    JoystickAnalogBitLX, JoystickAnalogBitLY,
+    JoystickAnalogBitRX, JoystickAnalogBitRY};
 
-typedef enum RawJoystickAnalogValue
+static void readButtons(void)
 {
-    RawJoystickAnalogValueMid = 0U,
-    RawJoystickAnalogValueLow = 1U,
-    RawJoystickAnalogValueHigh = 2U
-} RawJoystickAnalogValue;
+    const uint32_t raw_all = gpioReadButtons();
+    for (uint8_t i = 0U; i < BTN_COUNT; ++i)
+    {
+        const uint8_t raw_bit = (raw_all >> i) & 1U;
+        if (raw_bit != s_btn_raw[i])
+        {
+            s_btn_raw[i]            = raw_bit;
+            s_btn_debounce_timer[i] = getSysTime();
+        }
+        else if (getSysTime() - s_btn_debounce_timer[i] >= DEBOUNCE_MS)
+        {
+            if (raw_bit)
+                s_btn_data |=  (1U << i);
+            else
+                s_btn_data &= ~(1U << i);
+        }
+    }
+}
+
+static void readAnalog(void)
+{
+    if (!s_buffer_addr)
+    {
+        printf("joystick: analog buffer address is null\n");
+        return;
+    }
+
+    for (uint8_t i = 0U; i < ANALOG_COUNT; ++i)
+    {
+        uint8_t raw_axis = RawAnalogStateMid;
+        const uint16_t val = s_buffer_addr[i];
+        if (val < ANALOG_LOWER_THRESHOLD)
+            raw_axis = RawAnalogStateHigh;
+        else if (val > ANALOG_HIGHER_THRESHOLD)
+            raw_axis = RawAnalogStateLow;
+
+        if (raw_axis != s_analog_raw[i])
+        {
+            s_analog_raw[i]            = raw_axis;
+            s_analog_debounce_timer[i] = getSysTime();
+        }
+        else if (getSysTime() - s_analog_debounce_timer[i] >= DEBOUNCE_MS)
+        {
+            s_analog_data = (s_analog_data & ~s_axis_mask[i]) |
+                            ((uint32_t)(raw_axis << s_axis_shift[i]) & s_axis_mask[i]);
+        }
+    }
+}
 
 void joystickReadData(void)
 {
-    // Keep this as short as possible!
-    // Clear the dpad and special buttons
-    s_joystick_data = 0U;
-
-    // Set dpad buttons from GPIOA (active low, pull-up)
-    const uint32_t idr_a = ~GPIOA->IDR;
-    s_joystick_data |= (((idr_a >> 0U)  & 1U) << JOYSTICK_DATA_R_BTN_DUP_POS)    |  // PA0  -> R_Up
-                       (((idr_a >> 1U)  & 1U) << JOYSTICK_DATA_R_BTN_DRIGHT_POS)  |  // PA1  -> R_Right
-                       (((idr_a >> 5U)  & 1U) << JOYSTICK_DATA_R_BTN_DDOWN_POS)   |  // PA5  -> R_Down
-                       (((idr_a >> 6U)  & 1U) << JOYSTICK_DATA_R_BTN_DLEFT_POS)   |  // PA6  -> R_Left
-                       (((idr_a >> 7U)  & 1U) << JOYSTICK_DATA_L_BTN_DUP_POS)     |  // PA7  -> L_Up
-                       (((idr_a >> 8U)  & 1U) << JOYSTICK_DATA_L_BTN_DRIGHT_POS)  |  // PA8  -> L_Right
-                       (((idr_a >> 11U) & 1U) << JOYSTICK_DATA_L_BTN_DDOWN_POS)   |  // PA11 -> L_Down
-                       (((idr_a >> 12U) & 1U) << JOYSTICK_DATA_L_BTN_DLEFT_POS);     // PA12 -> L_Left
-
-    // Special buttons: PB11 -> Sp1 (launch), PB12 -> Sp2 (exit), active-low
-    const uint32_t idr_b = GPIOB->IDR;
-    if (!(idr_b & (1U << 11U))) { s_joystick_data |= JOYSTICK_DATA_SPECIAL_BTN_1_MASK; }
-    if (!(idr_b & (1U << 12U))) { s_joystick_data |= JOYSTICK_DATA_SPECIAL_BTN_2_MASK; }
-
-    // Analog values
-    if (s_buffer_addr)
-    {
-        uint16_t val = 0U;
-        for (uint8_t i = 0U; i < 4U; ++i)
-        {
-            val = s_buffer_addr[i];
-            if (val < ANALOG_LOWER_THRESHOLD || val > ANALOG_HIGHER_THRESHOLD)
-            {
-                s_joystick_data |= (((val < ANALOG_LOWER_THRESHOLD) ? RawJoystickAnalogValueLow : RawJoystickAnalogValueHigh) << s_axis_shift[i]) & s_axis_mask[i];
-            }
-        }
-    }
-
-    const uint32_t all_btn_mask = JOYSTICK_DATA_BTN_MASK | JOYSTICK_DATA_SPECIAL_BTN_MASK;
-    const uint32_t new_btn = s_joystick_data & all_btn_mask;
-    const uint32_t changed = new_btn ^ s_joystick_prev_btn;
-    if (changed)
-    {
-        static const char *const btn_names[] = {
-            "R_Up", "R_Right", "R_Down", "R_Left",
-            "L_Up", "L_Right", "L_Down", "L_Left",
-            "Special1", "Special2"
-        };
-        for (uint8_t i = 0U; i < 10U; ++i)
-        {
-            if (changed & (1U << i))
-            {
-                printf("BTN %s %s\n", btn_names[i], (new_btn & (1U << i)) ? "PRESS" : "RELEASE");
-            }
-        }
-        s_joystick_prev_btn = new_btn;
-    }
+    readButtons();
+    readAnalog();
 }
 
 void joystickInit(void)
 {
-    s_joystick_data = 0U;
+    s_btn_data = 0U;
+    s_analog_data = 0U;
     s_buffer_addr = getAdc1BufferAddress();
+
+    const uint32_t now = getSysTime();
+    for (uint8_t i = 0U; i < BTN_COUNT; ++i)
+    {
+        s_btn_raw[i] = 0U;
+        s_btn_debounce_timer[i] = now;
+    }
+    for (uint8_t i = 0U; i < ANALOG_COUNT; ++i)
+    {
+        s_analog_raw[i] = RawAnalogStateMid;
+        s_analog_debounce_timer[i] = now;
+    }
 }
 
 bool joystickGetRBtnUp(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_R_BTN_DUP_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_R_UP) != 0U;
 }
 bool joystickGetRBtnRight(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_R_BTN_DRIGHT_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_R_RIGHT) != 0U;
 }
 bool joystickGetRBtnDown(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_R_BTN_DDOWN_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_R_DOWN) != 0U;
 }
 bool joystickGetRBtnLeft(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_R_BTN_DLEFT_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_R_LEFT) != 0U;
 }
 bool joystickGetLBtnUp(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_L_BTN_DUP_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_L_UP) != 0U;
 }
 bool joystickGetLBtnRight(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_L_BTN_DRIGHT_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_L_RIGHT) != 0U;
 }
 bool joystickGetLBtnDown(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_L_BTN_DDOWN_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_L_DOWN) != 0U;
 }
 bool joystickGetLBtnLeft(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_L_BTN_DLEFT_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_L_LEFT) != 0U;
 }
 bool joystickGetSpecialBtn1(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_SPECIAL_BTN_1_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_SPECIAL1) != 0U;
 }
 bool joystickGetSpecialBtn2(void)
 {
-    return (s_joystick_data & JOYSTICK_DATA_SPECIAL_BTN_2_MASK) != 0U;
+    return (s_btn_data & BTN_MASK_SPECIAL2) != 0U;
 }
-JoystickAnalogValue joystickGetRAnalogY(void)
-{
-    JoystickAnalogValue joyRAnalogY = JoystickAnalogValueOff;
-    switch ((s_joystick_data & JOYSTICK_DATA_R_ANALOG_Y_MASK) >> JOYSTICK_DATA_R_ANALOG_Y_POS)
-    {
-    case RawJoystickAnalogValueLow:
-    {
-        joyRAnalogY = JoystickAnalogValueLowAxis;
-        break;
-    }
-    case RawJoystickAnalogValueHigh:
-    {
-        joyRAnalogY = JoystickAnalogValueHighAxis;
-        break;
-    }
-    default:
-        break;
-    }
-    return joyRAnalogY;
-}
-JoystickAnalogValue joystickGetRAnalogX(void)
-{
-    JoystickAnalogValue joyRAnalogX = JoystickAnalogValueOff;
-    switch ((s_joystick_data & JOYSTICK_DATA_R_ANALOG_X_MASK) >> JOYSTICK_DATA_R_ANALOG_X_POS)
-    {
-    case RawJoystickAnalogValueLow:
-    {
-        joyRAnalogX = JoystickAnalogValueLowAxis;
-        break;
-    }
-    case RawJoystickAnalogValueHigh:
-    {
-        joyRAnalogX = JoystickAnalogValueHighAxis;
-        break;
-    }
-    default:
-        break;
-    }
-    return joyRAnalogX;
-}
-JoystickAnalogValue joystickGetLAnalogY(void)
-{
-    // Joystick is flipped so we need to also flip the axes
-    JoystickAnalogValue joyLAnalogY = JoystickAnalogValueOff;
-    switch ((s_joystick_data & JOYSTICK_DATA_L_ANALOG_Y_MASK) >> JOYSTICK_DATA_L_ANALOG_Y_POS)
-    {
-    case RawJoystickAnalogValueLow:
-    {
-        joyLAnalogY = JoystickAnalogValueHighAxis;
-        break;
-    }
-    case RawJoystickAnalogValueHigh:
-    {
-        joyLAnalogY = JoystickAnalogValueLowAxis;
-        break;
-    }
-    default:
-        break;
-    }
-    return joyLAnalogY;
-}
-JoystickAnalogValue joystickGetLAnalogX(void)
-{
-    // Joystick is flipped so we need to also flip the axes
-    JoystickAnalogValue joyLAnalogX = JoystickAnalogValueOff;
-    switch ((s_joystick_data & JOYSTICK_DATA_L_ANALOG_X_MASK) >> JOYSTICK_DATA_L_ANALOG_X_POS)
-    {
-    case RawJoystickAnalogValueLow:
-    {
-        joyLAnalogX = JoystickAnalogValueHighAxis;
-        break;
-    }
-    case RawJoystickAnalogValueHigh:
-    {
-        joyLAnalogX = JoystickAnalogValueLowAxis;
-        break;
-    }
-    default:
-        break;
-    }
-    return joyLAnalogX;
-}
-
 bool joystickIsAnyButtonPressed(void)
 {
-    return ((s_joystick_data & JOYSTICK_DATA_BTN_MASK) != 0U);
+    return (s_btn_data & BTN_MASK_ALL) != 0U;
+}
+
+JoystickAxisState joystickGetRAnalogY(void)
+{
+    switch ((s_analog_data & ANALOG_MASK_RY) >> JoystickAnalogBitRY)
+    {
+    case RawAnalogStateLow:
+        return JoystickAxisStatePositive;
+    case RawAnalogStateHigh:
+        return JoystickAxisStateNegative;
+    default:
+        return JoystickAxisStateOff;
+    }
+}
+
+JoystickAxisState joystickGetRAnalogX(void)
+{
+    switch ((s_analog_data & ANALOG_MASK_RX) >> JoystickAnalogBitRX)
+    {
+    case RawAnalogStateLow:
+        return JoystickAxisStateNegative;
+    case RawAnalogStateHigh:
+        return JoystickAxisStatePositive;
+    default:
+        return JoystickAxisStateOff;
+    }
+}
+
+JoystickAxisState joystickGetLAnalogY(void)
+{
+    switch ((s_analog_data & ANALOG_MASK_LY) >> JoystickAnalogBitLY)
+    {
+    case RawAnalogStateLow:
+        return JoystickAxisStatePositive;
+    case RawAnalogStateHigh:
+        return JoystickAxisStateNegative;
+    default:
+        return JoystickAxisStateOff;
+    }
+}
+
+JoystickAxisState joystickGetLAnalogX(void)
+{
+    switch ((s_analog_data & ANALOG_MASK_LX) >> JoystickAnalogBitLX)
+    {
+    case RawAnalogStateLow:
+        return JoystickAxisStateNegative;
+    case RawAnalogStateHigh:
+        return JoystickAxisStatePositive;
+    default:
+        return JoystickAxisStateOff;
+    }
 }

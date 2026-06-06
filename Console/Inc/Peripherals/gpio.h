@@ -5,4 +5,5 @@
 
 void gpioInit(void);
 bool sdCardPresent(void);
+uint16_t gpioReadButtons(void);
 #endif /* __GPIO_H */

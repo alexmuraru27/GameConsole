@@ -203,6 +203,28 @@ bool sdCardPresent(void)
     return (GPIOD->IDR & GPIO_IDR_ID3_Msk) == 0U;
 }
 
+// Returns a 10-bit bitmask of active buttons (active-low pins, already inverted).
+// Bit layout matches JOYSTICK_DATA_*_BTN_* positions in joystick.c:
+//   0=R_Up 1=R_Right 2=R_Down 3=R_Left 4=L_Up 5=L_Right 6=L_Down 7=L_Left
+//   8=Special1 9=Special2
+uint16_t gpioReadButtons(void)
+{
+    const uint32_t a = ~GPIOA->IDR;
+    const uint32_t b = ~GPIOB->IDR;
+    return (uint16_t)(
+        (((a >> 0U)  & 1U) << 0U) |   // PA0  -> R_Up
+        (((a >> 1U)  & 1U) << 1U) |   // PA1  -> R_Right
+        (((a >> 5U)  & 1U) << 2U) |   // PA5  -> R_Down
+        (((a >> 6U)  & 1U) << 3U) |   // PA6  -> R_Left
+        (((a >> 7U)  & 1U) << 4U) |   // PA7  -> L_Up
+        (((a >> 8U)  & 1U) << 5U) |   // PA8  -> L_Right
+        (((a >> 11U) & 1U) << 6U) |   // PA11 -> L_Down
+        (((a >> 12U) & 1U) << 7U) |   // PA12 -> L_Left
+        (((b >> 11U) & 1U) << 8U) |   // PB11 -> Special1
+        (((b >> 12U) & 1U) << 9U)     // PB12 -> Special2
+    );
+}
+
 void gpioInit(void)
 {
     initGpioUsart3();

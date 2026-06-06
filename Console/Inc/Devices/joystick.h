@@ -5,12 +5,12 @@
 void joystickInit(void);
 void joystickReadData(void);
 
-typedef enum JoystickAnalogValue
+typedef enum JoystickAxisState
 {
-    JoystickAnalogValueOff = 0U,
-    JoystickAnalogValueLowAxis = 1U,
-    JoystickAnalogValueHighAxis = 2U
-} JoystickAnalogValue;
+    JoystickAxisStateOff      = 0U,
+    JoystickAxisStateNegative = 1U,
+    JoystickAxisStatePositive = 2U,
+} JoystickAxisState;
 
 bool joystickGetRBtnUp(void);
 bool joystickGetRBtnRight(void);
@@ -22,10 +22,10 @@ bool joystickGetLBtnDown(void);
 bool joystickGetLBtnLeft(void);
 bool joystickGetSpecialBtn1(void);
 bool joystickGetSpecialBtn2(void);
-JoystickAnalogValue joystickGetRAnalogY(void);
-JoystickAnalogValue joystickGetRAnalogX(void);
-JoystickAnalogValue joystickGetLAnalogY(void);
-JoystickAnalogValue joystickGetLAnalogX(void);
+JoystickAxisState joystickGetRAnalogY(void);
+JoystickAxisState joystickGetRAnalogX(void);
+JoystickAxisState joystickGetLAnalogY(void);
+JoystickAxisState joystickGetLAnalogX(void);
 bool joystickIsAnyButtonPressed(void);
 
 #endif /* __JOYSTICK_H */
