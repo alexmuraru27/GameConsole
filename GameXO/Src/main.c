@@ -30,7 +30,7 @@ int main(void)
     if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == 1U)
     {
         gameStateManagerInit();
-        playSound(ASSET_ID_WELCOME_SOUND, ASSET_ID_WELCOME_SOUND_DURATION);
+        playSound(ASSET_ID_WELCOME_SOUND);
         while (true)
         {
             // UPDATE

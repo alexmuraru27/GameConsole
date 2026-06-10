@@ -11,14 +11,13 @@
 #define INVALID_TRACK 255
 typedef struct
 {
-    const uint16_t *frequencies_hz; // note frequency in hz (0 for silence)
-    const uint16_t *durations_ms;   // duration in milliseconds
-    uint16_t notes;                 // Number of notes
-    bool is_playing;                // Playback status
-    bool is_looped;                 // If the track should be looped
-    void (*callback)(void);         // Callback fptr
-    uint32_t note_idx;              // Index of current note being played
-    uint32_t ms_counter;            // Counts milliseconds for current note
+    const uint16_t *notes_data; // interleaved {freq_hz, duration_ms, freq_hz, duration_ms, ...}
+    uint16_t notes;             // Number of notes
+    bool is_playing;            // Playback status
+    bool is_looped;             // If the track should be looped
+    bool *on_done_flag;         // Set to true by the ISR when the track finishes
+    uint32_t note_idx;          // Index of current note being played
+    uint32_t ms_counter;        // Counts milliseconds for current note
 } TrackData;
 
 static CCMRAM TrackData s_track_data_queue[SOUND_TRACKS];
@@ -34,10 +33,9 @@ void buzzerInit(void)
     {
         s_track_data_queue[track_id].is_looped = false;
         s_track_data_queue[track_id].is_playing = false;
-        s_track_data_queue[track_id].durations_ms = NULL;
-        s_track_data_queue[track_id].frequencies_hz = NULL;
+        s_track_data_queue[track_id].notes_data = NULL;
         s_track_data_queue[track_id].notes = 0U;
-        s_track_data_queue[track_id].callback = NULL;
+        s_track_data_queue[track_id].on_done_flag = NULL;
         s_track_data_queue[track_id].note_idx = 0U;
         s_track_data_queue[track_id].ms_counter = 0U;
     }
@@ -49,10 +47,9 @@ static bool clearTrack(const uint8_t track_number)
     {
         s_track_data_queue[track_number].is_looped = false;
         s_track_data_queue[track_number].is_playing = false;
-        s_track_data_queue[track_number].durations_ms = NULL;
-        s_track_data_queue[track_number].frequencies_hz = NULL;
+        s_track_data_queue[track_number].notes_data = NULL;
         s_track_data_queue[track_number].notes = 0U;
-        s_track_data_queue[track_number].callback = NULL;
+        s_track_data_queue[track_number].on_done_flag = NULL;
         s_track_data_queue[track_number].note_idx = 0U;
         s_track_data_queue[track_number].ms_counter = 0U;
         return true;
@@ -87,18 +84,15 @@ static uint8_t getLastTrackPlaying()
     return INVALID_TRACK;
 }
 
-static bool executeCallback(uint8_t track_number)
+static void signalDone(uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
     {
-        if (s_track_data_queue[track_number].callback != NULL)
+        if (s_track_data_queue[track_number].on_done_flag != NULL)
         {
-            s_track_data_queue[track_number].callback();
-            return true;
+            *s_track_data_queue[track_number].on_done_flag = true;
         }
     }
-
-    return false;
 }
 
 static void updatePWM(uint8_t track_id)
@@ -111,7 +105,7 @@ static void updatePWM(uint8_t track_id)
             if (s_track_data_queue[track_id].is_looped)
             {
                 // If it's looped -> reset the note index to 0
-                executeCallback(track_id);
+                signalDone(track_id);
                 s_track_data_queue[track_id].note_idx = 0U;
             }
             else
@@ -129,7 +123,7 @@ static void updatePWM(uint8_t track_id)
         // highest track IDs have priority in playing
         if (track_id == getLastTrackPlaying())
         {
-            const uint32_t frequency_hz = s_track_data_queue[track_id].frequencies_hz[s_track_data_queue[track_id].note_idx];
+            const uint32_t frequency_hz = s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U];
             if (frequency_hz == 0)
             {
                 timer3Disable();
@@ -164,7 +158,7 @@ bool buzzerStop(const uint8_t track_number)
         {
             timer3Disable();
         }
-        executeCallback(track_number);
+        signalDone(track_number);
         clearTrack(track_number);
         return true;
     }
@@ -181,7 +175,7 @@ void buzzerStopAll()
 
 bool buzzerResume(uint8_t track_number)
 {
-    if (track_number < SOUND_TRACKS && (s_track_data_queue[track_number].durations_ms != NULL) && (s_track_data_queue[track_number].frequencies_hz != NULL))
+    if (track_number < SOUND_TRACKS && s_track_data_queue[track_number].notes_data != NULL)
     {
         s_track_data_queue[track_number].is_playing = true;
         return true;
@@ -200,8 +194,14 @@ void buzzerInterruptHandler(void)
             continue;
         }
 
+        if (s_track_data_queue[track_id].note_idx >= s_track_data_queue[track_id].notes)
+        {
+            buzzerStop(track_id);
+            continue;
+        }
+
         s_track_data_queue[track_id].ms_counter++;
-        if (s_track_data_queue[track_id].ms_counter >= s_track_data_queue[track_id].durations_ms[s_track_data_queue[track_id].note_idx])
+        if (s_track_data_queue[track_id].ms_counter >= s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U + 1U])
         {
             s_track_data_queue[track_id].note_idx++;
             updatePWM(track_id);
@@ -209,15 +209,14 @@ void buzzerInterruptHandler(void)
     }
 }
 
-bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, const uint16_t *const frequencies, const uint16_t *const durations_ms, const uint16_t notes, void (*on_done_callback)(void))
+bool buzzerPlayWithFlag(const uint8_t track_number, const bool is_looped, const uint16_t *const notes_data, const uint16_t notes, bool *on_done_flag)
 {
-    if (track_number < SOUND_TRACKS && frequencies != NULL && durations_ms != NULL && notes != 0U)
+    if (track_number < SOUND_TRACKS && notes_data != NULL && notes != 0U)
     {
         clearTrack(track_number);
-        s_track_data_queue[track_number].frequencies_hz = frequencies;
-        s_track_data_queue[track_number].durations_ms = durations_ms;
+        s_track_data_queue[track_number].notes_data = notes_data;
         s_track_data_queue[track_number].notes = notes;
-        s_track_data_queue[track_number].callback = on_done_callback;
+        s_track_data_queue[track_number].on_done_flag = on_done_flag;
         s_track_data_queue[track_number].is_looped = is_looped;
         s_track_data_queue[track_number].is_playing = true;
         updatePWM(track_number);
@@ -226,7 +225,7 @@ bool buzzerPlayWithCallback(const uint8_t track_number, const bool is_looped, co
     return false;
 }
 
-bool buzzerPlay(const uint8_t track_number, const bool is_looped, const uint16_t *const frequencies, const uint16_t *const durations_ms, const uint16_t notes)
+bool buzzerPlay(const uint8_t track_number, const bool is_looped, const uint16_t *const notes_data, const uint16_t notes)
 {
-    return buzzerPlayWithCallback(track_number, is_looped, frequencies, durations_ms, notes, NULL);
+    return buzzerPlayWithFlag(track_number, is_looped, notes_data, notes, NULL);
 }

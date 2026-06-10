@@ -9,8 +9,8 @@ typedef struct
 
     // SOUND
     uint8_t (*buzzerGetMaxTracks)();
-    bool (*buzzerPlay)(uint8_t track_number, bool is_looped, const uint16_t *const frequencies_hz, const uint16_t *const durations_ms, uint16_t notes_number);
-    bool (*buzzerPlayWithCallback)(uint8_t track_number, bool is_looped, const uint16_t *const frequencies_hz, const uint16_t *const durations_ms, uint16_t notes_number, void (*on_done_callback)(void));
+    bool (*buzzerPlay)(uint8_t track_number, bool is_looped, const uint16_t *const notes_data, uint16_t notes_number);
+    bool (*buzzerPlayWithFlag)(uint8_t track_number, bool is_looped, const uint16_t *const notes_data, uint16_t notes_number, bool *on_done_flag);
     bool (*buzzerPause)(uint8_t track_number);
     bool (*buzzerResume)(uint8_t track_number);
     bool (*buzzerStop)(uint8_t track_number);

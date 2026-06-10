@@ -1,11 +1,18 @@
 {
     "configurations": [
         {
-            "name": "Windows",
+            "name": "STM32F407",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
-            "intelliSenseMode": "windows-msvc-x64",
+            "compilerPath": "/opt/arm-gnu-toolchain/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m4",
+                "-mfpu=fpv4-sp-d16",
+                "-mfloat-abi=hard",
+                "-mthumb"
+            ],
+            "intelliSenseMode": "gcc-arm",
             "cStandard": "c17",
             "cppStandard": "c++17",
             "defines": [

@@ -34,7 +34,7 @@ static void gameConsoleExposeApi()
             // SOUND
             .buzzerGetMaxTracks = &buzzerGetMaxTracks,
             .buzzerPlay = &buzzerPlay,
-            .buzzerPlayWithCallback = &buzzerPlayWithCallback,
+            .buzzerPlayWithFlag = &buzzerPlayWithFlag,
             .buzzerPause = &buzzerPause,
             .buzzerResume = &buzzerResume,
             .buzzerStop = &buzzerStop,
@@ -117,27 +117,48 @@ static void gameConsoleExposeApi()
     *API_PTR = api_header;
 }
 
-const uint16_t s_boot_melody[] = {
-    NOTE_D4, NOTE_FS4, NOTE_A4, NOTE_D5, NOTE_FS5, NOTE_A5,
-    NOTE_D6, NOTE_A5, NOTE_FS5, NOTE_D5, NOTE_A4};
-
-const uint16_t s_boot_tempo[] = {
-    450, 400, 350, 300, 250, 200,
-    150, 200, 250, 300, 600};
+const uint16_t s_boot_notes[] = {
+    NOTE_D4, 450, NOTE_FS4, 400, NOTE_A4, 350, NOTE_D5, 300, NOTE_FS5, 250, NOTE_A5, 200,
+    NOTE_D6, 150, NOTE_A5, 200, NOTE_FS5, 250, NOTE_D5, 300, NOTE_A4, 600};
 
 static void playBootSong()
 {
-    buzzerPlay(0, false, s_boot_melody, s_boot_tempo, sizeof(s_boot_melody) / sizeof(uint16_t));
+    buzzerPlay(0, false, s_boot_notes, sizeof(s_boot_notes) / sizeof(uint16_t) / 2U);
 }
 
 static const uint16_t s_step_notes[] = {
-    NOTE_C4, NOTE_D4, NOTE_E4, NOTE_F4, NOTE_G4,
-    NOTE_A4, NOTE_B4, NOTE_C5, NOTE_D5, NOTE_E5};
-static const uint16_t s_step_tempo[] = {80};
+    NOTE_C4,
+    80,
+    NOTE_D4,
+    80,
+    NOTE_E4,
+    80,
+    NOTE_F4,
+    80,
+    NOTE_G4,
+    80,
+    NOTE_A4,
+    80,
+    NOTE_B4,
+    80,
+    NOTE_C5,
+    80,
+    NOTE_D5,
+    80,
+    NOTE_E5,
+    80,
+    NOTE_F5,
+    80,
+};
 
 static void beep_step(uint8_t step)
 {
-    buzzerPlay(0, false, &s_step_notes[step], s_step_tempo, 1);
+    if (step >= (sizeof(s_step_notes) / sizeof(uint16_t) / 2U))
+    {
+        printf("beep_step: step %u out of range\n", step);
+        return;
+    }
+    buzzerPlay(0, false, &s_step_notes[step * 2U], 1);
     delay(150);
 }
 

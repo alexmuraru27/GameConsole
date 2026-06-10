@@ -77,7 +77,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 ### Sound (Buzzer)
 - `buzzerGetMaxTracks()`: Get number of sound tracks.
 - `buzzerPlay(track, data, size)`: Play sound data.
-- `buzzerPlayWithCallback(...)`: Play with callback.
+- `buzzerPlayWithFlag(...)`: Play with callback.
 - `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`: Control playback.
 
 ### Joystick
@@ -138,7 +138,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - Internal functions:
   - `buzzerInit()`: Set up timers and output pins.
   - `buzzerPlay()`, `buzzerPause()`, `buzzerResume()`, `buzzerStop()`: Playback control.
-  - `buzzerPlayWithCallback()`: Play sound and trigger callback on completion.
+  - `buzzerPlayWithFlag()`: Play sound and trigger callback on completion.
 
 ### Asset Loader (asset_loader.c/h)
 - Loads game assets (tiles, sounds, etc.) from SD card or flash.

@@ -336,15 +336,15 @@ bool levelManagerEnd(bool is_level_transition)
         // End game sound
         if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_DRAW)
         {
-            playSound(ASSET_ID_DRAW_SOUND, ASSET_ID_DRAW_SOUND_DURATION);
+            playSound(ASSET_ID_DRAW_SOUND);
         }
         else if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_WIN_X && s_is_player_symbol_x)
         {
-            playSound(ASSET_ID_WIN_SOUND, ASSET_ID_WIN_SOUND_DURATION);
+            playSound(ASSET_ID_WIN_SOUND);
         }
         else
         {
-            playSound(ASSET_ID_LOOSE_SOUND, ASSET_ID_LOOSE_SOUND_DURATION);
+            playSound(ASSET_ID_LOOSE_SOUND);
         }
     }
 

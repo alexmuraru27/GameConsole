@@ -71,6 +71,7 @@ static uint8_t s_analog_raw[ANALOG_COUNT];
 static uint32_t s_analog_debounce_timer[ANALOG_COUNT];
 
 static volatile uint16_t *s_buffer_addr = 0U;
+static bool s_initialized = false;
 
 static const uint32_t s_axis_mask[] = {
     ANALOG_MASK_LX, ANALOG_MASK_LY,
@@ -88,13 +89,13 @@ static void readButtons(void)
         const uint8_t raw_bit = (raw_all >> i) & 1U;
         if (raw_bit != s_btn_raw[i])
         {
-            s_btn_raw[i]            = raw_bit;
+            s_btn_raw[i] = raw_bit;
             s_btn_debounce_timer[i] = getSysTime();
         }
         else if (getSysTime() - s_btn_debounce_timer[i] >= DEBOUNCE_MS)
         {
             if (raw_bit)
-                s_btn_data |=  (1U << i);
+                s_btn_data |= (1U << i);
             else
                 s_btn_data &= ~(1U << i);
         }
@@ -103,12 +104,6 @@ static void readButtons(void)
 
 static void readAnalog(void)
 {
-    if (!s_buffer_addr)
-    {
-        printf("joystick: analog buffer address is null\n");
-        return;
-    }
-
     for (uint8_t i = 0U; i < ANALOG_COUNT; ++i)
     {
         uint8_t raw_axis = RawAnalogStateMid;
@@ -120,7 +115,7 @@ static void readAnalog(void)
 
         if (raw_axis != s_analog_raw[i])
         {
-            s_analog_raw[i]            = raw_axis;
+            s_analog_raw[i] = raw_axis;
             s_analog_debounce_timer[i] = getSysTime();
         }
         else if (getSysTime() - s_analog_debounce_timer[i] >= DEBOUNCE_MS)
@@ -133,6 +128,11 @@ static void readAnalog(void)
 
 void joystickReadData(void)
 {
+    if (!s_initialized)
+    {
+        return;
+    }
+
     readButtons();
     readAnalog();
 }
@@ -154,6 +154,7 @@ void joystickInit(void)
         s_analog_raw[i] = RawAnalogStateMid;
         s_analog_debounce_timer[i] = now;
     }
+    s_initialized = true;
 }
 
 bool joystickGetRBtnUp(void)

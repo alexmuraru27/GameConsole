@@ -1,5 +1,0 @@
-#ifndef __TEST_RENDERER_H
-#define __TEST_RENDERER_H
-
-void testRendererInit(void);
-#endif /* __TEST_RENDERER_H */
