@@ -187,7 +187,7 @@ void update() {
 - `Console/Src/`: Main source files
 - `Console/Inc/`: Headers
 - `GameXO/`: Example game
-- `Shared/`, `Tiles/`, `Assets/`: Shared resources
+- `Shared/`, `Assets/` (`Tiles/`, `Music/`): Shared resources
 
 ---
 

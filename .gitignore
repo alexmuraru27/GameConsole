@@ -56,3 +56,4 @@ build/
 GeneratedTiles/
 
 CLAUDE.md
+__pycache__

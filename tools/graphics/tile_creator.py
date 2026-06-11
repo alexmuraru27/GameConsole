@@ -3,7 +3,7 @@ import pygame
 import sys
 import os
 
-OUTPUT_FILES_DIR = "Tiles"
+OUTPUT_FILES_DIR = os.path.join("Assets", "Tiles")
 DEFAULT_H_FILENAME = "tile"
 TILE_SIZE = 16
 PIXEL_SIZE = 20
@@ -219,7 +219,7 @@ def export_as_array(filename):
     if not filename.endswith(".h"):
         filename += ".h"
     if not os.path.exists(OUTPUT_FILES_DIR):
-        os.mkdir(OUTPUT_FILES_DIR)
+        os.makedirs(OUTPUT_FILES_DIR)
     full_path = os.path.join(OUTPUT_FILES_DIR, filename)
     with open(full_path, "w") as f:
         # save tile data

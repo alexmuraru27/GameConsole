@@ -38,7 +38,7 @@ C_DEFS =  \
 C_INCLUDES =  \
 -IInc \
 -IAssets/Inc \
--I../Tiles \
+-I../Assets/Tiles \
 -I../Shared \
 -I../Shared/Api \
 -I../Shared/TileUtils

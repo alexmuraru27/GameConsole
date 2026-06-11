@@ -5,7 +5,15 @@
             "name": "Tile Creator",
             "type": "debugpy",
             "request": "launch",
-            "program": "tile_creator.py",
+            "program": "tools/graphics/tile_creator.py",
+            "console": "internalConsole"
+        },
+        {
+            "name": "Music Creator",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/music_creator/music_creator.py",
+            "args": ["-o", "Assets/Music"],
             "console": "internalConsole"
         },
         {

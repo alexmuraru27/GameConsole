@@ -75,7 +75,7 @@ C_INCLUDES =  \
 -IInc/SettingsStorage \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
--I../Tiles \
+-I../Assets/Tiles \
 -I../Shared \
 -I../Shared/Api \
 -I../Shared/TileUtils \

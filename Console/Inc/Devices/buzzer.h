@@ -5,6 +5,18 @@
 
 // in hertz
 #define NOTE_PAUSE 0U
+#define NOTE_C2 65U
+#define NOTE_CS2 69U
+#define NOTE_D2 73U
+#define NOTE_DS2 78U
+#define NOTE_E2 82U
+#define NOTE_F2 87U
+#define NOTE_FS2 93U
+#define NOTE_G2 98U
+#define NOTE_GS2 104U
+#define NOTE_A2 110U
+#define NOTE_AS2 117U
+#define NOTE_B2 123U
 #define NOTE_C3 130U
 #define NOTE_CS3 138U
 #define NOTE_D3 146U
@@ -69,6 +81,14 @@
 #define NOTE_CS8 4435U
 #define NOTE_D8 4699U
 #define NOTE_DS8 4978U
+#define NOTE_E8 5274U
+#define NOTE_F8 5588U
+#define NOTE_FS8 5920U
+#define NOTE_G8 6272U
+#define NOTE_GS8 6645U
+#define NOTE_A8 7040U
+#define NOTE_AS8 7459U
+#define NOTE_B8 7902U
 
 // API
 void buzzerInit(void);
