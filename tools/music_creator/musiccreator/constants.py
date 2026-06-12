@@ -13,7 +13,12 @@ DEFAULT_FILENAME = "music"
 # the buzzer sequence format stores both fields as uint16
 UINT16_MAX = 65535
 
+# .bin file magic ("NOT1") and format version,
+# see music_track.h for the C-side declarations
+NOTE_ASSET_MAGIC = b"NOT1"
+NOTE_ASSET_VERSION = 1
+
 DURATION_PRESETS_MS = [125, 250, 500, 1000]
 DEFAULT_DURATION_MS = 250
 DEFAULT_STEP_MS = 125
-DEFAULT_VOLUME_PERCENT = 60
+DEFAULT_VOLUME_PERCENT = 30

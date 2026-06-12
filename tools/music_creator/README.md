@@ -22,8 +22,8 @@ A frequency of `0` is a pause. The same format is written both as a raw
 - **Authentic playback**: square-wave synthesis approximating the buzzer,
   with playhead, pause/resume, and volume control.
 - **Keyboard-first entry**: place notes without touching the mouse.
-- **Dual output**: a `.bin` (loadable save state + runtime asset) and a `.c`
-  array ready to compile into a game.
+- **Dual output**: a `.bin` (loadable save state + runtime asset) and a
+  human-readable `.c` companion.
 
 ## Requirements
 
@@ -49,22 +49,27 @@ An example track ships with the tool — open it with
 | ------------------------- | --------------------------------------------- |
 | Left click empty cell     | Place a note at that pitch/time (previews it) |
 | Left click + drag right   | Stretch the note being placed                 |
-| Left click a note         | Select it (orange); ms box edits its length   |
-| Right click a note        | Delete it                                     |
+| Left click a note         | Select it (orange) and preview it; ms box edits its length |
+| Right click a note        | Delete it (click without dragging)            |
+| Right click + drag        | Pan the view in any direction                 |
 | Click a piano key (left)  | Preview that pitch                            |
+| Click/drag the time ruler | Set the play marker (where playback starts)   |
 | Mouse wheel / Shift+wheel | Scroll vertically / horizontally              |
+| Ctrl + wheel              | Zoom the timeline (anchored at the mouse)     |
 
 ### Keyboard
 
 | Key(s)              | Effect                                                  |
 | ------------------- | ------------------------------------------------------- |
 | `1`–`9` `0` `-` `+` | Place C, CS, D, DS, E, F, FS, G, GS, A, AS, B at cursor |
-| `Up` / `Down`       | Select octave (green bar on the piano keys)             |
+| `Up` / `Down`       | Transpose the selected note one pitch; with no selection, select octave (green bar on the piano keys) |
 | `Left` / `Right`    | Move the cursor (blue column) one grid step             |
 | `P`                 | Advance the cursor, leaving a pause                     |
 | `Delete`            | Delete the selected note                                |
 | `Escape`            | Deselect                                                |
-| `Space`             | Play / pause / resume                                   |
+| `Space`             | Play / pause / resume (playback starts at the play marker) |
+| `Ctrl+Z` / `Ctrl+R` | Undo / redo the last edit                               |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom the timeline in / out / reset           |
 | `Ctrl+S` / `Ctrl+L` | Save / load                                             |
 
 Notes placed by keyboard use the current **ms** length and advance the
@@ -77,6 +82,16 @@ cursor by their duration, so melodies can be typed in sequence.
   focus to keyboard note entry.
 - **Grid box**: time per grid cell (snapping resolution). Changing it only
   rescales the view; note timings are kept in milliseconds.
+- **Zoom −/+ buttons**: horizontal zoom of the timeline (8–96 px per grid
+  cell; purely visual, no effect on the data or snapping).
+- **Off-grid frequencies**: entries whose frequency is not a named pitch
+  (e.g. sound effects with jittered pitches) are drawn in teal on the
+  nearest row. They can be selected, deleted and re-timed without losing
+  their exact frequency; transposing snaps them to the row's named pitch.
+- **Time ruler**: the strip above the grid. Click (or drag) to place the
+  purple play marker — Play and Space start from there, so a section can be
+  replayed while editing it. The marker defaults to 0 (track start) and the
+  Stop button rewinds it there.
 - **File dropdown**: `<New Name>` to type a fresh name, or pick an existing
   `.bin` from the output directory. Save refreshes the list.
 
@@ -84,34 +99,73 @@ cursor by their duration, so melodies can be typed in sequence.
 
 ### `<name>.bin`
 
-Little-endian `uint16` pairs, 4 bytes per entry — identical to the array
-`buzzerPlay()` consumes, and also the editor's save state:
+A `MusicTrackHeader` followed by the note data, all little-endian. The
+structs are declared in [`music_track.h`](music_track.h) so C projects can
+import the format directly:
+
+```c
+typedef struct __attribute__((packed))
+{
+    uint16_t frequency_hz; // 0 = pause
+    uint16_t duration_ms;
+} NoteEntry;
+
+typedef struct __attribute__((packed))
+{
+    uint32_t magic;      // "NOT1"  (NOTE_ASSET_MAGIC = 0x31544F4E)
+    uint32_t version;    // NOTE_ASSET_VERSION
+    uint32_t noteCount;  // number of NoteEntry entries
+    uint32_t dataSize;   // noteCount * sizeof(NoteEntry)
+} MusicTrackHeader;
+
+typedef struct __attribute__((packed))
+{
+    MusicTrackHeader header;
+    NoteEntry entries[]; // header.noteCount entries
+} MusicTrack;
+```
 
 ```
-offset 0: frequency_hz  (uint16 LE)   0 = pause
-offset 2: duration_ms   (uint16 LE)
-offset 4: frequency_hz ...
+offset  0: MusicTrackHeader            (16 bytes)
+offset 16: NoteEntry[noteCount]       (4 bytes each)
 ```
+
+A loaded file maps directly onto `MusicTrack`:
+
+```c
+const MusicTrack *track = (const MusicTrack *)buffer;
+if (track->header.magic == NOTE_ASSET_MAGIC &&
+    track->header.version == NOTE_ASSET_VERSION)
+{
+    play((const uint16_t *)track->entries, track->header.noteCount);
+}
+```
+
+Loading still accepts legacy header-less files (raw pairs only).
 
 ### `<name>.c`
 
+A human-readable companion to the `.bin` (the `.bin` is the file meant for
+actual use):
+
 ```c
 // Generated by music_creator.py - do not edit manually
-#include <stdint.h>
+#include "music_track.h"
 
 #define MY_TUNE_NOTES_NUMBER 3U
+
+const MusicTrackHeader my_tune_music_header = {
+    .magic = NOTE_ASSET_MAGIC,
+    .version = NOTE_ASSET_VERSION,
+    .noteCount = MY_TUNE_NOTES_NUMBER,
+    .dataSize = MY_TUNE_NOTES_NUMBER * sizeof(NoteEntry),
+};
 
 const uint16_t my_tune_music[MY_TUNE_NOTES_NUMBER * 2U] = {
     440U, 250U, // A4
     0U, 250U, // PAUSE
     523U, 500U, // C5
 };
-```
-
-Firmware usage:
-
-```c
-buzzerPlay(track, /*is_looped=*/false, my_tune_music, MY_TUNE_NOTES_NUMBER);
 ```
 
 ### `notes.yaml`
@@ -156,6 +210,7 @@ graph TD
     MW --> ST[storage.py<br/>.bin / .c files]
     MW --> AU
     PR --> TL[timeline.py<br/>Timeline, TimelineNote]
+    PR --> HI[history.py<br/>UndoStack]
     PR --> TH[gui/theme.py<br/>colors + geometry]
     TL --> CO[constants.py]
     NT --> CO
@@ -163,7 +218,7 @@ graph TD
     classDef qt fill:#d6e4ff,stroke:#3b6fc9
     classDef core fill:#dcf2dc,stroke:#3f8f4f
     class MW,PR,TH qt
-    class TL,ST,AU,NT,CO core
+    class TL,ST,AU,NT,CO,HI core
 ```
 
 ### Module responsibilities
@@ -173,10 +228,12 @@ graph TD
 | `constants.py`       | Shared defaults, limits, repo paths                                                                                      | no            |
 | `notes.py`           | Read `notes.yaml`, `NoteTable` lookups (name ↔ frequency, octaves)                                                       | no            |
 | `timeline.py`        | `Timeline`/`TimelineNote` domain model: monophonic note placement, overlap trimming, conversion to/from buzzer sequences | no            |
+| `history.py`         | `UndoStack`: memento-based undo/redo with burst coalescing                                                              | no            |
 | `storage.py`         | `.bin` serialization, `.c` code generation, output dir listing                                                           | no            |
 | `audio.py`           | Square-wave synthesis, `Player` (play/pause/resume/stop, position clock, volume)                                         | no            |
 | `gui/theme.py`       | Geometry and color constants                                                                                             | yes           |
-| `gui/piano_roll.py`  | `PianoRoll` (grid view/controller over a `Timeline`), `PianoGutter` (fixed key column)                                   | yes           |
+| `gui/piano_roll.py`  | `PianoRoll` (grid view/controller over a `Timeline`), `PianoGutter` (fixed key column), `TimeRuler` (play marker bar)    | yes           |
+| `gui/confirm.py`     | In-window Yes/No overlay (centered on all platforms, incl. Wayland)                                                      | yes           |
 | `gui/main_window.py` | Window layout, keyboard handling, transport, file UI                                                                     | yes           |
 | `music_creator.py`   | Argument parsing, wiring, app lifecycle                                                                                  | yes           |
 

@@ -13,10 +13,10 @@ from PyQt6.QtGui import QKeySequence, QRegularExpressionValidator, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMessageBox,
     QPushButton,
     QScrollArea,
     QSlider,
@@ -36,7 +36,8 @@ from ..constants import (
 )
 from ..notes import SEMITONE_ORDER
 from . import theme
-from .piano_roll import PianoGutter, PianoRoll
+from .confirm import confirm
+from .piano_roll import PianoGutter, PianoRoll, TimeRuler
 
 NEW_NAME_ITEM = "<New Name>"
 
@@ -69,6 +70,7 @@ class MusicCreatorWindow(QMainWindow):
             note_table.octaves[0] if note_table.octaves else None
         )
 
+        self._play_offset_ms = 0
         self.playhead_timer = QTimer(self)
         self.playhead_timer.setInterval(theme.PLAYHEAD_TIMER_MS)
         self.playhead_timer.timeout.connect(self._update_playhead)
@@ -97,6 +99,12 @@ class MusicCreatorWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+S"), self, self.save_clicked)
         QShortcut(QKeySequence("Ctrl+L"), self, self.load_clicked)
+        QShortcut(QKeySequence("Ctrl+Z"), self, self.undo)
+        QShortcut(QKeySequence("Ctrl+R"), self, self.redo)
+        QShortcut(QKeySequence("Ctrl+="), self, lambda: self._zoom(+1))
+        QShortcut(QKeySequence("Ctrl++"), self, lambda: self._zoom(+1))
+        QShortcut(QKeySequence("Ctrl+-"), self, lambda: self._zoom(-1))
+        QShortcut(QKeySequence("Ctrl+0"), self, self._zoom_reset)
         QShortcut(QKeySequence(Qt.Key.Key_Space), self, self.toggle_playback)
 
     def _build_duration_row(self):
@@ -134,9 +142,20 @@ class MusicCreatorWindow(QMainWindow):
         self.step_spin.setSuffix(" ms")
         self.step_spin.setFixedWidth(90)
         self.step_spin.setToolTip("Time per grid cell (snapping)")
-        self.step_spin.valueChanged.connect(lambda v: self.roll.set_step(v))
+        self.step_spin.valueChanged.connect(self._step_changed)
         self.step_spin.lineEdit().returnPressed.connect(self.setFocus)
         row.addWidget(self.step_spin)
+        row.addSpacing(20)
+        row.addWidget(QLabel("Zoom"))
+        for label, direction, tip in (
+            ("-", -1, "Zoom out (Ctrl+-, Ctrl+wheel)"),
+            ("+", +1, "Zoom in (Ctrl+=, Ctrl+wheel)"),
+        ):
+            button = QPushButton(label)
+            button.setFixedWidth(28)
+            button.setToolTip(tip)
+            button.clicked.connect(lambda _, d=direction: self._zoom(d))
+            row.addWidget(button)
         self.status_label = QLabel()
         row.addWidget(self.status_label)
         row.addStretch()
@@ -147,19 +166,28 @@ class MusicCreatorWindow(QMainWindow):
         self.roll.selection_changed.connect(self._roll_selection_changed)
         self.roll.preview_requested.connect(self.player.preview)
         self.roll.content_changed.connect(self._update_status)
+        self.roll.zoom_requested.connect(self._zoom)
+        self.roll.scroll_requested.connect(self._roll_scrolled)
+        self.roll.pan_requested.connect(self._roll_panned)
         self.gutter = PianoGutter(self.note_table.pitched_desc)
         self.gutter.preview_requested.connect(self.player.preview)
+        self.ruler = TimeRuler()
+        self.ruler.play_start_changed.connect(self._play_start_changed)
         self.scroll = QScrollArea()
         self.scroll.setWidget(self.roll)
         self.scroll.setWidgetResizable(False)
         self.scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self.scroll.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.scroll.verticalScrollBar().valueChanged.connect(self.gutter.set_offset)
-        row = QHBoxLayout()
-        row.setSpacing(0)
-        row.addWidget(self.gutter)
-        row.addWidget(self.scroll, stretch=1)
-        return row
+        self.scroll.horizontalScrollBar().valueChanged.connect(self.ruler.set_offset)
+        grid = QGridLayout()
+        grid.setSpacing(0)
+        grid.addWidget(self.ruler, 0, 1)
+        grid.addWidget(self.gutter, 1, 0)
+        grid.addWidget(self.scroll, 1, 1)
+        grid.setColumnStretch(1, 1)
+        grid.setRowStretch(1, 1)
+        return grid
 
     def _build_bottom_row(self, filename):
         row = QHBoxLayout()
@@ -188,7 +216,7 @@ class MusicCreatorWindow(QMainWindow):
         self.pause_button.clicked.connect(self.pause_resume)
         row.addWidget(self.pause_button)
         stop_button = QPushButton("Stop")
-        stop_button.clicked.connect(self.stop_playback)
+        stop_button.clicked.connect(self.stop_clicked)
         row.addWidget(stop_button)
         row.addSpacing(30)
         row.addWidget(QLabel("Vol"))
@@ -224,11 +252,21 @@ class MusicCreatorWindow(QMainWindow):
 
     def keyPressEvent(self, event):
         key = event.key()
-        # Up/Down follow the keys visually (high pitches at the top)
+        # Up/Down transpose the selected note one pitch; with no selection
+        # they pick the octave. Directions follow the keys visually
+        # (high pitches at the top).
         if key == Qt.Key.Key_Up:
-            self.change_octave(+1)
+            if self.roll.selected is not None:
+                if self.roll.transpose_selected(-1):
+                    self._ensure_note_visible(self.roll.selected)
+            else:
+                self.change_octave(+1)
         elif key == Qt.Key.Key_Down:
-            self.change_octave(-1)
+            if self.roll.selected is not None:
+                if self.roll.transpose_selected(+1):
+                    self._ensure_note_visible(self.roll.selected)
+            else:
+                self.change_octave(-1)
         elif key == Qt.Key.Key_Left:
             self.roll.advance_cursor(-self.roll.step_ms)
             self._ensure_cursor_visible()
@@ -254,22 +292,109 @@ class MusicCreatorWindow(QMainWindow):
     def _ensure_cursor_visible(self):
         self._scroll_horizontally_to(self.roll.x_of_ms(self.roll.cursor_ms))
 
+    def _ensure_note_visible(self, note):
+        row = self.roll.row_of(note.frequency_hz)
+        if row is None:
+            return
+        y = row * theme.CELL_H
+        bar = self.scroll.verticalScrollBar()
+        view_h = self.scroll.viewport().height()
+        if y < bar.value() or y > bar.value() + view_h - theme.CELL_H * 2:
+            bar.setValue(max(0, y - view_h // 2))
+
     def _scroll_horizontally_to(self, x):
         bar = self.scroll.horizontalScrollBar()
         view_w = self.scroll.viewport().width()
-        if x < bar.value() or x > bar.value() + view_w - theme.CELL_W * 2:
+        if x < bar.value() or x > bar.value() + view_w - self.roll.cell_w * 2:
             bar.setValue(max(0, x - view_w // 2))
 
     # ---------------- playback ----------------
 
-    def play(self):
-        sequence = self.roll.timeline.to_sequence()
+    def _play_start_changed(self, ms):
+        self.roll.set_play_start(ms)
+        self.ruler.set_play_start(ms)
+        # pygame cannot seek: reposition active playback by restarting it
+        # from the new marker, staying paused if it was paused
+        if not self.player.is_active:
+            return
+        was_paused = self.player.is_paused
+        self.stop_playback()
+        sequence = self.roll.timeline.to_sequence(ms)
         if not sequence:
-            self.statusBar().showMessage("Nothing to play", 2000)
+            return
+        self._play_offset_ms = ms
+        self.player.play(sequence)
+        if was_paused:
+            self.player.pause()
+            self.pause_button.setText("Resume")
+            self.roll.set_playhead(ms)
+        else:
+            self.playhead_timer.start()
+
+    def _step_changed(self, step_ms):
+        self.roll.set_step(step_ms)
+        self.ruler.set_step(step_ms)
+        # keep both views of the (re-snapped) marker identical
+        self.roll.set_play_start(self.ruler.play_start_ms)
+
+    def _roll_scrolled(self, delta, horizontal):
+        # standard Qt wheel feel: 3 lines per 120-unit notch
+        bar = (
+            self.scroll.horizontalScrollBar()
+            if horizontal
+            else self.scroll.verticalScrollBar()
+        )
+        bar.setValue(bar.value() - int(delta / 120 * 3 * bar.singleStep()))
+
+    def _roll_panned(self, dx, dy):
+        # grab-and-drag: the content follows the mouse
+        hbar = self.scroll.horizontalScrollBar()
+        vbar = self.scroll.verticalScrollBar()
+        hbar.setValue(hbar.value() - dx)
+        vbar.setValue(vbar.value() - dy)
+
+    def _zoom(self, direction, anchor_roll_x=None):
+        factor = 1.25 if direction > 0 else 0.8
+        new_cell_w = max(
+            theme.CELL_W_MIN,
+            min(theme.CELL_W_MAX, round(self.roll.cell_w * factor)),
+        )
+        if new_cell_w != self.roll.cell_w:
+            self._apply_zoom(new_cell_w, anchor_roll_x)
+
+    def _zoom_reset(self):
+        if self.roll.cell_w != theme.CELL_W:
+            self._apply_zoom(theme.CELL_W, None)
+
+    def _apply_zoom(self, cell_w, anchor_roll_x):
+        # keep the time under the anchor (mouse or viewport center) in place
+        hbar = self.scroll.horizontalScrollBar()
+        if anchor_roll_x is None:
+            anchor_roll_x = hbar.value() + self.scroll.viewport().width() // 2
+        anchor_ms = self.roll.ms_of_x(anchor_roll_x)
+        viewport_x = anchor_roll_x - hbar.value()
+        self.roll.set_cell_w(cell_w)
+        self.ruler.set_cell_w(cell_w)
+        hbar.setValue(max(0, self.roll.x_of_ms(anchor_ms) - viewport_x))
+
+    def play(self):
+        start_ms = self.roll.play_start_ms
+        sequence = self.roll.timeline.to_sequence(start_ms)
+        if not sequence:
+            self.statusBar().showMessage(
+                "Nothing to play after the play marker", 3000
+            )
             return
         self.stop_playback()
+        self._play_offset_ms = start_ms
         self.player.play(sequence)
         self.playhead_timer.start()
+
+    def stop_clicked(self):
+        self.stop_playback()
+        # an explicit Stop also rewinds the play marker to the start
+        self.roll.set_play_start(0)
+        self.ruler.set_play_start(0)
 
     def stop_playback(self):
         self.player.stop()
@@ -303,10 +428,19 @@ class MusicCreatorWindow(QMainWindow):
         if elapsed_ms >= self.player.total_ms:
             self.stop_playback()
             return
-        self.roll.set_playhead(int(elapsed_ms))
-        self._scroll_horizontally_to(self.roll.x_of_ms(elapsed_ms))
+        position_ms = self._play_offset_ms + elapsed_ms
+        self.roll.set_playhead(int(position_ms))
+        self._scroll_horizontally_to(self.roll.x_of_ms(position_ms))
 
     # ---------------- editing callbacks ----------------
+
+    def undo(self):
+        if not self.roll.undo():
+            self.statusBar().showMessage("Nothing to undo", 2000)
+
+    def redo(self):
+        if not self.roll.redo():
+            self.statusBar().showMessage("Nothing to redo", 2000)
 
     def _roll_selection_changed(self, note):
         if note is not None and note.duration_ms != self.duration_spin.value():
@@ -369,8 +503,7 @@ class MusicCreatorWindow(QMainWindow):
         )
 
     def _confirm(self, question):
-        answer = QMessageBox.question(self, "Confirm", question)
-        return answer == QMessageBox.StandardButton.Yes
+        return confirm(self, question)
 
     def save_clicked(self):
         sequence = self.roll.timeline.to_sequence()

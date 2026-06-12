@@ -88,20 +88,38 @@ class Timeline:
     def clear(self):
         self.notes = []
 
-    def to_sequence(self):
+    def snapshot(self):
+        """Memento of the current content (for undo/redo)."""
+        return [
+            (note.start_ms, note.duration_ms, note.frequency_hz)
+            for note in self.notes
+        ]
+
+    def restore(self, snapshot):
+        """Replace the content with a snapshot() memento."""
+        self.notes = [TimelineNote(*entry) for entry in snapshot]
+
+    def to_sequence(self, start_ms=0):
         """Flatten to buzzer (frequency_hz, duration_ms) pairs; gaps -> pauses.
 
-        Gaps longer than UINT16_MAX ms are split into multiple pause entries.
+        With start_ms, the sequence covers only the timeline from that point:
+        earlier notes are skipped and a note straddling start_ms is trimmed
+        to its remainder. Gaps longer than UINT16_MAX ms are split into
+        multiple pause entries.
         """
         sequence = []
-        t = 0
+        t = start_ms
         for note in sorted(self.notes, key=lambda n: n.start_ms):
-            gap = note.start_ms - t
+            if note.end_ms <= start_ms:
+                continue
+            note_start = max(note.start_ms, start_ms)
+            gap = note_start - t
             while gap > 0:
                 chunk = min(gap, UINT16_MAX)
                 sequence.append((0, chunk))
                 gap -= chunk
-            sequence.append((note.frequency_hz, min(note.duration_ms, UINT16_MAX)))
+            duration = note.end_ms - note_start
+            sequence.append((note.frequency_hz, min(duration, UINT16_MAX)))
             t = note.end_ms
         return sequence
 
