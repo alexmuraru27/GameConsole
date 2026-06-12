@@ -357,16 +357,22 @@ class PianoRoll(QWidget):
 
     # ---- painting ----
 
-    def paintEvent(self, _event):
+    def paintEvent(self, event):
         painter = QPainter(self)
-        width = self.width()
+        # paint only the exposed region: with fine grid steps the full
+        # widget can be hundreds of thousands of pixels wide
+        clip = event.rect()
         height = self.height()
         for row, (name, _freq) in enumerate(self.pitches):
             color = (
                 theme.COLOR_ROW_SHARP if "S" in name else theme.COLOR_ROW_NATURAL
             )
-            painter.fillRect(0, row * theme.CELL_H, width, theme.CELL_H, color)
-        for col in range(width // self.cell_w + 1):
+            painter.fillRect(
+                clip.left(), row * theme.CELL_H, clip.width(), theme.CELL_H, color
+            )
+        first_col = clip.left() // self.cell_w
+        last_col = clip.right() // self.cell_w + 1
+        for col in range(first_col, last_col + 1):
             x = col * self.cell_w
             painter.setPen(theme.COLOR_BEAT if col % 4 == 0 else theme.COLOR_GRID)
             painter.drawLine(x, 0, x, height)
@@ -376,7 +382,7 @@ class PianoRoll(QWidget):
             painter.setPen(
                 theme.COLOR_OCTAVE if is_octave_boundary else theme.COLOR_GRID
             )
-            painter.drawLine(0, y, width, y)
+            painter.drawLine(clip.left(), y, clip.right(), y)
         cursor_x = self.x_of_ms(self.cursor_ms)
         painter.fillRect(cursor_x, 0, self.cell_w, height, theme.COLOR_CURSOR)
         # playback start marker

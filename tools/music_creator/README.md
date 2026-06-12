@@ -45,32 +45,32 @@ An example track ships with the tool — open it with
 
 ### Mouse
 
-| Action                    | Effect                                        |
-| ------------------------- | --------------------------------------------- |
-| Left click empty cell     | Place a note at that pitch/time (previews it) |
-| Left click + drag right   | Stretch the note being placed                 |
+| Action                    | Effect                                                     |
+| ------------------------- | ---------------------------------------------------------- |
+| Left click empty cell     | Place a note at that pitch/time (previews it)              |
+| Left click + drag right   | Stretch the note being placed                              |
 | Left click a note         | Select it (orange) and preview it; ms box edits its length |
-| Right click a note        | Delete it (click without dragging)            |
-| Right click + drag        | Pan the view in any direction                 |
-| Click a piano key (left)  | Preview that pitch                            |
-| Click/drag the time ruler | Set the play marker (where playback starts)   |
-| Mouse wheel / Shift+wheel | Scroll vertically / horizontally              |
-| Ctrl + wheel              | Zoom the timeline (anchored at the mouse)     |
+| Right click a note        | Delete it (click without dragging)                         |
+| Right click + drag        | Pan the view in any direction                              |
+| Click a piano key (left)  | Preview that pitch                                         |
+| Click/drag the time ruler | Set the play marker (where playback starts)                |
+| Mouse wheel / Shift+wheel | Scroll vertically / horizontally                           |
+| Ctrl + wheel              | Zoom the timeline (anchored at the mouse)                  |
 
 ### Keyboard
 
-| Key(s)              | Effect                                                  |
-| ------------------- | ------------------------------------------------------- |
-| `1`–`9` `0` `-` `+` | Place C, CS, D, DS, E, F, FS, G, GS, A, AS, B at cursor |
-| `Up` / `Down`       | Transpose the selected note one pitch; with no selection, select octave (green bar on the piano keys) |
-| `Left` / `Right`    | Move the cursor (blue column) one grid step             |
-| `P`                 | Advance the cursor, leaving a pause                     |
-| `Delete`            | Delete the selected note                                |
-| `Escape`            | Deselect                                                |
-| `Space`             | Play / pause / resume (playback starts at the play marker) |
-| `Ctrl+Z` / `Ctrl+R` | Undo / redo the last edit                               |
-| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom the timeline in / out / reset           |
-| `Ctrl+S` / `Ctrl+L` | Save / load                                             |
+| Key(s)                         | Effect                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `1`–`9` `0` `-` `+`            | Place C, CS, D, DS, E, F, FS, G, GS, A, AS, B at cursor                                               |
+| `Up` / `Down`                  | Transpose the selected note one pitch; with no selection, select octave (green bar on the piano keys) |
+| `Left` / `Right`               | Move the cursor (blue column) one grid step                                                           |
+| `P`                            | Advance the cursor, leaving a pause                                                                   |
+| `Delete`                       | Delete the selected note                                                                              |
+| `Escape`                       | Deselect                                                                                              |
+| `Space`                        | Play / pause / resume (playback starts at the play marker)                                            |
+| `Ctrl+Z` / `Ctrl+Y`            | Undo / redo the last edit                                                                             |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom the timeline in / out / reset                                                                    |
+| `Ctrl+S` / `Ctrl+L`            | Save / load                                                                                           |
 
 Notes placed by keyboard use the current **ms** length and advance the
 cursor by their duration, so melodies can be typed in sequence.
@@ -80,10 +80,12 @@ cursor by their duration, so melodies can be typed in sequence.
 - **Preset buttons / ms box**: length for new notes. With a note selected,
   the ms box edits that note directly; press Enter in the box to return
   focus to keyboard note entry.
-- **Grid box**: time per grid cell (snapping resolution). Changing it only
-  rescales the view; note timings are kept in milliseconds.
-- **Zoom −/+ buttons**: horizontal zoom of the timeline (8–96 px per grid
-  cell; purely visual, no effect on the data or snapping).
+- **Grid box**: time per grid cell (snapping resolution, 1–2000 ms; at 1 ms
+  placement is effectively unsnapped — the buzzer's native resolution).
+  Changing it only rescales the view; note timings are kept in milliseconds.
+- **Zoom −/+ buttons**: horizontal zoom of the timeline (4–256 px per grid
+  cell; purely visual, no effect on the data or snapping). For even more
+  magnification, lower the Grid step — zoom is pixels *per grid cell*.
 - **Off-grid frequencies**: entries whose frequency is not a named pitch
   (e.g. sound effects with jittered pitches) are drawn in teal on the
   nearest row. They can be selected, deleted and re-timed without losing
@@ -228,7 +230,7 @@ graph TD
 | `constants.py`       | Shared defaults, limits, repo paths                                                                                      | no            |
 | `notes.py`           | Read `notes.yaml`, `NoteTable` lookups (name ↔ frequency, octaves)                                                       | no            |
 | `timeline.py`        | `Timeline`/`TimelineNote` domain model: monophonic note placement, overlap trimming, conversion to/from buzzer sequences | no            |
-| `history.py`         | `UndoStack`: memento-based undo/redo with burst coalescing                                                              | no            |
+| `history.py`         | `UndoStack`: memento-based undo/redo with burst coalescing                                                               | no            |
 | `storage.py`         | `.bin` serialization, `.c` code generation, output dir listing                                                           | no            |
 | `audio.py`           | Square-wave synthesis, `Player` (play/pause/resume/stop, position clock, volume)                                         | no            |
 | `gui/theme.py`       | Geometry and color constants                                                                                             | yes           |

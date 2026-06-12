@@ -5,8 +5,8 @@ from PyQt6.QtGui import QColor
 
 # piano roll geometry (pixels)
 CELL_W = 24
-CELL_W_MIN = 8
-CELL_W_MAX = 96
+CELL_W_MIN = 4
+CELL_W_MAX = 256
 CELL_H = 16
 GUTTER_W = 56
 RULER_H = 22
