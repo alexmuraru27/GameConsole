@@ -2,18 +2,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Tile Creator",
+            "name": "Pixel Forge",
             "type": "debugpy",
             "request": "launch",
-            "program": "tools/graphics/tile_creator.py",
-            "console": "internalConsole"
+            "program": "tools/graphics/pixel_forge.py",
+            "console": "internalConsole",
+            "args": [
+                "-o",
+                "Assets/Gfx"
+            ]
         },
         {
             "name": "Music Creator",
             "type": "debugpy",
             "request": "launch",
             "program": "tools/music_creator/music_creator.py",
-            "args": ["-o", "Assets/Music"],
+            "args": [
+                "-o",
+                "Assets/Music"
+            ],
             "console": "internalConsole"
         },
         {

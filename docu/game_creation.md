@@ -52,11 +52,13 @@ DEFINE_ASSET_16(audio_duration,ASSET_ID_AUDIO_DURATION,   ASSET_TYPE_AUDIO_DURAT
 
 Assets are lazy-loaded at runtime via `assetLoaderGetAssetData()`, so total asset data can exceed what fits in RAM at once.
 
-For tile data from the [Tile Creator](../tools/graphics/README.md), use the generated define directly:
+Tile data generated as a `DEFINE_*` macro (e.g. headers in `Assets/Tiles/`) plugs directly into the asset macros:
 
 ```c
 DEFINE_ASSET_8(my_tile, ASSET_ID_MY_TILE, ASSET_TYPE_TILE, (DEFINE_MY_TILE_DATA));
 ```
+
+For free-form pictures, [Pixel Forge](../tools/graphics/README.md) exports `GfxAsset` `.bin`/`.c` files in the console's 2bpp/4bpp formats.
 
 ### 6. Build and deploy
 

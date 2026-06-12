@@ -25,7 +25,7 @@ make clean     # remove all build artifacts
 | API & renderer internals | [docu/API_README.md](docu/API_README.md)         |
 | Hardware & pinout        | [docu/HW.md](docu/HW.md)                        |
 | Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
-| Tile Creator tool        | [tools/graphics/README.md](tools/graphics/README.md) |
+| Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md) |
 | Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md) |
 
 ## Naming Conventions
