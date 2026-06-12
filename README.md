@@ -1,179 +1,43 @@
-- [GameConsole](#gameconsole)
-  - [Development Board](#development-board)
-  - [Naming Conventions](#naming-conventions)
-  - [Tile Creator](#tile-creator)
-    - [Script](#script)
-    - [Deps](#deps)
-    - [User inputs:](#user-inputs)
-    - [Usage](#usage)
-  - [API \& Internal Documentation](#api--internal-documentation)
-  - [HW Configuration](#hw-configuration)
-  - [Game Creation Setup](#game-creation-setup)
-  - [EEPROM Mapping](#eeprom-mapping)
-    - [AT24C256](#at24c256)
-
-
 # GameConsole
-## Development Board
-https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html
 
+An embedded game console platform for the STM32F407VET6, with a NES-inspired tile renderer, SD card game loader, and a shared ConsoleAPI bridge that lets game binaries call into the firmware without linking against it.
 
-## Naming Conventions 
+**Development board:** [STM32F407VET6 F4VE V2.0](https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html)
 
-| Element              | Suggested Case          | Example                                     |
-| -------------------- | ----------------------- | ------------------------------------------- |
-| **Macros/Defines**   | UPPER_SNAKE_CASE        | `#define MAX_BUFFER_SIZE 256`               |
-| **Constants**        | UPPER_SNAKE_CASE        | `const int DEFAULT_TIMEOUT`                 |
-| **Global variables** | g_snake_case            | `g_system_initialized`                      |
-| **Static globals**   | s_snake_case            | `s_buffer_index`                            |
-| **Local variables**  | snake_case              | `temp_value`                                |
-| **Functions**        | snake_case or camelCase | `init_peripherals()` or `initPeripherals()` |
-| **Struct types**     | PascalCase              | `typedef struct SensorData`                 |
-| **Enum types**       | PascalCase              | `typedef enum PowerState`                   |
-| **Struct members**   | snake_case              | `uint16_t adc_value;`                       |
-| **Typedefs**         | PascalCase              | `typedef uint8_t Byte;`                     |
+![Console PCB](docu/HW/PCB_DESIGN.png)
 
+## Quick Start
 
-## Tile Creator
+Requires `arm-none-eabi-gcc` and `openocd` on PATH.
 
-### Script
-tile_creator.py
-
-### Deps
-pygame
-
-### User inputs:
-1. Left click draw
-2. Right click clear
-3. RCtrl S -> save(by textbox name)
-4. RCtrl L -> load(by textbox name)
-
-### Usage
-Click on the 4 big squares to select the palette with which to draw (1st one is always the transparent one)
-After you selected a palette you can also change its color from the top grid containing the system palette
-
-Output directory: generated_tiles/
-
-![alt text](docu/tile_creator_docu.png)
-
-E.g output
-
-```c++
-#ifndef __bricks1_H
-#define __bricks1_H
-#include "tileCreator.h"
-const uint8_t bricks1_data[64U] = DEFINE_TILE(
-	2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 
-	3, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 3, 1, 1, 1, 
-	2, 1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 3, 3, 3, 
-	2, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 
-	3, 3, 3, 3, 1, 3, 3, 3, 3, 3, 3, 2, 1, 1, 1, 1, 
-	2, 2, 2, 2, 1, 3, 2, 2, 2, 2, 2, 2, 2, 1, 3, 3, 
-	2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 
-	3, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 
-	2, 1, 3, 2, 2, 2, 2, 2, 1, 2, 2, 1, 3, 3, 3, 3, 
-	2, 1, 3, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 2, 2, 2, 
-	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 
-	3, 3, 3, 3, 1, 3, 3, 3, 3, 2, 3, 1, 1, 1, 1, 1, 
-	2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 1, 3, 3);
-const uint8_t bricks1_palette[4U] = {0x30, 0x7, 0x17, 0x27};
-#endif
-#endif
-
+```bash
+make all       # build Console firmware + GameXO game
+make flash     # flash firmware via OpenOCD/STLink
+make flashswo  # flash and start SWO trace output
+make deploy    # copy GameXO.bin to SD card at /mnt/sd
+make clean     # remove all build artifacts
 ```
 
-## API & Internal Documentation
+## Documentation
 
-See [docu/API_README.md](docu/API_README.md) for a full API reference, module internals, renderer usage, and advanced graphics documentation.
+| Topic                    | Location                                         |
+| ------------------------ | ------------------------------------------------ |
+| API & renderer internals | [docu/API_README.md](docu/API_README.md)         |
+| Hardware & pinout        | [docu/HW.md](docu/HW.md)                        |
+| Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
+| Tile Creator tool        | [tools/graphics/README.md](tools/graphics/README.md) |
+| Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md) |
 
-## HW Configuration
+## Naming Conventions
 
-See [docu/HW.md](docu/HW.md) for HW pinning and components
-
-## Game Creation Setup
-
-To create a new game for the GameConsole platform, follow these steps:
-
-1. **Use the Provided Linker Script**
-   - In your game's Makefile, set the linker script to `../game.ld`.
-   - This ensures your game binary is laid out with the correct memory regions and symbols for the loader.
-
-2. **Include the Console API Header**
-   - Add `#include "game_console_api.h"` to your main source file.
-   - This gives you access to the Console API and asset macros.
-
-3. **Declare the API Header Pointer**
-   - Add the following to your main file in global scope:
-     ```c
-     DECLARE_API_HEADER_PTR(api_hdr_ptr);
-     ```
-   - This allows you to call any API function, e.g.:
-     ```c
-     printf("Hello from my game!\r\n");
-     ```
-
-4. **Define the Game Header**
-   - At the end of your main file, define the `GameBinaryHeader` in `(".game_header")` dedicated section:
-     ```c
-     DEFINE_GAME_BINARY_HEADER(game_header, main);
-     ```
-   - This header is required for the loader recognize the memory layout of the game, and load its necessary data.
-
-5. **Add Assets**
-   - Use the asset macros from `game_console_api.h` and asset IDs/types from your game to define assets in your game binary.
-   - Start by defining the asset header (required for asset discovery):
-     ```c
-     DEFINE_ASSET_HEADER(ASSET_MAGIC, ASSET_VERSION, ASSET_COUNT);
-     ```
-   - Then, define each asset using the provided macros and IDs/types
-     ```c
-     // Example: Define a font asset (see assets.h for IDs/types)
-     DEFINE_ASSET_8(font_a, ASSET_ID_FONT_A, ASSET_TYPE_FONT, { /* font data here */ });
-     // Example: Define an audio data asset
-     DEFINE_ASSET_16(audio_data, ASSET_ID_AUDIO_DATA, ASSET_TYPE_AUDIO_DATA, { /* audio data here */ });
-     // Example: Define an audio duration asset
-     DEFINE_ASSET_16(audio_duration, ASSET_ID_AUDIO_DURATION, ASSET_TYPE_AUDIO_DURATION, { /* duration data here */ });
-     ```
-	 Important: All assets stored with `DEFINE_ASSET` macros are lazy loaded on runtime via the `assetLoader` api functions. By doing this you can have more assets that can fit in the console text/data memory at once.
-
-    In case of tile data generated with the `tile_creator` you can use the output define directly into the `DEFINE_ASSET_8` macro
-
-    ```c
-   DEFINE_ASSET_8(font_a, ASSET_ID_FONT_A, ASSET_TYPE_TILE, (DEFINE_FONT_A_TILE));
-    ```
-
-6. **Build and Deploy**
-   - Build your game using the provided Makefile.
-   - Deploy the resulting `.bin` file to the SD card main directory
-
-7. **E.g. of main file**
-  ```C
-  #include "game_console_api.h"
-  #include "assets.h"
-
-  DECLARE_API_HEADER_PTR(api_hdr_ptr);
-
-  int main(void)
-  {
-      if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == API_VERSION)
-      {
-          printf("Hello from GameXO :D\r\n");
-      }
-  }
-
-  DECLARE_GAME_BINARY_HEADER(game_header, main);
-  ```
----
-
-## EEPROM Mapping
-### AT24C256
-
- | Address Range | Size  | Purpose              |
- | ------------- | ----- | -------------------- |
- | 0x0000-0x01FF | 512B  | System header        |
- | 0x0200-0x03FF | 512B  | Settings directory   |
- | 0x0400-0x07FF | 1024B | Console settings     |
- | 0x0800-0x7FFF | 30KB  | Settings data region |
+| Element            | Convention       | Example                  |
+| ------------------ | ---------------- | ------------------------ |
+| Macros / Defines   | UPPER_SNAKE_CASE | `MAX_BUFFER_SIZE`        |
+| Constants          | UPPER_SNAKE_CASE | `DEFAULT_TIMEOUT`        |
+| Global variables   | g_snake_case     | `g_system_initialized`   |
+| Static globals     | s_snake_case     | `s_buffer_index`         |
+| Local variables    | snake_case       | `temp_value`             |
+| Functions          | snake_case       | `init_peripherals()`     |
+| Struct / Enum types| PascalCase       | `SensorData`, `PowerState` |
+| Struct members     | snake_case       | `adc_value`              |
+| Typedefs           | PascalCase       | `Byte`                   |
