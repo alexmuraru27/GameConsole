@@ -1,15 +1,15 @@
 INCLUDE "../common.ld"
 
 /* Highest address of the user mode stack */
-_estack = ORIGIN(GAME_RAM_DATA) + LENGTH(GAME_RAM_DATA);    /* end of GAME_RAM_DATA */
-/* Generate a link error if heap and stack don't fit into GAME_RAM_DATA */
+_estack = ORIGIN(GAME_RAM_CCM) + LENGTH(GAME_RAM_CCM);    /* end of GAME_RAM_CCM */
+/* Generate a link error if heap and stack don't fit into GAME_RAM_CCM */
 _Min_Heap_Size = 0x0;  /* required amount of heap=0 -> use only static allocated memory  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
 /* Define output sections */
 SECTIONS
 {
-  /* The program code and other data goes into GAME_RAM_EXEC */
+  /* The program code and other data goes into GAME_RAM_CCM */
   .text :
   {
     . = ALIGN(4);
@@ -26,9 +26,9 @@ SECTIONS
     . = ALIGN(4);
     __game_text_end = .;
     _etext = .;        /* define a global symbols at end of code */
-  } >GAME_RAM_EXEC
+  } >GAME_RAM_CCM
 
-  /* Constant data goes into GAME_RAM_EXEC */
+  /* Constant data goes into GAME_RAM_CCM */
   .rodata :
   {
     . = ALIGN(4);
@@ -37,12 +37,12 @@ SECTIONS
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     . = ALIGN(4);
     __game_ro_data_end = .;
-  } >GAME_RAM_EXEC
+  } >GAME_RAM_CCM
 
   /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
-  /* Initialized data sections goes into GAME_RAM_DATA, load LMA copy after code */
+  /* Initialized data sections goes into GAME_RAM_CCM */
   .data :
   {
     . = ALIGN(4);
@@ -56,7 +56,7 @@ SECTIONS
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
     __game_data_init_end = .;
-  } >GAME_RAM_DATA
+  } >GAME_RAM_CCM
 
   /* Uninitialized data section */
   .bss :
@@ -74,9 +74,9 @@ SECTIONS
     _ebss = .;         /* define a global symbol at bss end */
     __bss_end__ = _ebss;
     __game_data_no_init_end = .;
-  } >GAME_RAM_DATA
+  } >GAME_RAM_CCM
 
-  /* User_heap_stack section, used to check that there is enough GAME_RAM_DATA left */
+  /* User_heap_stack section, used to check that there is enough GAME_RAM_CCM left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -85,17 +85,16 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >GAME_RAM_DATA
+  } >GAME_RAM_CCM
 
-  .assets :
+  /* Asset arena in SRAM — runtime buffer pool for .pak-loaded assets, not in .bin */
+  .asset_area (NOLOAD):
   {
     . = ALIGN(4);
-    __game_code_assets_start = .;
-    KEEP (*(.assets.header))
-    KEEP (*(.assets.data))
-    __game_code_assets_end = .;
-    . = ALIGN(4);
-  } >GAME_ASSETS
+    __asset_area_start = .;
+    . = . + LENGTH(GAME_RAM_ASSET);
+    __asset_area_end = .;
+  } >GAME_RAM_ASSET
 
   /* Remove information from the standard libraries */
   /DISCARD/ :
@@ -111,4 +110,3 @@ ASSERT(__game_header_end <= __game_text_start, "Linker symbols order should be p
 ASSERT(__game_text_end <= __game_ro_data_start, "Linker symbols order should be preserved in memory");
 ASSERT(__game_ro_data_end <= __game_data_init_start, "Linker symbols order should be preserved in memory");
 ASSERT(__game_data_init_end <= __game_data_no_init_start, "Linker symbols order should be preserved in memory");
-ASSERT(__game_data_no_init_end <= __game_code_assets_start, "Linker symbols order should be preserved in memory");

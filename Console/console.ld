@@ -112,20 +112,6 @@ SECTIONS
     _edata = .;        /* define a global symbol at data end */
   } >CONSOLE_RAM AT> CONSOLE_FLASH
 
-  _siccmram = LOADADDR(.ccmram);
-
-  /* CONSOLE_CCMRAM section 0 initialized like bss */
-  .ccmram (NOLOAD):
-  {
-    . = ALIGN(4);
-    _sccmram = .;       /* create a global symbol at ccmram start */
-    *(.ccmram)
-    *(.ccmram*)
-
-    . = ALIGN(4);
-    _eccmram = .;       /* create a global symbol at ccmram end */
-  } >CONSOLE_CCMRAM
-
 
   /* Uninitialized data section */
   . = ALIGN(4);

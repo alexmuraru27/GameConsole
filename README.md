@@ -23,6 +23,7 @@ make clean     # remove all build artifacts
 | Topic                    | Location                                         |
 | ------------------------ | ------------------------------------------------ |
 | API & renderer internals | [docu/API_README.md](docu/API_README.md)         |
+| Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                |
 | Hardware & pinout        | [docu/HW.md](docu/HW.md)                        |
 | Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
 | Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md) |

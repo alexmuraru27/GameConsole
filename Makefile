@@ -8,8 +8,9 @@ BUILD_DIR = build
 # targets
 ######################################
 all: $(BUILD_DIR)
-	$(MAKE) -C Console all
+#   temporary disabled until reworking the memory management and the renderer/assets
 	$(MAKE) -C GameXO all
+	$(MAKE) -C Console all
 	$(MAKE) -C Shared all
 
 flash:  $(BUILD_DIR)
@@ -27,7 +28,8 @@ $(BUILD_DIR):
 # clean up
 #######################################
 clean:
-	$(MAKE) -C Console clean
+#   temporary disabled until reworking the memory management and the renderer/assets
+# 	$(MAKE) -C Console clean
 	$(MAKE) -C GameXO clean
 	$(MAKE) -C Shared clean
 	-rm -fR $(BUILD_DIR)

@@ -5,8 +5,6 @@
 #include "timer.h"
 #include "stddef.h"
 
-#define CCMRAM __attribute__((section(".ccmram")))
-
 #define SOUND_TRACKS 5
 #define INVALID_TRACK 255
 typedef struct
@@ -20,7 +18,7 @@ typedef struct
     uint32_t ms_counter;        // Counts milliseconds for current note
 } TrackData;
 
-static CCMRAM TrackData s_track_data_queue[SOUND_TRACKS];
+static TrackData s_track_data_queue[SOUND_TRACKS];
 static bool s_muted = false;
 
 uint8_t buzzerGetMaxTracks()
