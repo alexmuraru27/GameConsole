@@ -10,17 +10,17 @@ Defined in `common.ld`.
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
 | SHARED_RAM     | 0x20000000 | 2K   | rw    | `ConsoleAPIHeader` struct — games read it at runtime                              |
 | CONSOLE_RAM    | 0x20000800 | 62K  | rwx   | Console firmware .data, .bss, stack, heap, all DMA buffers, FatFs, SDIO, audio    |
-| GAME_RAM_ASSET | 0x20010000 | 64K  | rw    | Runtime asset arena — game carves buffers here for .pak loads, zero bytes in .bin |
+| GAME_RAM       | 0x20010000 | 64K  | rwx   | Game .text, .rodata, .data, .bss, stack, heap — loaded from .bin at runtime       |
 
 Total: 2K + 62K + 64K = 128K ✓
 
 ## CCM (Core-Coupled Memory)
 
-| Region       | Origin     | Size | Perms | Purpose                                |
-| ------------ | ---------- | ---- | ----- | -------------------------------------- |
-| GAME_RAM_CCM | 0x10000000 | 64K  | rwx   | Entire game binary lives and runs here |
+| Region         | Origin     | Size | Perms | Purpose                                |
+| -------------- | ---------- | ---- | ----- | -------------------------------------- |
+| GAME_RAM_ASSET | 0x10000000 | 64K  | rw    | Asset arena — .pak-loaded buffers.     |
 
-CCM is tightly coupled to the Cortex-M4 core (zero wait states, no bus contention with DMA). The game's `.text`, `.rodata`, `.data`, `.bss`, heap, and stack all live here. Note: CCM **cannot do DMA** — any game data that needs DMA must go through the SRAM asset arena.
+**CCM is D-bus only on STM32F4 — it cannot execute code.** The game's `.text`, `.rodata`, `.data`, and `.bss` live in `GAME_RAM` (regular SRAM, on both I-bus and D-bus). CCM holds the asset arena (SDIO is PIO, so CPU copies FIFO → CCM works). CCM also **cannot do DMA** — any future DMA-backed I/O must use SRAM buffers.
 
 ## Flash
 
@@ -33,17 +33,17 @@ The console firmware runs directly from flash. Its `.data` section LMA is in fla
 
 ## Game binary layout
 
-The `.bin` file on the SD card is a flat image of the game's CCM contents:
+The `.bin` file on the SD card is a flat image of the game's `GAME_RAM` contents:
 
 ```
-GAME_RAM_CCM  (in .bin)
-├── .game_header      ~44 B    GameBinaryHeader (magic, boundary symbols, entry point)
+GAME_RAM  (in .bin)
+├── .game_header      ~52 B    GameBinaryHeader (magic, boundary symbols, entry point)
 ├── .text                    game code
 ├── .rodata                  constants and strings
 ├── .data                    initialized globals
 ```
 
-`.bss`, `._user_heap_stack`, and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file.
+`.bss` and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file.
 
 ### GameBinaryHeader
 
@@ -53,21 +53,38 @@ Placed in `.game_header` at the start of the binary. The loader reads it to know
 | --------------------- | ---------------------------- |
 | `magic`               | `0x47414D45` ("GAME")        |
 | `header_start / end`  | Boundary of this struct      |
-| `text_start / end`    | Code region (CCM)            |
-| `ro_data_start / end` | Read-only data (CCM)         |
-| `data_start / end`    | Initialized data (CCM)       |
-| `bss_start / end`     | Zero-fill region (CCM)       |
-| `entry_point`         | Function pointer to `main()` |
+| `text_start / end`    | Code region (SRAM)           |
+| `ro_data_start / end` | Read-only data (SRAM)        |
+| `data_start / end`    | Initialized data (SRAM)      |
+| `bss_start / end`     | Zero-fill region (SRAM)      |
+| `stack_top`           | Initial PSP stack pointer (SRAM top, 0x20020000) |
+| `entry_point`         | Function pointer to `_game_start()` |
 
 The loader computes file offsets as `region_addr - header_start` — this works because the `.bin` starts at `header_start` and all regions are contiguous.
 
 ### Loading sequence
 
 1. Read header from the first `sizeof(GameBinaryHeader)` bytes of the `.bin`
-2. `memset(bss_start, 0, bss_end - bss_start)` — zero BSS in CCM
-3. Copy `.text`, `.rodata`, `.data` from the `.bin` into their CCM target addresses
-4. `game_entry()` — jump to `entry_point` in CCM
-5. Game returns when Special Button 2 is pressed
+2. `memset(bss_start, 0, bss_end - bss_start)` — zero BSS in SRAM
+3. Copy `.text`, `.rodata`, `.data` from the `.bin` into their SRAM target addresses
+4. Set PSP to `stack_top` (top of GAME_RAM), set `CONTROL[1]` to use PSP in Thread mode
+5. `game_entry()` — jump to `entry_point` (`_game_start` in startup.s)
+6. `_game_start` pushes LR, calls `__libc_init_array`, calls `main()`, pops PC
+7. Game returns to the loader; loader clears `CONTROL[1]` (back to MSP) and closes file
+
+The game runs on PSP (GAME_RAM) while the console and all exception handlers use MSP (CONSOLE_RAM).
+If the game faults, the CPU switches to MSP for the handler — the game's
+PSP stack is preserved untouched for post-mortem inspection.
+
+### Why game code is in SRAM, not CCM
+
+On the STM32F4, CCM is connected to the D-bus only — **it cannot execute code**.
+Attempting to fetch an instruction from CCM causes an IBUSERR (instruction bus error)
+HardFault. This is a hardware limitation, not configurable.
+
+The fix: game `.text`, `.rodata`, `.data`, `.bss`, and stack all live in `GAME_RAM`
+(regular SRAM, on both I-bus and D-bus). CCM is used for the asset arena, since
+SDIO reads are PIO (CPU copies the FIFO to the buffer) — no DMA required.
 
 ## Asset system
 
@@ -75,10 +92,10 @@ Games ship as **two files** on the SD card:
 
 | File         | Contents                                                                   |
 | ------------ | -------------------------------------------------------------------------- |
-| `GameXO.bin` | Header + code + rodata + data (CCM only, no assets)                        |
+| `GameXO.bin` | Header + code + rodata + data (SRAM only, no assets)                        |
 | `GameXO.pak` | All tiles, audio, sprites in a [PAK1 container](../tools/packer/README.md) |
 
-Assets are **lazily loaded** at runtime. The game calls `assetLoaderGetAssetData(id, buffer, size)` with a buffer carved from the 64 KB `GAME_RAM_ASSET` arena. The loader seeks the `.pak` file, walks the `PakEntry` table to find the matching ID, and copies the blob into the buffer. Nothing is pre-loaded — the game manages its own working set.
+Assets are **lazily loaded** at runtime. The game calls `assetLoaderGetAssetData(id, buffer, size)` with a buffer carved from the 64 KB `GAME_RAM_ASSET` arena (in CCM). The loader seeks the `.pak` file, walks the `PakEntry` table to find the matching ID, and copies the blob into the buffer. Nothing is pre-loaded — the game manages its own working set.
 
 The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a YAML manifest and emits:
 - `<name>.pak` — binary container with CRC32-verified entries
@@ -103,6 +120,6 @@ All writes are CRC-16-CCITT validated (polynomial `0x1021`, initial `0xFFFF`). C
 | ------------ | ---------------- | ---------------------------------------------------------------------------------- |
 | `common.ld`  | Both             | MEMORY region definitions, `.game_console_api` and `.game_header` output sections  |
 | `console.ld` | Console firmware | `.isr_vector`, `.text`, `.rodata` → flash; `.data`, `.bss` → CONSOLE_RAM           |
-| `game.ld`    | Games            | `.text`, `.rodata`, `.data`, `.bss` → GAME_RAM_CCM; `.asset_area` → GAME_RAM_ASSET |
+| `game.ld`    | Games            | `.text`, `.rodata`, `.data`, `.bss`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
 
 `common.ld` is included by both linker scripts via `INCLUDE "../common.ld"`. The ASSERTS validate that regions don't overlap and sizes sum to 128K.

@@ -1,23 +1,21 @@
 INCLUDE "../common.ld"
 
-/* Highest address of the user mode stack */
-_estack = ORIGIN(GAME_RAM_CCM) + LENGTH(GAME_RAM_CCM);    /* end of GAME_RAM_CCM */
-/* Generate a link error if heap and stack don't fit into GAME_RAM_CCM */
-_Min_Heap_Size = 0x0;  /* required amount of heap=0 -> use only static allocated memory  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+/* Game code + data + stack all live in GAME_RAM (regular SRAM, I-bus + D-bus).
+ * Assets live in GAME_RAM_ASSET (CCM, D-bus only — data, not code). */
+_estack = ORIGIN(GAME_RAM) + LENGTH(GAME_RAM);    /* top of SRAM (0x20020000) */
+_Min_Heap_Size = 0x0;
+_Min_Stack_Size = 0x400;
 
-/* Define output sections */
 SECTIONS
 {
-  /* The program code and other data goes into GAME_RAM_CCM */
   .text :
   {
     . = ALIGN(4);
     __game_text_start = .;
-    *(.text)           /* .text sections (code) */
-    *(.text*)          /* .text* sections (code) */
-    *(.glue_7)         /* glue arm to thumb code */
-    *(.glue_7t)        /* glue thumb to arm code */
+    *(.text)
+    *(.text*)
+    *(.glue_7)
+    *(.glue_7t)
     *(.eh_frame)
 
     KEEP (*(.init))
@@ -25,45 +23,40 @@ SECTIONS
 
     . = ALIGN(4);
     __game_text_end = .;
-    _etext = .;        /* define a global symbols at end of code */
-  } >GAME_RAM_CCM
+    _etext = .;
+  } >GAME_RAM
 
-  /* Constant data goes into GAME_RAM_CCM */
   .rodata :
   {
     . = ALIGN(4);
     __game_ro_data_start = .;
-    *(.rodata)         /* .rodata sections (constants, strings, etc.) */
-    *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
+    *(.rodata)
+    *(.rodata*)
     . = ALIGN(4);
     __game_ro_data_end = .;
-  } >GAME_RAM_CCM
+  } >GAME_RAM
 
-  /* used by the startup to initialize data */
   _sidata = LOADADDR(.data);
 
-  /* Initialized data sections goes into GAME_RAM_CCM */
   .data :
   {
     . = ALIGN(4);
     __game_data_init_start = .;
-    _sdata = .;        /* create a global symbol at data start */
-    *(.data)           /* .data sections */
-    *(.data*)          /* .data* sections */
-    *(.RamFunc)        /* .RamFunc sections */
-    *(.RamFunc*)       /* .RamFunc* sections */
+    _sdata = .;
+    *(.data)
+    *(.data*)
+    *(.RamFunc)
+    *(.RamFunc*)
 
     . = ALIGN(4);
-    _edata = .;        /* define a global symbol at data end */
+    _edata = .;
     __game_data_init_end = .;
-  } >GAME_RAM_CCM
+  } >GAME_RAM
 
-  /* Uninitialized data section */
   .bss :
   {
     . = ALIGN(4);
-    /* This is used by the startup in order to initialize the .bss secion */
-    _sbss = .;         /* define a global symbol at bss start */
+    _sbss = .;
     __bss_start__ = _sbss;
     __game_data_no_init_start = .;
     *(.bss)
@@ -71,12 +64,11 @@ SECTIONS
     *(COMMON)
 
     . = ALIGN(4);
-    _ebss = .;         /* define a global symbol at bss end */
+    _ebss = .;
     __bss_end__ = _ebss;
     __game_data_no_init_end = .;
-  } >GAME_RAM_CCM
+  } >GAME_RAM
 
-  /* User_heap_stack section, used to check that there is enough GAME_RAM_CCM left */
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -85,9 +77,9 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >GAME_RAM_CCM
+  } >GAME_RAM
 
-  /* Asset arena in SRAM — runtime buffer pool for .pak-loaded assets, not in .bin */
+  /* Asset arena in CCM — runtime buffer pool for .pak-loaded assets, not in .bin */
   .asset_area (NOLOAD):
   {
     . = ALIGN(4);
@@ -96,7 +88,6 @@ SECTIONS
     __asset_area_end = .;
   } >GAME_RAM_ASSET
 
-  /* Remove information from the standard libraries */
   /DISCARD/ :
   {
     libc.a ( * )

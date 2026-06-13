@@ -25,19 +25,56 @@ static void syncFrame()
     s_last_frame_time = api_hdr_ptr->api.getSysTime();
 }
 
+static const uint16_t s_smoke_test_notes[] = {
+    261,
+    150, // C4
+    294,
+    150, // D4
+    330,
+    150, // E4
+    349,
+    150, // F4
+    392,
+    150, // G4
+    440,
+    150, // A4
+    494,
+    150, // B4
+    523,
+    300, // C5 (hold longer)
+    494,
+    150, // B4
+    440,
+    150, // A4
+    392,
+    150, // G4
+    349,
+    150, // F4
+    330,
+    150, // E4
+    294,
+    150, // D4
+    261,
+    400, // C4 (hold at end)
+};
+
 int main(void)
 {
     if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == 1U)
     {
-        gameStateManagerInit();
-        playSound(ASSET_ID_WELCOME_SOUND);
+        api_hdr_ptr->api.buzzerPlay(
+            0U, false,
+            s_smoke_test_notes,
+            sizeof(s_smoke_test_notes) / sizeof(uint16_t) / 2U);
+        // gameStateManagerInit();
+        // playSound(ASSET_ID_WELCOME_SOUND);
         while (true)
         {
             // UPDATE
-            gameStateManagerUpdate();
+            // gameStateManagerUpdate();
 
             // RENDER
-            api_hdr_ptr->api.rendererRender();
+            // api_hdr_ptr->api.rendererRender();
 
             // SYNC frame -> 50fps
             syncFrame();
@@ -50,4 +87,8 @@ int main(void)
     }
 }
 
-DECLARE_GAME_BINARY_HEADER(main);
+extern void _game_start(void);
+DECLARE_GAME_BINARY_HEADER(_game_start);
+
+// Smoke-test song: ascending then descending C major scale.
+// {frequency_hz, duration_ms} pairs; frequency 0 = pause.

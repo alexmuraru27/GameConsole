@@ -26,6 +26,10 @@ Src/sound.c\
 Assets/Src/assets.c \
 Src/syscalls.c
 
+# ASM sources
+ASM_SOURCES =  \
+startup.s
+
 #######################################
 # CFLAGS
 #######################################
@@ -75,6 +79,9 @@ all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_
 # list of objects
 OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 vpath %.c $(sort $(dir $(C_SOURCES)))
+# list of ASM program objects
+OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
+vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
 ######################################
 # targets

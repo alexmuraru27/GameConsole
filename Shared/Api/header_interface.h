@@ -14,6 +14,7 @@ typedef struct
     uint32_t data_end;
     uint32_t bss_start;
     uint32_t bss_end;
+    uint32_t stack_top;
     uint32_t entry_point;
 } GameBinaryHeader;
 
@@ -24,6 +25,7 @@ typedef struct
     extern uint32_t __game_ro_data_start, __game_ro_data_end;           \
     extern uint32_t __game_data_init_start, __game_data_init_end;       \
     extern uint32_t __game_data_no_init_start, __game_data_no_init_end; \
+    extern uint32_t _estack;                                            \
     __attribute__((section(".game_header")))                            \
     const GameBinaryHeader game_header_variable_47414D45 = {            \
         .magic = 0x47414D45,                                            \
@@ -37,6 +39,7 @@ typedef struct
         .data_end = (uint32_t)&__game_data_init_end,                    \
         .bss_start = (uint32_t)&__game_data_no_init_start,              \
         .bss_end = (uint32_t)&__game_data_no_init_end,                  \
+        .stack_top = (uint32_t)&_estack,                                \
         .entry_point = (uint32_t)&entry_func}
 
 #endif

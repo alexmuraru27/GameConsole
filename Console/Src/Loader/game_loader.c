@@ -97,27 +97,53 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 
         if (text_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), s_game_header.text_start, s_game_header.header_start, text_file_size);
+            res = loadRegionToMemory(loaderGetFile(), s_game_header.text_start, s_game_header.header_start, text_file_size);
+            if (res != FR_OK)
+            {
+                return res;
+            }
         }
 
         if (ro_data_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), s_game_header.ro_data_start, s_game_header.header_start, ro_data_file_size);
+            res = loadRegionToMemory(loaderGetFile(), s_game_header.ro_data_start, s_game_header.header_start, ro_data_file_size);
+            if (res != FR_OK)
+            {
+                return res;
+            }
         }
 
         if (data_file_size > 0U)
         {
-            loadRegionToMemory(loaderGetFile(), s_game_header.data_start, s_game_header.header_start, data_file_size);
+            res = loadRegionToMemory(loaderGetFile(), s_game_header.data_start, s_game_header.header_start, data_file_size);
+            if (res != FR_OK)
+            {
+                return res;
+            }
         }
 
-        // TODO - switch the stack pointer
-        // TODO - save the OS stack pointer first
-        // __asm volatile("msr msp, %0" ::"r"(game_header->data_end) :);
+        // Set PSP to the game's stack and switch Thread mode to use PSP.
+        // This isolates the game's stack from the console: if the game faults,
+        // the CPU enters Handler mode on MSP (console stack), leaving the
+        // game's PSP stack intact for debugging.
+        __asm volatile("msr psp, %0" : : "r"(s_game_header.stack_top));
+
+        uint32_t control;
+        __asm volatile("mrs %0, control" : "=r"(control));
+        control |= 2U; // CONTROL[1] = SPSEL → use PSP in Thread mode
+        __asm volatile("msr control, %0" : : "r"(control));
+        __asm volatile("isb" : : : "memory");
+
         void (*game_entry)(void) = (void (*)(void))s_game_header.entry_point;
         game_entry();
-        loaderCloseFile();
 
-        // TODO restore OS stack pointer after game return
+        // Switch Thread mode back to MSP before touching console state
+        __asm volatile("mrs %0, control" : "=r"(control));
+        control &= ~2U; // CONTROL[1] = 0 → back to MSP
+        __asm volatile("msr control, %0" : : "r"(control));
+        __asm volatile("isb" : : : "memory");
+
+        loaderCloseFile();
     }
 
     return 0U;
