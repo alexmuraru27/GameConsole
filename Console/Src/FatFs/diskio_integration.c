@@ -3,36 +3,48 @@
 #include "sysclock.h"
 #include "stdio.h"
 
-#define SECTOR_SIZE 512
-#define FAT32_SIGNATURE 0xAA55
+static uint32_t s_sd_rca = 0;
+static uint8_t s_sd_type = 0;
 
-static uint32_t s_sd_rca = 0; // Relative Card Address
-static uint8_t s_sd_type = 0; // Card Type
-
-uint8_t getSdType()
+uint8_t getSdType(void)
 {
     return s_sd_type;
 }
 
+uint32_t getSdSectorCount(void)
+{
+    uint32_t csd[4];
+    if (sdioSendCommand(CMD9, s_sd_rca << 16U, SD_RESP_LONG) != SD_OK)
+    {
+        return 0;
+    }
+    csd[0] = SDIO->RESP1;
+    csd[1] = SDIO->RESP2;
+    csd[2] = SDIO->RESP3;
+    csd[3] = SDIO->RESP4;
+    if (((csd[0] >> 30U) & 0x3U) == 1U)
+    {
+        uint32_t c_size = ((csd[1] & 0x3FU) << 16U) | ((csd[2] >> 16U) & 0xFFFFU);
+        return (c_size + 1U) * 1024U;
+    }
+    return 0x100000U;
+}
+
 uint8_t sdInit(void)
 {
-    uint32_t response[4];
-    uint8_t ret;
     sdioInit();
 
-    // multiple CMD0s for better reliability
-    for (int i = 0U; i < 3U; i++)
+    /* CMD0: GO_IDLE_STATE — matches HAL SD_PowerON */
+    if (sdioSendCommand(CMD0, 0U, SD_RESP_NONE) != SD_OK)
     {
-        ret = sdioSendCommand(CMD0, 0U, SD_RESP_NONE);
-        delay(50U);
+        return SD_ERROR;
     }
+    delay(2U);
 
-    // CMD8: voltage range and card version
-    ret = sdioSendCommand(CMD8, 0x1AA, SD_RESP_SHORT);
-    if (ret == SD_OK)
+    /* CMD8: SEND_IF_COND — matches HAL */
+    if (sdioSendCommand(CMD8, 0x1AA, SD_RESP_SHORT) == SD_OK)
     {
-        response[0] = SDIO->RESP1;
-        if ((response[0] & 0xFF) == 0xAA)
+        if ((SDIO->RESP1 & 0xFF) == 0xAA)
         {
             s_sd_type = SD_CARD_SDHC;
         }
@@ -44,156 +56,294 @@ uint8_t sdInit(void)
     else
     {
         s_sd_type = SD_CARD_SDSC;
+        /* HAL pattern: resend CMD0 on CMD8 failure (V1.X cards) */
+        sdioSendCommand(CMD0, 0U, SD_RESP_NONE);
+        delay(2U);
     }
 
-    // ACMD41
-    ret = sdioSendRobustAcmd41();
-    if (ret != SD_OK)
-    {
-        return ret;
-    }
+    /* CMD55: APP_CMD before ACMD41 loop — matches HAL line 2802 */
+    sdioSendCommand(CMD55, 0U, SD_RESP_SHORT);
 
-    // CMD2: CID
-    ret = sdioSendCommand(CMD2, 0U, SD_RESP_LONG);
-    if (ret != SD_OK)
+    if (sdioSendRobustAcmd41() != SD_OK)
     {
-        return ret;
+        return SD_ERROR;
     }
-
-    // CMD3: RCA
-    ret = sdioSendCommand(CMD3, 0U, SD_RESP_SHORT);
-    if (ret != SD_OK)
+    if (sdioSendCommand(CMD2, 0U, SD_RESP_LONG) != SD_OK)
     {
-        return ret;
+        return SD_ERROR;
+    }
+    if (sdioSendCommand(CMD3, 0U, SD_RESP_SHORT) != SD_OK)
+    {
+        return SD_ERROR;
     }
 
     s_sd_rca = (SDIO->RESP1 >> 16U) & 0xFFFF;
-
-    // CMD7: Select card
-    ret = sdioSendCommand(CMD7, s_sd_rca << 16U, SD_RESP_SHORT);
-    if (ret != SD_OK)
+    if (sdioSendCommand(CMD7, s_sd_rca << 16U, SD_RESP_SHORT) != SD_OK)
     {
-        return ret;
+        return SD_ERROR;
     }
-
-    // Set block size to 512 bytes
-    ret = sdioSendCommand(CMD16, 512U, SD_RESP_SHORT);
-    if (ret != SD_OK)
+    if (sdioSendCommand(CMD16, 512U, SD_RESP_SHORT) != SD_OK)
     {
-        return ret;
+        return SD_ERROR;
     }
 
     sdSwitchTo4bitMode(s_sd_rca << 16U);
 
-    // Switch to higher speed clock after successful initialization
-    // Divide by 4 = 12MHz
-    SDIO->CLKCR = (SDIO->CLKCR & ~0xFF) | 2U;
-    delay(10U);
+    // Raise clock from 400 kHz init speed to 12 MHz transfer speed
+    sdioRaiseClock();
+
+    /* Wait for card to be fully ready after init (HAL pattern) */
+    sdWaitCardReady();
+
     return SD_OK;
 }
+
+/*
+ * HAL pattern: DCTRL=0 → ConfigData (DTIMER,DLEN,DCTRL armed) → CMD → unified loop
+ * This is identical for both read and write — only DTDIR differs.
+ */
 
 uint8_t sdReadSingleBlock(uint32_t block_addr, uint8_t *buffer)
 {
-    uint32_t timeout = 3000000U;
-    uint8_t ret;
-    uint32_t *data_ptr = (uint32_t *)buffer;
     uint32_t status;
-    uint32_t words_read = 0;
 
-    // Clear all flags
     SDIO->ICR = 0x5FF;
+    SDIO->DCTRL = 0U;
 
-    // Configure data path
+    uint32_t addr = block_addr;
+    if (s_sd_type != SD_CARD_SDHC)
+    {
+        addr *= 512U;
+    }
+
+    /* ConfigData — arm DPSM before command */
     SDIO->DTIMER = 0xFFFFFFFF;
     SDIO->DLEN = 512U;
-    SDIO->DCTRL = SDIO_DCTRL_DTEN | SDIO_DCTRL_DTDIR | (9U << SDIO_DCTRL_DBLOCKSIZE_Pos); // Block size 2^9 = 512
+    SDIO->DCTRL = SDIO_DCTRL_DTEN | SDIO_DCTRL_DTDIR | (9U << SDIO_DCTRL_DBLOCKSIZE_Pos);
 
-    // Send CMD17
-    ret = sdioSendCommand(CMD17, block_addr, SD_RESP_SHORT);
-    if (ret != SD_OK)
+    /* CMD17 */
+    if (sdioSendCommand(CMD17, addr, SD_RESP_SHORT) != SD_OK)
     {
-        return ret;
+        SDIO->ICR = 0x5FF;
+        return SD_ERROR;
     }
 
-    // Read data with improved FIFO handling
-    while (words_read < 128U && timeout--)
+    /* Unified polling loop — matches HAL_SD_ReadBlocks */
+    uint8_t *bp = buffer;
+    uint32_t remaining = 512U;
+    uint32_t deadline = getSysTime() + 3000U;
+    uint32_t word;
+
+    while (!(SDIO->STA & (SDIO_STA_RXOVERR | SDIO_STA_DCRCFAIL |
+                          SDIO_STA_DTIMEOUT | SDIO_STA_DATAEND)))
     {
-        // 128 words = 512 bytes
-        status = SDIO->STA;
-
-        if (status & (SDIO_STA_RXOVERR | SDIO_STA_DCRCFAIL | SDIO_STA_DTIMEOUT))
+        if ((SDIO->STA & SDIO_STA_RXFIFOHF) && (remaining > 0U))
         {
-            if (status & SDIO_STA_DTIMEOUT)
+            for (uint32_t j = 0; j < 8U && remaining > 0U; j++)
             {
-                printf("SDIO timeout\r\n");
-            }
-            if (status & SDIO_STA_DCRCFAIL)
-            {
-                printf("SDIO CRC fail\r\n");
-            }
-            if (status & SDIO_STA_RXOVERR)
-            {
-                printf("SDIO RX overrun\r\n");
-            }
-            return SD_ERROR;
-        }
-
-        // data available?
-        if (status & SDIO_STA_RXFIFOHF)
-        {
-            // Read 8 words (32b) from FIFO
-            for (int i = 0; i < 8 && words_read < 128; i++)
-            {
-                *data_ptr++ = SDIO->FIFO;
-                words_read++;
+                word = SDIO->FIFO;
+                *bp++ = (uint8_t)(word);        remaining--;
+                *bp++ = (uint8_t)(word >> 8U);  remaining--;
+                *bp++ = (uint8_t)(word >> 16U); remaining--;
+                *bp++ = (uint8_t)(word >> 24U); remaining--;
             }
         }
-        else if (status & SDIO_STA_RXDAVL)
-        {
-            // read available data
-            *data_ptr++ = SDIO->FIFO;
-            words_read++;
-        }
 
-        // check if transfer is complete
-        if (status & SDIO_STA_DATAEND)
+        if (getSysTime() > deadline)
         {
-            break;
+            SDIO->ICR = 0x5FF;
+            return SD_TIMEOUT;
         }
     }
 
-    // any remaining data
-    while (!(SDIO->STA & SDIO_STA_RXFIFOE) && words_read < 128U)
-    {
-        *data_ptr++ = SDIO->FIFO;
-        words_read++;
-    }
-
-    // clear flags
+    status = SDIO->STA;
     SDIO->ICR = 0x5FF;
 
-    if (timeout == 0)
+    if (status & SDIO_STA_DTIMEOUT)
     {
-        printf("Read timeout\r\n");
         return SD_TIMEOUT;
     }
-
+    if (status & SDIO_STA_DCRCFAIL)
+    {
+        return SD_ERROR;
+    }
+    if (status & SDIO_STA_RXOVERR)
+    {
+        return SD_ERROR;
+    }
     return SD_OK;
 }
 
-// Read multiple blocks from SD card
 uint8_t sdReadMultipleBlocks(uint32_t block_addr, uint8_t *buffer, uint32_t count)
 {
-    uint8_t ret = SD_OK;
-
-    for (uint32_t i = 0U; i < count; i++)
+    for (uint32_t i = 0; i < count; i++)
     {
-        ret = sdReadSingleBlock(block_addr + i, buffer + (i * 512U));
-        if (ret != SD_OK)
+        if (sdReadSingleBlock(block_addr + i, buffer + (i * 512U)) != SD_OK)
         {
-            return ret;
+            return SD_ERROR;
+        }
+    }
+    return SD_OK;
+}
+
+uint8_t sdWriteSingleBlock(uint32_t block_addr, const uint8_t *buffer)
+{
+    uint32_t status;
+
+    SDIO->ICR = 0x5FF;
+    SDIO->DCTRL = 0U;
+
+    uint32_t addr = block_addr;
+    if (s_sd_type != SD_CARD_SDHC)
+    {
+        addr *= 512U;
+    }
+
+    /* ConfigData — arm DPSM BEFORE command (HAL pattern) */
+    SDIO->DTIMER = 0xFFFFFFFF;
+    SDIO->DLEN = 512U;
+    SDIO->DCTRL = SDIO_DCTRL_DTEN | (9U << SDIO_DCTRL_DBLOCKSIZE_Pos);
+
+    /* CMD24 */
+    if (sdioSendCommand(CMD24, addr, SD_RESP_SHORT) != SD_OK)
+    {
+        SDIO->ICR = 0x5FF;
+        return SD_ERROR;
+    }
+
+    /* Unified polling loop — matches HAL_SD_WriteBlocks exactly */
+    const uint8_t *bp = buffer;
+    uint32_t remaining = 512U;
+    uint32_t deadline = getSysTime() + 3000U;
+    uint32_t word;
+
+    while (!(SDIO->STA & (SDIO_STA_TXUNDERR | SDIO_STA_DCRCFAIL |
+                          SDIO_STA_DTIMEOUT | SDIO_STA_DATAEND)))
+    {
+        if ((SDIO->STA & SDIO_STA_TXFIFOHE) && (remaining > 0U))
+        {
+            for (uint32_t j = 0; j < 8U && remaining > 0U; j++)
+            {
+                word  = (uint32_t)(*bp++); remaining--;
+                word |= (uint32_t)(*bp++) << 8U;  remaining--;
+                word |= (uint32_t)(*bp++) << 16U; remaining--;
+                word |= (uint32_t)(*bp++) << 24U; remaining--;
+                SDIO->FIFO = word;
+            }
+        }
+
+        if (getSysTime() > deadline)
+        {
+            SDIO->ICR = 0x5FF;
+            return SD_TIMEOUT;
         }
     }
 
+    status = SDIO->STA;
+    SDIO->ICR = 0x5FF;
+
+    if (status & SDIO_STA_DTIMEOUT)
+    {
+        return SD_TIMEOUT;
+    }
+    if (status & SDIO_STA_DCRCFAIL)
+    {
+        return SD_ERROR;
+    }
+    if (status & SDIO_STA_TXUNDERR)
+    {
+        return SD_ERROR;
+    }
     return SD_OK;
+}
+
+uint8_t sdWriteMultipleBlocks(uint32_t block_addr, const uint8_t *buffer, uint32_t count)
+{
+    uint32_t status;
+
+    SDIO->ICR = 0x5FF;
+    SDIO->DCTRL = 0U;
+
+    uint32_t addr = block_addr;
+    if (s_sd_type != SD_CARD_SDHC)
+    {
+        addr *= 512U;
+    }
+
+    SDIO->DTIMER = 0xFFFFFFFF;
+    SDIO->DLEN = count * 512U;
+    SDIO->DCTRL = SDIO_DCTRL_DTEN | (9U << SDIO_DCTRL_DBLOCKSIZE_Pos);
+
+    if (sdioSendCommand(CMD25, addr, SD_RESP_SHORT) != SD_OK)
+    {
+        SDIO->ICR = 0x5FF;
+        return SD_ERROR;
+    }
+
+    const uint8_t *bp = buffer;
+    uint32_t remaining = count * 512U;
+    uint32_t deadline = getSysTime() + 5000U;
+    uint32_t word;
+
+    while (!(SDIO->STA & (SDIO_STA_TXUNDERR | SDIO_STA_DCRCFAIL |
+                          SDIO_STA_DTIMEOUT | SDIO_STA_DATAEND)))
+    {
+        if ((SDIO->STA & SDIO_STA_TXFIFOHE) && (remaining > 0U))
+        {
+            for (uint32_t j = 0; j < 8U && remaining > 0U; j++)
+            {
+                word  = (uint32_t)(*bp++); remaining--;
+                word |= (uint32_t)(*bp++) << 8U;  remaining--;
+                word |= (uint32_t)(*bp++) << 16U; remaining--;
+                word |= (uint32_t)(*bp++) << 24U; remaining--;
+                SDIO->FIFO = word;
+            }
+        }
+
+        if (getSysTime() > deadline)
+        {
+            SDIO->ICR = 0x5FF;
+            return SD_TIMEOUT;
+        }
+    }
+
+    status = SDIO->STA;
+    SDIO->ICR = 0x5FF;
+
+    if (status & SDIO_STA_DATAEND)
+    {
+        sdioSendCommand(CMD12, 0U, SD_RESP_SHORT);
+    }
+
+    if (status & SDIO_STA_DTIMEOUT)
+    {
+        return SD_TIMEOUT;
+    }
+    if (status & SDIO_STA_DCRCFAIL)
+    {
+        return SD_ERROR;
+    }
+    if (status & SDIO_STA_TXUNDERR)
+    {
+        return SD_ERROR;
+    }
+    return SD_OK;
+}
+
+void sdWaitCardReady(void)
+{
+    uint32_t state = 0;
+    for (uint32_t poll = 0; poll < 500; poll++)
+    {
+        if (sdioSendCommand(CMD13, s_sd_rca << 16U, SD_RESP_SHORT) == SD_OK)
+        {
+            state = (SDIO->RESP1 >> 9U) & 0xFU;
+            if (state == 4U)
+            {
+                return;
+            }
+        }
+        delay(1);
+    }
+    printf("sdWaitCardReady timeout, state=%lu\r\n", state);
 }

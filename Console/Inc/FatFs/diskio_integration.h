@@ -11,7 +11,11 @@
 uint8_t sdInit(void);
 uint8_t sdReadSingleBlock(uint32_t block_addr, uint8_t *buffer);
 uint8_t sdReadMultipleBlocks(uint32_t block_addr, uint8_t *buffer, uint32_t count);
+uint8_t sdWriteSingleBlock(uint32_t block_addr, const uint8_t *buffer);
+uint8_t sdWriteMultipleBlocks(uint32_t block_addr, const uint8_t *buffer, uint32_t count);
 
 uint8_t getSdType();
+uint32_t getSdSectorCount(void);
+void sdWaitCardReady(void);
 
 #endif

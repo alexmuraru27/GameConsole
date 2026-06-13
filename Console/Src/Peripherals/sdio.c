@@ -21,12 +21,22 @@ void sdioInit(void)
     // Clear all flags
     SDIO->ICR = 0x5FF;
 
-    // Configure clock control register for conservative initialization
-    SDIO->CLKCR = 4U | SDIO_CLKCR_CLKEN;
+    // Initialization clock: 400 kHz max per SD spec
+    // SDIO_CK = 48 MHz / (CLKDIV + 2)
+    // CLKDIV = 118 → 48/(118+2) = 400 kHz (matches HAL SDIO_INIT_CLK_DIV)
+    SDIO->CLKCR = 118U | SDIO_CLKCR_CLKEN;
     delay(10U);
 
     // Configure timeouts
     SDIO->DTIMER = 0xFFFFFFFF; // Maximum data timeout
+}
+
+void sdioRaiseClock(void)
+{
+    // Switch to transfer speed after card is initialized
+    // CLKDIV = 22 → 48/(22+2) = 2 MHz
+    SDIO->CLKCR = (SDIO->CLKCR & ~0xFF) | 22U;
+    delay(10U);
 }
 
 uint8_t sdSwitchTo4bitMode(const uint32_t rca)
