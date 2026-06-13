@@ -28,6 +28,7 @@ make clean     # remove all build artifacts
 | Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
 | Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md) |
 | Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md) |
+| Memory Analysis tool     | [tools/memory_analysis/README.md](tools/memory_analysis/README.md) |
 
 ## Naming Conventions
 

@@ -6,7 +6,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "tools/graphics/pixel_forge.py",
-            "console": "internalConsole",
+            "console": "integratedTerminal",
             "args": [
                 "-o",
                 "Assets/Gfx"
@@ -21,14 +21,14 @@
                 "-o",
                 "Assets/Music"
             ],
-            "console": "internalConsole"
+            "console": "integratedTerminal"
         },
         {
             "name": "Asset Packer (example)",
             "type": "debugpy",
             "request": "launch",
             "program": "tools/packer/packer.py",
-            "console": "internalConsole",
+            "console": "integratedTerminal",
             "args": [
                 "tools/packer/example/manifest.yaml",
                 "-o",
@@ -36,6 +36,14 @@
                 "-d",
                 "tools/packer/example/out"
             ]
+        },
+        {
+            "name": "Memory Analysis",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/memory_analysis/memory_analysis.py",
+            "console": "integratedTerminal",
+            "justMyCode": true
         },
         {
             "name": "OpenOCD Debug",
