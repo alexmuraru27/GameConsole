@@ -1,0 +1,21 @@
+version: 1
+assets:
+  - id: 1
+    name: ASSET_LEVEL1_TILESET
+    path: assets/level1/tileset.bin
+
+  - id: 2
+    name: ASSET_LEVEL1_MAP
+    path: assets/level1/map.bin
+
+  - id: 3
+    name: ASSET_LEVEL1_PALETTE
+    path: assets/level1/palette.bin
+
+  - id: 4
+    name: ASSET_PLAYER_CHR
+    path: assets/sprites/player.bin
+
+  - id: 5
+    name: ASSET_SFX_JUMP
+    path: assets/audio/jump.bin

@@ -24,6 +24,20 @@
             "console": "internalConsole"
         },
         {
+            "name": "Asset Packer (example)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "tools/packer/packer.py",
+            "console": "internalConsole",
+            "args": [
+                "tools/packer/example/manifest.yaml",
+                "-o",
+                "Level1",
+                "-d",
+                "tools/packer/example/out"
+            ]
+        },
+        {
             "name": "OpenOCD Debug",
             "cwd": "${workspaceRoot}",
             "executable": "./build/Console/GameConsole.elf",

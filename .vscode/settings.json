@@ -76,5 +76,9 @@
         "network_constants.h": "c",
         "crc.h": "c"
     },
-    "cortex-debug.variableUseNaturalFormat": true
+    "cortex-debug.variableUseNaturalFormat": true,
+    "workbench.editorAssociations": {
+        "*.bin": "hexEditor.hexedit",
+        "*.pak": "hexEditor.hexedit"
+    }
 }
