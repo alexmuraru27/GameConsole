@@ -6,6 +6,7 @@
 #include "string.h"
 #include "main_menu.h"
 #include "stdio.h"
+#include "buzzer.h"
 
 #define FPS 30
 #define FRAME_PERIOD (1000U / FPS)
@@ -39,6 +40,8 @@ static void render()
 
 int main(void)
 {
+  // TODO Temporary mute
+  buzzerSetMute(true);
   gameConsoleInit();
   mainMenuInit();
 

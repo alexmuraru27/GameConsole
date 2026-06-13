@@ -99,6 +99,8 @@ bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
 void buzzerStopAll();
+void buzzerSetMute(bool muted);
+bool buzzerIsMuted(void);
 
 // Interrupt Handler
 void buzzerInterruptHandler(void);

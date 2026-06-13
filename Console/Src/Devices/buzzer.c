@@ -21,6 +21,7 @@ typedef struct
 } TrackData;
 
 static CCMRAM TrackData s_track_data_queue[SOUND_TRACKS];
+static bool s_muted = false;
 
 uint8_t buzzerGetMaxTracks()
 {
@@ -116,15 +117,14 @@ static void updatePWM(uint8_t track_id)
             }
         }
 
-        // safe to set to 0 here because updatePWM is called only when the current song is playing
-        // after the current note duration was exceeded
-        // it should be set here in order to let the background songs to be playing
         s_track_data_queue[track_id].ms_counter = 0;
+
         // highest track IDs have priority in playing
         if (track_id == getLastTrackPlaying())
         {
             const uint32_t frequency_hz = s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U];
-            if (frequency_hz == 0)
+
+            if (s_muted || frequency_hz == 0)
             {
                 timer3Disable();
             }
@@ -228,4 +228,31 @@ bool buzzerPlayWithFlag(const uint8_t track_number, const bool is_looped, const 
 bool buzzerPlay(const uint8_t track_number, const bool is_looped, const uint16_t *const notes_data, const uint16_t notes)
 {
     return buzzerPlayWithFlag(track_number, is_looped, notes_data, notes, NULL);
+}
+
+void buzzerSetMute(const bool muted)
+{
+    s_muted = muted;
+    if (muted)
+    {
+        timer3Disable();
+    }
+    else
+    {
+        // Restore PWM for the current note on the highest-priority active track
+        uint8_t track_id = getLastTrackPlaying();
+        if (track_id != INVALID_TRACK)
+        {
+            const uint32_t freq = s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U];
+            if (freq != 0)
+            {
+                timer3Trigger(freq, 50U);
+            }
+        }
+    }
+}
+
+bool buzzerIsMuted(void)
+{
+    return s_muted;
 }
