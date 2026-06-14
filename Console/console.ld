@@ -129,6 +129,20 @@ SECTIONS
     __bss_end__ = _ebss;
   } >CONSOLE_RAM
 
+  /* TODO : TEST ONLY! */
+  /* Measurement aid: game-owned data tagged GAME_RAM_DATA (sprite storage, test
+   * pixel assets) lives here instead of CONSOLE_RAM, so CONSOLE_RAM usage tracks
+   * only the console library. NOLOAD — written at runtime before first read. */
+  .game_ram (NOLOAD) :
+  {
+    . = ALIGN(4);
+    _sgameram = .;
+    *(.game_ram)
+    *(.game_ram*)
+    . = ALIGN(4);
+    _egameram = .;
+  } >GAME_RAM
+
   /* User_heap_stack section, used to check that there is enough CONSOLE_RAM left */
   ._user_heap_stack :
   {

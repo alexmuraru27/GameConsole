@@ -80,6 +80,5 @@
     "workbench.editorAssociations": {
         "*.bin": "hexEditor.hexedit",
         "*.pak": "hexEditor.hexedit"
-    },
-    "todo-tree.ripgrep": "/usr/bin/rg"
+    }
 }

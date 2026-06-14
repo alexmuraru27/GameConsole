@@ -46,7 +46,7 @@ simple to reason about and — as we will see — straightforward to make fast.
 ```
    GAME                           RENDERER                         SCREEN
  ┌────────┐   rendererSubmit()  ┌───────────────────────┐  DMA   ┌──────────┐
- │ sprite │ ──────────────────► │ sort → bin → composite│ ─────► │ ILI9341  │
+ │ sprite │ ──────────────────► │  sort → composite     │ ─────► │ ILI9341  │
  │  list  │                     │      (this file)      │        │ 320×240  │
  └────────┘   rendererRender()  └───────────────────────┘        └──────────┘
 ```
@@ -60,8 +60,8 @@ Key facts:
 | Transparency        | palette index `0` is transparent                 |
 | Layers              | `LAYER_BG`, `LAYER_FG`, `LAYER_UI` (back→front)  |
 | Ordering            | by `z` ascending within a layer, then by layer   |
-| Output path         | 16-line scanline strips, double-buffered, DMA    |
-| Frame cost (busy)   | ~12.4 ms render → fits 30 FPS with headroom      |
+| Output path         | 8-line scanline strips, double-buffered, DMA     |
+| Frame cost (busy)   | ~13.6 ms render at the 8-line default → fits 30 FPS with headroom |
 
 ---
 
@@ -166,32 +166,37 @@ The STM32F407 has 128 KB of regular SRAM (plus 64 KB CCM that **DMA cannot
 reach**). A full RGB565 framebuffer simply does not fit, and even if it did it
 would swallow most of RAM.
 
-So the renderer works in **horizontal chunks of 16 scanlines**:
+So the renderer works in **horizontal chunks of `RENDERER_SCANLINES` rows** (8):
 
 ```
          320 px wide
    ┌────────────────────┐ y=0
-   │      chunk 0        │  16 rows  ── composite ──► s_scanline_buffer[0] ──DMA──►┐
-   ├────────────────────┤ y=16                                                      │
-   │      chunk 1        │  16 rows  ── composite ──► s_scanline_buffer[1] ──DMA──► │ ILI9341
-   ├────────────────────┤ y=32                                                      │
-   │        ...          │                                                          │
-   ├────────────────────┤ y=224                                                     │
-   │      chunk 14       │  16 rows                                                  │
+   │      chunk 0        │  8 rows  ── composite ──► s_scanline_buffer[0] ──DMA──►┐
+   ├────────────────────┤ y=8                                                      │
+   │      chunk 1        │  8 rows  ── composite ──► s_scanline_buffer[1] ──DMA──► │ ILI9341
+   ├────────────────────┤ y=16                                                     │
+   │        ...          │                                                         │
+   ├────────────────────┤ y=232                                                    │
+   │      chunk 29       │  8 rows                                                  │
    └────────────────────┘ y=240
-       15 chunks = ceil(240 / 16)
+       30 chunks = ceil(240 / 8)
 ```
 
-Each chunk buffer is `16 × 320 × 2 = 10,240 bytes`; there are **two** of them
-(20,480 bytes total) for double-buffering. This is the central memory/bandwidth
+Each chunk buffer is `8 × 320 × 2 = 5,120 bytes`; there are **two** of them
+(10,240 bytes total) for double-buffering. This is the central memory/bandwidth
 trade: we give up a persistent framebuffer and in return rebuild each strip from
 the sprite list every frame.
 
 ```c
-#define RENDERER_SCANLINES 16U
-#define MAX_CHUNKS ((RENDERER_HEIGHT + RENDERER_SCANLINES - 1U) / RENDERER_SCANLINES) // 15
+#define RENDERER_SCANLINES 8U
 static uint16_t s_scanline_buffer[2U][RENDERER_SCANLINES * RENDERER_WIDTH] __attribute__((aligned(4)));
 ```
+
+> **Chunk height is a RAM/FPS knob.** Smaller chunks shrink the scanline buffer
+> (the renderer's only N-dependent RAM), so RAM falls monotonically as you lower
+> `RENDERER_SCANLINES`. The cost is FPS: there are more strips, and each one
+> re-scans the sprite lists (see §6.3), so per-chunk overhead rises. `8` is the
+> chosen balance — half the buffer of 16 for a modest FPS cost.
 
 The buffers are **4-byte aligned** on purpose — the opaque blitter writes two
 pixels at a time with a 32-bit store (see §7.4), which requires word alignment.
@@ -200,17 +205,17 @@ pixels at a time with a 32-bit store (see §7.4), which requires word alignment.
 
 ## 5. The frame pipeline
 
-`rendererRender()` runs three stages — sort, bin, then a composite+DMA loop:
+`rendererRender()` runs two stages — sort, then a composite+DMA loop:
 
 ```
  ┌─────────────────────────────────────────────────────────────────────────┐
  │ rendererRender()                                                         │
  │                                                                          │
  │  1. sortSpritesByZ()       counting sort each layer by z (ascending)     │
- │  2. binSpritesIntoChunks() bucket each sprite into the chunks it covers  │
  │                                                                          │
- │  3. for chunk = 0..14:                                                   │
- │       renderScanlineChunk()   ── composite this strip in a back buffer   │
+ │  2. for chunk = 0..29:                                                   │
+ │       renderScanlineChunk()   ── walk sorted sprites, composite the ones │
+ │                                  overlapping this strip, in a back buffer│
  │       ili9341DrawScanlines()  ── DMA the previous/this strip to the LCD  │
  │                                                                          │
  └─────────────────────────────────────────────────────────────────────────┘
@@ -256,34 +261,42 @@ for (i) s_sorted[layer][z_count[z]++] = &sprite[i]; // 3) scatter (stable)
 It produces `s_sorted[layer][]` = pointers to sprites in ascending `z`. The sort
 is **stable**, so sprites with equal `z` keep submission order.
 
-### 6.3 Binning into chunks
+### 6.3 Selecting a chunk's sprites (scan, not pre-bin)
 
-A sprite at `y=30, h=20` spans screen rows 30..49, which touches chunk 1 (16..31)
-and chunk 2 (32..47) and chunk 3 (48..63). `binSpritesIntoChunks()` figures out,
-for every sprite, which chunks it overlaps, and builds a **flat per-chunk list**
-so the compositor for chunk *k* can iterate only the sprites that actually touch
-chunk *k*.
+For each chunk, `renderScanlineChunk()` walks the z-sorted lists and composites
+the sprites that overlap this strip, skipping the rest with a one-line vertical
+test:
 
-It is a classic two-pass bucket fill (count, then place):
-
+```c
+for (layer in BG, FG, UI)                     // back-to-front layer order
+    for (sprite in s_sorted[layer])           // ascending z within the layer
+        if (sprite->y >= chunk_bottom ||      // wholly below this strip
+            sprite->y + sprite->h <= chunk_top) // wholly above this strip
+            continue;                         // ← cheap reject, any height
+        composite the sprite into this strip;
 ```
- pass 1: for each sprite, for each chunk it covers:  s_chunk_count[chunk]++
- prefix-sum s_chunk_count → s_chunk_start (offsets into one shared pool)
- pass 2: for each sprite, append its pointer into s_chunk_pool[ slot ]
-```
 
-The pool is sized `(320+256+256) × 2` so a sprite spanning two chunks is fine.
-Crucially the bin walk follows the **layer order BG → FG → UI** and, within a
-layer, the **sorted z order**. So when the compositor reads a chunk's list
-front-to-back in array order, it is already in correct **back-to-front paint
-order**: `BG(low z) → BG(high z) → FG → UI`.
+Walking `BG → FG → UI`, ascending z within each, is exactly **back-to-front
+paint order** (`BG(low z) → BG(high z) → FG → UI`), so later sprites correctly
+overdraw earlier ones.
+
+> **Why a scan and not a pre-built per-chunk list?** An earlier design pre-binned
+> sprites into a flat `s_chunk_pool` (one entry per sprite-per-chunk-it-touches)
+> so each chunk could read just its own list. That pool has to be sized for the
+> worst case — *every* sprite at the *tallest* supported height — which for a
+> 200 px sprite at an 8-line chunk height is `ceil(200/8)+1 ≈ 26` entries each.
+> With variable-height sprites that array becomes either enormous or too small
+> (and an overflow silently blanks the frame). The scan needs **no pool at all**:
+> it is O(1) extra memory and correct for any sprite size, at the cost of a
+> vertical reject test per (sprite, chunk). The reject is a couple of loads and a
+> compare, and `composite*` still does the precise clip for the survivors.
 
 ### 6.4 Per-chunk compositing
 
 ```c
 for (chunk_index = 0; scanline_y < 240; chunk_index++) {
     buffer_index = chunk_index & 1;                       // ping-pong A/B
-    renderScanlineChunk(s_scanline_buffer[buffer_index], chunk_index, scanline_y, lines);
+    renderScanlineChunk(s_scanline_buffer[buffer_index], scanline_y, lines);
     ili9341DrawScanlines(lines, scanline_y, lines * 320, s_scanline_buffer[buffer_index]);
     scanline_y += lines;
 }
@@ -656,7 +669,7 @@ Rules of thumb:
 
 | Term | Meaning |
 | ---- | ------- |
-| **Chunk** | A horizontal strip of 16 scanlines; the unit of compositing + DMA. |
+| **Chunk** | A horizontal strip of `RENDERER_SCANLINES` (8) scanlines; the unit of compositing + DMA. |
 | **Layer** | Coarse front/back grouping: `BG < FG < UI`. |
 | **`z`** | Fine draw order within a layer; low = behind. |
 | **2bpp / 4bpp** | 2 or 4 bits per pixel; 4 or 16 palette indices. |
@@ -670,10 +683,9 @@ Rules of thumb:
 | Constant | Value | Where |
 | -------- | ----- | ----- |
 | `RENDERER_WIDTH` × `RENDERER_HEIGHT` | 320 × 240 | `renderer.h` |
-| `RENDERER_SCANLINES` | 16 (chunk height) | `renderer.c` |
-| `MAX_CHUNKS` | 15 | `renderer.c` |
+| `RENDERER_SCANLINES` | 8 (chunk height; 30 strips/frame) | `renderer.c` |
 | `MAX_SPRITES_BG / FG / UI` | 320 / 256 / 256 | `renderer.c` |
-| Scanline buffers | 2 × 16 × 320 × 2 B = 20,480 B | `renderer.c` |
+| Scanline buffers | 2 × 8 × 320 × 2 B = 10,240 B | `renderer.c` |
 
 ---
 

@@ -9,6 +9,12 @@
 #include "buzzer.h"
 #include "joystick.h"
 
+/* Game-owned data lives in GAME_RAM (see console.ld's .game_ram section), so it
+ * doesn't count against the console library's CONSOLE_RAM budget — this mirrors
+ * the real split where a loaded game owns its sprites and the console only
+ * borrows pointers to them. (Test harness only; not production-safe.) */
+#define GAME_RAM_DATA __attribute__((section(".game_ram")))
+
 /* ---- Palettes ---- */
 static const uint16_t s_pal_bg[4]    = {0, 0xF800, 0x001F, 0};
 static const uint16_t s_pal_fg[4]    = {0, 0x07E0, 0, 0};
@@ -19,7 +25,7 @@ static const uint16_t s_pal_panel[4] = {0, 0x8410, 0, 0};
 /* ---- 16x16 2bpp tiles ---- */
 #define TILE_PX 16U
 #define TILE_BYTES ((TILE_PX * TILE_PX) / 4U)
-static uint8_t s_tile_red[TILE_BYTES], s_tile_blue[TILE_BYTES];
+static uint8_t s_tile_red[TILE_BYTES] GAME_RAM_DATA, s_tile_blue[TILE_BYTES] GAME_RAM_DATA;
 
 static void initTiles(void)
 {
@@ -31,7 +37,7 @@ static void initTiles(void)
 #define CURSOR_PX 8U
 #define CURSOR_BYTES ((CURSOR_PX * CURSOR_PX) / 4U)
 #define CURSOR_SPEED 3
-static uint8_t s_cursor_px[CURSOR_BYTES];
+static uint8_t s_cursor_px[CURSOR_BYTES] GAME_RAM_DATA;
 static int16_t s_cursor_x = (RENDERER_WIDTH/2) - (CURSOR_PX/2);
 static int16_t s_cursor_y = (RENDERER_HEIGHT/2) - (CURSOR_PX/2);
 
@@ -62,7 +68,7 @@ static const uint8_t s_letter_bits[5][LETTER_H] = {
     {0x80,0x80,0x80,0x80,0x80,0x80,0xFE,0x00},
     {0x7C,0x82,0x82,0x82,0x82,0x82,0x7C,0x00},
 };
-static uint8_t s_letter_data[5][LETTER_BYTES];
+static uint8_t s_letter_data[5][LETTER_BYTES] GAME_RAM_DATA;
 
 static void initLetters(void)
 {
@@ -88,72 +94,81 @@ static void initLetters(void)
 static const uint8_t s_hello[] = {0,1,2,2,3,255,0,1,2,2,3,255};
 #define HLEN (sizeof(s_hello))
 
+/* Game-owned persistent sprite storage (lives in GAME_RAM). The renderer only
+ * borrows pointers into this pool, so it must stay valid until rendererRender()
+ * returns — it does: we refill it before submitting, and render reads it right
+ * after. Sized to the scene (300 BG + 226 FG + 200 UI = 726) with margin. */
+#define SCENE_SPRITE_MAX 768U
+static Sprite s_scene[SCENE_SPRITE_MAX] GAME_RAM_DATA;
+static uint16_t s_scene_count;
+
+/* Store a sprite in the game pool and hand the renderer a pointer to it. */
+static void submitSprite(Layer layer, Sprite sprite)
+{
+    if (s_scene_count >= SCENE_SPRITE_MAX)
+        return;
+    s_scene[s_scene_count] = sprite;
+    rendererSubmit(layer, &s_scene[s_scene_count]);
+    s_scene_count++;
+}
+
 static void submitFrame(void)
 {
     rendererClear();
+    s_scene_count = 0U;
 
     /* BG: full-screen checkerboard (300 sprites) */
     for (uint8_t r = 0U; r < GRID_ROWS; r++)
         for (uint8_t c = 0U; c < GRID_COLS; c++)
-        {
-            const Sprite s = {
+            submitSprite(LAYER_BG, (Sprite){
                 .x = (int16_t)(c*TILE_PX), .y = (int16_t)(r*TILE_PX),
                 .w = TILE_PX, .h = TILE_PX, .z = 0,
                 .flags = SPRITE_OPAQUE, .format = GFX_FMT_2BPP,
                 .pixels = ((r^c)&1U) ? s_tile_blue : s_tile_red,
                 .palette = s_pal_bg,
-            };
-            rendererSubmit(LAYER_BG, &s);
-        }
+            });
 
     /* FG: ~3/4 screen (225 sprites) */
     for (uint8_t r = 0U; r < FG_ROWS; r++)
         for (uint8_t c = 0U; c < FG_COLS; c++)
-        {
-            const Sprite s = {
+            submitSprite(LAYER_FG, (Sprite){
                 .x = (int16_t)(c*TILE_PX), .y = (int16_t)(r*TILE_PX),
                 .w = TILE_PX, .h = TILE_PX, .z = 0,
                 .flags = SPRITE_OPAQUE, .format = GFX_FMT_2BPP,
                 .pixels = s_tile_red, .palette = s_pal_fg,
-            };
-            rendererSubmit(LAYER_FG, &s);
-        }
+            });
 
     /* FG: cursor */
-    { const Sprite s = {
+    submitSprite(LAYER_FG, (Sprite){
         .x = s_cursor_x, .y = s_cursor_y,
         .w = CURSOR_PX, .h = CURSOR_PX, .z = 10,
         .flags = 0, .format = GFX_FMT_2BPP,
         .pixels = s_cursor_px, .palette = s_pal_cursor,
-    }; rendererSubmit(LAYER_FG, &s); }
+    });
 
     /* UI: text (100 chars) */
     for (uint16_t i = 0U; i < UI_CHARS; i++)
     {
         uint8_t ch = s_hello[i % HLEN];
-        const Sprite s = {
+        submitSprite(LAYER_UI, (Sprite){
             .x = (int16_t)((i % UI_COLS) * (LETTER_W+1)),
             .y = (int16_t)((i / UI_COLS) * (LETTER_H+1)),
             .w = LETTER_W, .h = LETTER_H, .z = 0,
             .format = GFX_FMT_2BPP,
             .pixels = (ch < 5U) ? s_letter_data[ch] : s_letter_data[4],
             .palette = s_pal_text,
-        };
-        rendererSubmit(LAYER_UI, &s);
+        });
     }
 
     /* UI: panel ~1/3 screen (100 sprites) */
     for (uint8_t r = 0U; r < 10U; r++)
         for (uint8_t c = 0U; c < 10U; c++)
-        {
-            const Sprite s = {
+            submitSprite(LAYER_UI, (Sprite){
                 .x = (int16_t)(160 + c*TILE_PX), .y = (int16_t)(80 + r*TILE_PX),
                 .w = TILE_PX, .h = TILE_PX, .z = 0,
                 .flags = SPRITE_OPAQUE, .format = GFX_FMT_2BPP,
                 .pixels = s_tile_red, .palette = s_pal_panel,
-            };
-            rendererSubmit(LAYER_UI, &s);
-        }
+            });
 }
 
 void SystemInit(void) { systemClockConfig(); }

@@ -4,14 +4,14 @@
 #include <stdint.h>
 #include "stdbool.h"
 
-#define RENDERER_WIDTH  320U
+#define RENDERER_WIDTH 320U
 #define RENDERER_HEIGHT 240U
 
 typedef enum
 {
-    SPRITE_FLIP_H  = (1U << 0),
-    SPRITE_FLIP_V  = (1U << 1),
-    SPRITE_OPAQUE  = (1U << 2), /* no transparent pixels: skip the per-pixel index==0 test */
+    SPRITE_FLIP_H = (1U << 0),
+    SPRITE_FLIP_V = (1U << 1),
+    SPRITE_OPAQUE = (1U << 2), /* no transparent pixels: skip the per-pixel index==0 test */
 } SpriteFlags;
 
 typedef enum
@@ -30,12 +30,12 @@ typedef enum
 
 typedef struct
 {
-    int16_t  x, y;
+    int16_t x, y;
     uint16_t w, h;
-    uint8_t  z;
-    uint8_t  flags;
-    uint8_t  format;
-    const uint8_t  *pixels;
+    uint8_t z;
+    uint8_t flags;
+    uint8_t format;
+    const uint8_t *pixels;
     const uint16_t *palette;
 } Sprite;
 
