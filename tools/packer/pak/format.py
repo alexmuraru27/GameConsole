@@ -1,6 +1,6 @@
 """The .pak binary format: constants, struct layouts, and CRC helpers.
 
-This is the Python mirror of ``pak_format.h`` and the single source of truth for
+This is the Python mirror of ``asset_format.h`` and the single source of truth for
 the on-disk layout. Every field is a little-endian ``uint32``, so the structs are
 contiguous with no padding:
 

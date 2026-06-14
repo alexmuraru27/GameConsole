@@ -1,5 +1,5 @@
-#ifndef PAK_FORMAT_H
-#define PAK_FORMAT_H
+#ifndef ASSET_FORMAT_H
+#define ASSET_FORMAT_H
 
 #include <stdint.h>
 
@@ -16,24 +16,26 @@
  * padding) and map directly onto the file bytes.
  */
 
-#define PAK_MAGIC   0x314B4150u  /* "PAK1" little-endian */
+#define PAK_MAGIC 0x314B4150u /* "PAK1" little-endian */
 #define PAK_VERSION 1u
 
-typedef struct {
+typedef struct
+{
     uint32_t id;     /* asset id */
-    uint32_t offset; /* blob offset, relative to PakHeader.dataOffset */
+    uint32_t offset; /* blob offset, relative to AssetHeader.dataOffset */
     uint32_t size;   /* stored blob size in bytes */
     uint32_t crc32;  /* CRC32 of this blob */
-} PakEntry;
+} AssetEntry;
 
-typedef struct {
-    uint32_t magic;      /* PAK_MAGIC */
-    uint32_t version;    /* PAK_VERSION */
+typedef struct
+{
+    uint32_t magic;      /* ASSET_MAGIC */
+    uint32_t version;    /* ASSET_VERSION */
     uint32_t assetCount; /* number of PakEntry records */
     uint32_t dataOffset; /* byte offset of the first blob (start of raw data) */
     uint32_t pakSize;    /* total file size in bytes */
     uint32_t pakCrc;     /* CRC32 of the whole file, excluding these 4 bytes */
     PakEntry entries[];  /* assetCount entries, followed by the raw blobs */
-} PakHeader;
+} AssetHeader;
 
-#endif /* PAK_FORMAT_H */
+#endif /* ASSET_FORMAT_H */

@@ -1,5 +1,4 @@
 #include "game_console_api.h"
-#include "assets.h"
 #include "game_state_manager.h"
 #include "sound.h"
 #include "stdio.h"

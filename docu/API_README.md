@@ -88,15 +88,6 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 
 ### Renderer
 - `rendererRender()`: Draw the current frame.
-- `rendererSetDirtyCompleteRedraw()`: Force full redraw.
-- `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Screen size.
-- `rendererGetWidthTiles()`, `rendererGetHeightTiles()`: Tile grid size.
-- `rendererGetTilePixelSize()`: Tile size in pixels.
-- `rendererOamSetXYPos(idx, x, y)`: Set sprite position.
-- `rendererOamGetXPos(idx)`, `rendererOamGetYPos(idx)`: Get sprite position.
-- `rendererPatternTableSetTile(...)`, `rendererPatternTableClear()`: Tile graphics.
-- `rendererFramePaletteSetSprite(...)`, `rendererFramePaletteSetBackground(...)`: Palette control.
-- ...and more (see `game_console_api.h`).
 
 ### Asset Loader
 - `assetLoaderGetAssetMetadata(asset_id, *size)`: Get asset size.
@@ -113,16 +104,13 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - **stm32f4xx_it.c**: Defines interrupt handlers for faults and system exceptions (NMI, HardFault, etc.).
 
 ### Renderer (renderer.c/h)
-- Handles tile-based graphics rendering to the ILI9341 display.
-- Manages OAM (Object Attribute Memory) for sprite positions and attributes.
-- Provides palette and pattern table management for flexible graphics.
-- Supports dirty rectangle redraws for performance.
+- Scanline-based graphics engine rendering to the ILI9341 display.
+- 320×240 pixel screen, double-buffered scanline approach for DMA-friendly rendering.
+- 64-color system palette (RGB565).
 - Internal functions:
-  - `rendererInit()`: Initialize display and buffers.
-  - `rendererRender()`: Draws the current frame.
-  - `rendererOamSetXYPos()`, `rendererOamSetTileIdx()`, etc.: Manipulate sprite data.
-  - `rendererPatternTableSetTile()`: Update tile graphics.
-  - `rendererFramePaletteSetSprite()`: Set sprite palette.
+  - `rendererInit()`: Initialize scanline buffers.
+  - `rendererRender()`: Draws the current frame (currently a stub — rendering is being reworked).
+  - `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Query screen dimensions.
 
 ### Joystick (joystick.c/h)
 - Reads analog and digital joystick inputs via ADC and GPIO.
@@ -168,16 +156,13 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 ---
 
 ## Example Usage
-Move a sprite with the joystick:
+Read joystick input:
 ```c
 void update() {
-    uint8_t x = rendererOamGetXPos(0);
-    uint8_t y = rendererOamGetYPos(0);
-    if (joystickGetLAnalogX() == JoystickAnalogValueHighAxis) x += 5;
-    if (joystickGetLAnalogX() == JoystickAnalogValueLowAxis)  x -= 5;
-    if (joystickGetLAnalogY() == JoystickAnalogValueHighAxis) y += 5;
-    if (joystickGetLAnalogY() == JoystickAnalogValueLowAxis)  y -= 5;
-    rendererOamSetXYPos(0, x, y);
+    if (joystickGetLAnalogX() == JoystickAnalogValueHighAxis) { /* move right */ }
+    if (joystickGetLAnalogX() == JoystickAnalogValueLowAxis)  { /* move left */ }
+    if (joystickGetLAnalogY() == JoystickAnalogValueHighAxis) { /* move down */ }
+    if (joystickGetLAnalogY() == JoystickAnalogValueLowAxis)  { /* move up */ }
 }
 ```
 
@@ -187,7 +172,7 @@ void update() {
 - `Console/Src/`: Main source files
 - `Console/Inc/`: Headers
 - `GameXO/`: Example game
-- `Shared/`, `Assets/` (`Tiles/`, `Music/`): Shared resources
+- `Shared/`, `Assets/` (`Music/`): Shared resources
 
 ---
 
@@ -204,7 +189,7 @@ The `Console` directory is organized into several submodules, each with its own 
 
 ### Renderer
 - **Files:** `renderer.[ch]`
-- **Purpose:** Tile-based graphics engine, sprite/OAM management, palette and pattern table control.
+- **Purpose:** Scanline-based graphics engine for the ILI9341 320×240 display.
 
 ### Loader
 - **Files:** `asset_loader.[ch]`, `game_loader.[ch]`, `loader.[ch]`
@@ -283,18 +268,14 @@ See `README.md` for license and authorship.
   ```
 
 ### Renderer
-- **Purpose:** Tile-based graphics, sprite/OAM, palette, and pattern table management.
+- **Purpose:** Scanline-based graphics engine for the ILI9341 display.
 - **Key Functions:**
-  - `rendererInit()`: Initialize renderer.
-  - `rendererRender()`: Draw frame.
-  - `rendererSetDirtyCompleteRedraw()`: Force full redraw.
-  - `rendererOamSetXYPos(idx, x, y)`: Set sprite position.
-  - `rendererPatternTableSetTile(idx, data, size)`: Set tile graphics.
-  - `rendererFramePaletteSetSprite(...)`: Set sprite palette.
+  - `rendererInit()`: Initialize scanline buffers.
+  - `rendererRender()`: Draw the current frame.
+  - `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Screen dimensions (320×240).
 - **Usage Example:**
   ```c
-  rendererOamSetXYPos(0, 20, 30);
-  rendererPatternTableSetTile(1, tile_data, 16);
+  rendererInit();
   rendererRender();
   ```
 
@@ -343,88 +324,25 @@ See `README.md` for license and authorship.
   loaderCloseFile();
   ```
 
-# Renderer: Full Documentation and Drawing Guide
+# Renderer: Full Documentation
 
 ## Overview
-The renderer is a tile-based, palette-driven graphics engine inspired by classic consoles. It supports background and sprite layers, tile flipping, palette selection, and priority control. The renderer is optimized for embedded systems and uses a dirty-tile system for efficient redraws.
+The renderer is a scanline-based graphics engine targeting the ILI9341 320×240 display. It uses double-buffered scanline strips for DMA-friendly pixel transfer to the LCD.
 
 ## Graphics Model
-- **Screen Size:** 256x240 pixels (16x16 pixel tiles, 16x15 tiles)
-- **Tiles:** 16x16 pixels, 64 bytes per tile, up to 256 unique tiles (pattern table)
-- **Sprites:** Up to 64 sprites (OAM entries), each using a tile and palette
-- **Palettes:**
-  - 64 system colors (RGB565)
-  - 16 frame palettes for sprites, 16 for background, each with 4 colors (index 0 is transparent)
-- **Layers:**
-  - Background (tilemap, per-tile palette, flip, priority)
-  - Sprites (OAM, per-sprite palette, flip, priority)
-
-## Data Structures
-- **Pattern Table:** `s_pattern_table[256][64]` — stores tile graphics (bitplanes)
-- **Name Table:** `s_name_table[32*15]` — background tile indices
-- **Attribute Table:** `s_attribute_table[32*15]` — per-tile palette, flip, priority
-- **OAM:** `s_oam[64]` — sprite attributes (position, tile, palette, flip, priority)
-- **Frame Palettes:** `s_frame_palette_sprite[16][4]`, `s_frame_palette_bg[16][4]`
+- **Screen Size:** 320×240 pixels
 - **System Palette:** 64 fixed RGB565 colors
+- **Scanline Buffers:** Two buffers of 16 scanlines × 320 pixels each (`RENDERER_SCANLINE_BUFFERS` × `RENDERER_WIDTH`), enabling double-buffered rendering
 
-## Drawing Pipeline
-1. **Background (Low Priority):** Draws all background tiles with low priority.
-2. **Sprites (Priority=1):** Draws sprites set to appear behind high-priority background tiles.
-3. **Background (High Priority):** Draws high-priority background tiles (can cover sprites).
-4. **Sprites (Priority=0):** Draws sprites set to appear in front of high-priority background tiles.
+## API
+The renderer exposes a minimal public API:
+- `rendererInit()` — initialize scanline buffers
+- `rendererRender()` — render the current frame to the ILI9341
+- `rendererGetWidthPixels()` / `rendererGetHeightPixels()` — query screen dimensions
 
-## How to Draw
-### 1. Define Tiles
-- Use `rendererPatternTableSetTile(tile_idx, tile_data, 64)` to upload a tile (16x16, 4bpp planar format).
-- Tile data is 64 bytes: 2 bitplanes per row, 16 rows.
-
-### 2. Set Palettes
-- Use `rendererFramePaletteSetSprite(palette_idx, color_idx, system_palette_idx)` to set sprite palette colors.
-- Use `rendererFramePaletteSetBackground(palette_idx, color_idx, system_palette_idx)` for background.
-- Each palette has 4 colors (index 0 = transparent for sprites).
-
-### 3. Build Background
-- Use `rendererNameTableSetTile(tile_x, tile_y, tile_idx)` to assign a tile to a background position.
-- Use `rendererAttributeTableSetPalette(tile_x, tile_y, palette_idx)` to set the palette for a tile.
-- Use `rendererAttributeTableSetFlipH/V(tile_x, tile_y, bool)` to flip tiles.
-- Use `rendererAttributeTableSetPriorityHigh(tile_x, tile_y, bool)` to control if a tile is drawn above sprites.
-
-### 4. Draw Sprites
-- Use OAM setters:
-  - `rendererOamSetXYPos(oam_idx, x, y)`
-  - `rendererOamSetTileIdx(oam_idx, tile_idx)`
-  - `rendererOamSetPaletteIdx(oam_idx, palette_idx)`
-  - `rendererOamSetFlipH/V(oam_idx, bool)`
-  - `rendererOamSetPriorityLow(oam_idx, bool)` (true = behind high-priority BG)
-- Example:
-  ```c
-  rendererOamSetXYPos(0, 100, 120);
-  rendererOamSetTileIdx(0, 5);
-  rendererOamSetPaletteIdx(0, 2);
-  rendererOamSetFlipH(0, false);
-  rendererOamSetFlipV(0, false);
-  rendererOamSetPriorityLow(0, false);
-  ```
-
-### 5. Trigger Rendering
-- Call `rendererRender()` once per frame (after all updates).
-- Only dirty tiles/sprites are redrawn for efficiency.
-
-## Advanced Features
-- **Dirty Redraw:** Only changed tiles/sprites are redrawn. Use `rendererSetDirtyCompleteRedraw()` to force a full redraw.
-- **Transparency:** Palette index 0 is transparent for sprites; background tiles are always opaque.
-- **Flipping:** Both tiles and sprites can be flipped horizontally/vertically.
-- **Priority:** Sprites and tiles can be layered using priority bits.
-
-## Example: Drawing a Moving Sprite
+## Usage
 ```c
-// Set up tile graphics and palette
-rendererPatternTableSetTile(1, my_tile_data, 64);
-rendererFramePaletteSetSprite(2, 1, 10); // palette 2, color 1 = system color 10
-// Place sprite
-rendererOamSetXYPos(0, x, y);
-rendererOamSetTileIdx(0, 1);
-rendererOamSetPaletteIdx(0, 2);
+rendererInit();
 // In your game loop:
 rendererRender();
 ```
@@ -432,20 +350,6 @@ rendererRender();
 ## System Palette
 ![system_palette](docu/system_palette.png)
 
-## Z-order rendering of sprites and background
-| rendererOamSetPriorityLow | rendererAttributeTableSetPriorityHigh | Order of elements         | Explanation                                |
-| ------------------------- | ------------------------------------- | ------------------------- | ------------------------------------------ |
-| true                      | false/true                            | Bg Low - Bg High - Sprite | Sprite will always be on top               |
-| false                     | false                                 | Bg Low - Sprite           | Sprite is drawn over low priority BG       |
-| false                     | true                                  | Sprite - Bg High          | Sprite is drawn under the high priority BG |
-
-## Tips for Developers
-- Use as few redraws as possible for best performance.
-- Group tiles with the same palette for efficient color use.
-- Use flipping to reuse tile graphics.
-- Use high-priority background tiles for HUDs or overlays.
-- Always call `rendererRender()` after making changes.
-
-## Reference: Renderer API
-- See `renderer.h` for all available functions and their descriptions.
+## Reference
+- See `renderer.h` and `renderer.c` for implementation details.
 

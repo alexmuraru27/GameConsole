@@ -260,40 +260,6 @@ void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height
     ili9341FillScreen(ILI9341_BLACK);
 }
 
-void ili9341DrawPixel(uint16_t x, uint16_t y, uint16_t color)
-{
-    if ((x >= s_window_width) || (y >= s_window_height))
-        return;
-    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, 1U, 1U);
-    ili9341WriteData(color);
-}
-
-void ili9341SetAddrWindow(const uint16_t x, const uint16_t y,
-                          const uint16_t w, const uint16_t h)
-{
-    fsmcDmaWait();
-    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
-}
-
-void ili9341SendPixel(uint16_t color)
-{
-    ili9341WriteData(color);
-}
-
-void ili9341DrawImage(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
-                      const uint16_t *data)
-{
-    if ((x >= s_window_width) || (y >= s_window_height))
-        return;
-    if ((x + w - 1U) >= s_window_width)
-        return;
-    if ((y + h - 1U) >= s_window_height)
-        return;
-
-    ili9341SetAddrWindowScreen(x + s_window_x_offset, y + s_window_y_offset, w, h);
-    fsmcDmaSend(data, (uint32_t)w * h);
-}
-
 void ili9341DrawScanlines(const uint8_t lines, const uint16_t lines_offset, const uint16_t array_size, const uint16_t *data)
 {
     if (lines == 0)

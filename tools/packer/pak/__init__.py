@@ -1,6 +1,6 @@
 """GameConsole ``.pak`` asset-container library.
 
-The on-disk format is defined in :mod:`pak.format` (mirroring ``pak_format.h``).
+The on-disk format is defined in :mod:`pak.format` (mirroring ``asset_format.h``).
 The pipeline is split by concern:
 
     manifest -> builder -> verify -> report

@@ -45,18 +45,14 @@ DEFINE_ASSET_HEADER(ASSET_MAGIC, ASSET_VERSION, ASSET_COUNT);
 Then define each asset:
 
 ```c
-DEFINE_ASSET_8(font_a,         ASSET_ID_FONT_A,          ASSET_TYPE_FONT,           { /* data */ });
-DEFINE_ASSET_16(audio_data,    ASSET_ID_AUDIO_DATA,       ASSET_TYPE_AUDIO_DATA,     { /* data */ });
-DEFINE_ASSET_16(audio_duration,ASSET_ID_AUDIO_DURATION,   ASSET_TYPE_AUDIO_DURATION, { /* data */ });
+DEFINE_ASSET_8(my_data,      ASSET_ID_MY_DATA,       ASSET_TYPE_CUSTOM,         { /* uint8 data  */ });
+DEFINE_ASSET_16(audio_data,  ASSET_ID_AUDIO_DATA,    ASSET_TYPE_AUDIO_DATA,     { /* uint16 data */ });
+DEFINE_ASSET_16(audio_duration, ASSET_ID_AUDIO_DURATION, ASSET_TYPE_AUDIO_DURATION, { /* uint16 data */ });
 ```
 
 Assets are lazy-loaded at runtime via `assetLoaderGetAssetData()`, so total asset data can exceed what fits in RAM at once.
 
-Tile data generated as a `DEFINE_*` macro (e.g. headers in `Assets/Tiles/`) plugs directly into the asset macros:
-
-```c
-DEFINE_ASSET_8(my_tile, ASSET_ID_MY_TILE, ASSET_TYPE_TILE, (DEFINE_MY_TILE_DATA));
-```
+The `DEFINE_TILE(...)` macro from `Shared/TileUtils/tileCreator.h` is available for defining 2bpp planar pixel/tile data that plugs directly into `DEFINE_ASSET_8`.
 
 For free-form pictures, [Pixel Forge](../tools/graphics/README.md) exports `GfxAsset` `.bin`/`.c` files in the console's 2bpp/4bpp formats.
 
@@ -68,7 +64,6 @@ Build with the provided Makefile and copy the resulting `.bin` to the SD card ro
 
 ```c
 #include "game_console_api.h"
-#include "assets.h"
 
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
 

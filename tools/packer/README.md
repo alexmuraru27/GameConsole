@@ -4,7 +4,7 @@
 emits a C enum of their ids. A game loads the one `.pak` from the SD card and
 looks assets up by id instead of shipping dozens of loose `.bin` files.
 
-The on-disk format is defined once, in C, in [`pak_format.h`](pak_format.h).
+The on-disk format is defined once, in C, in [`asset_format.h`](asset_format.h).
 That header is the contract: the packer writes bytes that match it exactly, and
 console/game code includes it to read them back.
 
@@ -18,12 +18,12 @@ console/game code includes it to read them back.
 Running the packer with `--output-name Level1` writes two files into the output
 directory:
 
-| File                 | Purpose                                                        |
-|----------------------|----------------------------------------------------------------|
-| `Level1.pak`         | The binary container (header + entries + raw asset blobs).      |
-| `Level1AssetEnum.h`  | `typedef enum { ... } Level1AssetId;` mapping each asset name to its id. |
+| File                | Purpose                                                                  |
+| ------------------- | ------------------------------------------------------------------------ |
+| `Level1.pak`        | The binary container (header + entries + raw asset blobs).               |
+| `Level1AssetEnum.h` | `typedef enum { ... } Level1AssetId;` mapping each asset name to its id. |
 
-The game includes `Level1AssetEnum.h` (for the ids) and `pak_format.h` (for the
+The game includes `Level1AssetEnum.h` (for the ids) and `asset_format.h` (for the
 `PakHeader` / `PakEntry` structs) to read the pak at runtime.
 
 The enum type is named after the output (`Level1AssetId`, `<name>AssetId` in
@@ -70,12 +70,12 @@ transform them. Entry order in the `.pak` follows manifest order.
 python packer.py <manifest> --output-name <name> [--output-dir DIR] [--assets-root DIR]
 ```
 
-| Argument                | Description                                                              |
-|-------------------------|--------------------------------------------------------------------------|
-| `manifest`              | Path to the YAML manifest.                                                |
-| `-o`, `--output-name`   | Base name for outputs: writes `<name>.pak` and `<name>AssetEnum.h`. Required. |
-| `-d`, `--output-dir`    | Directory for the generated files (default: current directory).          |
-| `--assets-root`         | Base directory for relative asset paths (default: the manifest's directory). |
+| Argument              | Description                                                                   |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `manifest`            | Path to the YAML manifest.                                                    |
+| `-o`, `--output-name` | Base name for outputs: writes `<name>.pak` and `<name>AssetEnum.h`. Required. |
+| `-d`, `--output-dir`  | Directory for the generated files (default: current directory).               |
+| `--assets-root`       | Base directory for relative asset paths (default: the manifest's directory).  |
 
 The packer self-verifies the bytes it produced before writing anything to disk,
 so a corrupt pak is never emitted.
@@ -83,7 +83,7 @@ so a corrupt pak is never emitted.
 ## Binary layout
 
 All fields are little-endian `uint32`. Because every field is a `uint32`, the
-structs in `pak_format.h` are naturally contiguous (no padding) and map directly
+structs in `asset_format.h` are naturally contiguous (no padding) and map directly
 onto the file bytes.
 
 ```
@@ -106,23 +106,23 @@ pakSize     +-----------------------------------------+
 
 **PakHeader** (fixed fields):
 
-| Field        | Type     | Meaning                                                   |
-|--------------|----------|-----------------------------------------------------------|
-| `magic`      | uint32   | `0x314B4150` — the ASCII bytes `PAK1` in file order.      |
-| `version`    | uint32   | Format version (`1`).                                     |
-| `assetCount` | uint32   | Number of `PakEntry` records.                             |
-| `dataOffset` | uint32   | Byte offset of the first asset blob: `24 + assetCount*16`. |
-| `pakSize`    | uint32   | Total file size in bytes.                                 |
-| `pakCrc`     | uint32   | CRC32 of the whole file, excluding these 4 bytes.        |
+| Field        | Type   | Meaning                                                    |
+| ------------ | ------ | ---------------------------------------------------------- |
+| `magic`      | uint32 | `0x314B4150` — the ASCII bytes `PAK1` in file order.       |
+| `version`    | uint32 | Format version (`1`).                                      |
+| `assetCount` | uint32 | Number of `PakEntry` records.                              |
+| `dataOffset` | uint32 | Byte offset of the first asset blob: `24 + assetCount*16`. |
+| `pakSize`    | uint32 | Total file size in bytes.                                  |
+| `pakCrc`     | uint32 | CRC32 of the whole file, excluding these 4 bytes.          |
 
 **PakEntry** (one per asset):
 
-| Field    | Type   | Meaning                                          |
-|----------|--------|--------------------------------------------------|
-| `id`     | uint32 | Asset id (matches an `AssetId` enum constant).   |
-| `offset` | uint32 | Blob offset **relative to `dataOffset`**.        |
-| `size`   | uint32 | Blob size in bytes.                              |
-| `crc32`  | uint32 | CRC32 of this blob.                              |
+| Field    | Type   | Meaning                                        |
+| -------- | ------ | ---------------------------------------------- |
+| `id`     | uint32 | Asset id (matches an `AssetId` enum constant). |
+| `offset` | uint32 | Blob offset **relative to `dataOffset`**.      |
+| `size`   | uint32 | Blob size in bytes.                            |
+| `crc32`  | uint32 | CRC32 of this blob.                            |
 
 ## How offsets work
 
@@ -176,7 +176,7 @@ and point at any `.pak` bytes.
 ## Using a pak from C
 
 ```c
-#include "pak_format.h"
+#include "asset_format.h"
 #include "Level1AssetEnum.h"   // ASSET_PLAYER_CHR, ..., Level1AssetId
 
 // pak_base points at the loaded .pak file bytes.
@@ -198,15 +198,15 @@ static const uint8_t *asset_data(const uint8_t *pak_base, Level1AssetId id, uint
 
 The logic lives in the `pak` package; `packer.py` is just the CLI front end:
 
-| File | Responsibility |
-|------|----------------|
-| `pak/format.py`   | Constants, struct layouts, CRC helpers (the Python mirror of `pak_format.h`). |
-| `pak/manifest.py` | Manifest model + YAML loader/validation. |
-| `pak/builder.py`  | `build_pak()` — assemble the container bytes. |
-| `pak/verify.py`   | `verify_pak()` — re-parse and validate. |
-| `pak/codegen.py`  | `render_enum_header()` — the C asset-id enum. |
-| `pak/report.py`   | `format_summary()` — the printed summary. |
-| `packer.py`       | Argument parsing and orchestration. |
+| File              | Responsibility                                                                  |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `pak/format.py`   | Constants, struct layouts, CRC helpers (the Python mirror of `asset_format.h`). |
+| `pak/manifest.py` | Manifest model + YAML loader/validation.                                        |
+| `pak/builder.py`  | `build_pak()` — assemble the container bytes.                                   |
+| `pak/verify.py`   | `verify_pak()` — re-parse and validate.                                         |
+| `pak/codegen.py`  | `render_enum_header()` — the C asset-id enum.                                   |
+| `pak/report.py`   | `format_summary()` — the printed summary.                                       |
+| `packer.py`       | Argument parsing and orchestration.                                             |
 
 You can also use the library directly: `from pak import build_pak, verify_pak`.
 
