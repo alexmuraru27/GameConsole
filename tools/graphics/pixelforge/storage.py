@@ -8,6 +8,7 @@
         uint32 height      pixels
         uint32 format      GfxFormat (1 = 2bpp, 2 = 4bpp)
         uint32 dataSize    pixel data bytes after the header
+        uint32 flags       GFX_FLAG_* bitmask (GFX_FLAG_OPAQUE)
     pixel rows:            dataSize bytes, row-major, each row padded to a
                            byte boundary; 2bpp = 4 px/byte MSB-first,
                            4bpp = 2 px/byte high nibble first
@@ -16,6 +17,9 @@
 
 The start of a file maps onto the GfxAsset struct in gfx_asset.h (header +
 pixel data); the palette is a separate block following it.
+
+Files written before the flags word existed have a 4-int header; load_bin
+accepts both layouts.
 """
 
 import os
@@ -28,12 +32,19 @@ from .constants import (
     COLORS_PER_FORMAT,
     FORMAT_NAMES,
     GFX_ASSET_MAGIC,
+    GFX_FLAG_OPAQUE,
     MAX_SIZE,
     SYSTEM_PALETTE_SIZE,
 )
 
-_HEADER_STRUCT = struct.Struct("<4s4I")
+_HEADER_STRUCT = struct.Struct("<4s5I")        # magic, w, h, format, dataSize, flags
+_LEGACY_HEADER_STRUCT = struct.Struct("<4s4I")  # pre-flags files (no flags word)
 _C_BYTES_PER_LINE = 16
+
+
+def header_flags(canvas):
+    """Header flags bitmask derived from the canvas content."""
+    return GFX_FLAG_OPAQUE if canvas.is_opaque() else 0
 
 
 def row_stride(width, bits):
@@ -87,6 +98,7 @@ def save_bin(canvas, bin_path):
         canvas.height,
         canvas.format,
         len(pixels),
+        header_flags(canvas),
     )
     with open(bin_path, "wb") as f:
         f.write(header + pixels + palette)
@@ -95,10 +107,11 @@ def save_bin(canvas, bin_path):
 def load_bin(bin_path):
     with open(bin_path, "rb") as f:
         raw = f.read()
-    if len(raw) < _HEADER_STRUCT.size:
+    if len(raw) < _LEGACY_HEADER_STRUCT.size:
         raise ValueError(f"{bin_path} is too small for a GfxAssetHeader")
-    magic, width, height, fmt, pixel_size = _HEADER_STRUCT.unpack(
-        raw[: _HEADER_STRUCT.size]
+    # magic/width/height/format/dataSize sit at the same offsets in both layouts.
+    magic, width, height, fmt, pixel_size = _LEGACY_HEADER_STRUCT.unpack(
+        raw[: _LEGACY_HEADER_STRUCT.size]
     )
     if magic != GFX_ASSET_MAGIC:
         raise ValueError(f"{bin_path} is not a GFX1 file")
@@ -108,12 +121,20 @@ def load_bin(bin_path):
         raise ValueError(f"{bin_path} has an invalid size {width}x{height}")
     bits = BITS_PER_PIXEL[fmt]
     color_count = COLORS_PER_FORMAT[fmt]
-    payload = raw[_HEADER_STRUCT.size :]
     if pixel_size != row_stride(width, bits) * height:
         raise ValueError(f"{bin_path} dataSize does not match its size/format")
-    if len(payload) != pixel_size + color_count:
+
+    # The flags word is optional: accept both the current and the legacy header.
+    body = pixel_size + color_count
+    if len(raw) == _HEADER_STRUCT.size + body:
+        payload = raw[_HEADER_STRUCT.size :]
+    elif len(raw) == _LEGACY_HEADER_STRUCT.size + body:
+        payload = raw[_LEGACY_HEADER_STRUCT.size :]
+    else:
         raise ValueError(f"{bin_path} has an inconsistent GfxAssetHeader")
 
+    # The opaque flag is recomputed from the pixels on the next save, so the
+    # stored value is informational only and need not be carried on the Canvas.
     pixels = payload[:pixel_size]
     palette = [b % SYSTEM_PALETTE_SIZE for b in payload[pixel_size:]]
     return Canvas(width, height, fmt, palette, unpack_pixels(pixels, width, height, bits))
@@ -138,6 +159,7 @@ def save_c_file(canvas, c_path, name):
         f.write(f"    .height = {macro}_HEIGHT,\n")
         f.write(f"    .format = GFX_FMT_{format_name},\n")
         f.write(f"    .dataSize = {macro}_DATA_SIZE,\n")
+        f.write(f"    .flags = {'GFX_FLAG_OPAQUE' if canvas.is_opaque() else '0'},\n")
         f.write("};\n\n")
         f.write(
             "// system palette indices (slot 0 is transparent, its color is"

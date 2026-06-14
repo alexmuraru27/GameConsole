@@ -19,6 +19,10 @@ GFX_ASSET_MAGIC = b"GFX1"
 GFX_FMT_2BPP = 1
 GFX_FMT_4BPP = 2
 
+# GfxAssetHeader.flags bits (gfx_asset.h). GFX_FLAG_OPAQUE is set at export time
+# when the picture has no transparent (slot 0) pixels.
+GFX_FLAG_OPAQUE = 0x1
+
 BITS_PER_PIXEL = {GFX_FMT_2BPP: 2, GFX_FMT_4BPP: 4}
 COLORS_PER_FORMAT = {GFX_FMT_2BPP: 4, GFX_FMT_4BPP: 16}
 FORMAT_NAMES = {GFX_FMT_2BPP: "2bpp", GFX_FMT_4BPP: "4bpp"}

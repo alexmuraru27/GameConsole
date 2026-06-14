@@ -217,6 +217,22 @@ class CanvasView(QWidget):
                 painter.drawLine(x * cell, 0, x * cell, self.height())
             for y in range(y_first, y_last + 2):
                 painter.drawLine(0, y * cell, self.width(), y * cell)
+        self._draw_border(painter)
+
+    def _draw_border(self, painter):
+        """Outline the whole grid so its extent is visible at any zoom.
+
+        Drawn as four edge bars (not the faint, zoom-gated grid lines) on top of
+        the cells. The paintEvent clip keeps partial updates cheap and redraws
+        the border wherever an edge cell is repainted over it.
+        """
+        border = theme.CANVAS_BORDER_PX
+        width, height = self.width(), self.height()
+        color = theme.COLOR_CANVAS_BORDER
+        painter.fillRect(0, 0, width, border, color)            # top
+        painter.fillRect(0, height - border, width, border, color)  # bottom
+        painter.fillRect(0, 0, border, height, color)           # left
+        painter.fillRect(width - border, 0, border, height, color)  # right
 
     def _apply_widget_size(self):
         self.setFixedSize(

@@ -91,6 +91,8 @@ are declared in [`gfx_asset.h`](gfx_asset.h) so C projects can import the
 format directly:
 
 ```c
+#define GFX_FLAG_OPAQUE 0x1U // picture has no transparent (slot 0) pixels
+
 typedef enum
 {
     GFX_FMT_2BPP = 1,
@@ -104,6 +106,7 @@ typedef struct __attribute__((packed))
     uint32_t height;   // pixels
     uint32_t format;   // GfxFormat
     uint32_t dataSize; // pixel data bytes after this header
+    uint32_t flags;    // GFX_FLAG_* bitmask
 } GfxAssetHeader;
 
 typedef struct __attribute__((packed))
@@ -125,6 +128,11 @@ The file layout:
               background slot, its stored color is the picture's
               suggested backdrop color
 ```
+
+`flags` is set automatically at export time: `GFX_FLAG_OPAQUE` is raised when
+the picture uses no slot-0 (transparent) pixels, so a consumer can pick the
+fast opaque blit. (Files written before the `flags` word existed have a
+four-int header and still load.)
 
 The start of the file maps onto `GfxAsset` (header + pixel data); the
 palette block follows at `sizeof(GfxAssetHeader) + dataSize`. Row stride is
@@ -149,6 +157,7 @@ const GfxAssetHeader logo_gfx_header = {
     .height = LOGO_HEIGHT,
     .format = GFX_FMT_4BPP,
     .dataSize = LOGO_DATA_SIZE,
+    .flags = GFX_FLAG_OPAQUE, // or 0 when the picture has transparent pixels
 };
 
 // system palette indices (slot 0 is transparent, its color is the backdrop)

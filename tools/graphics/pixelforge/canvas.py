@@ -47,6 +47,10 @@ class Canvas:
         """Usable palette slots in the current format (incl. transparent 0)."""
         return COLORS_PER_FORMAT[self.format]
 
+    def is_opaque(self):
+        """True when no pixel uses slot 0, i.e. the picture has no transparency."""
+        return 0 not in self.pixels
+
     # ---------------- pixels ----------------
 
     def get(self, x, y):

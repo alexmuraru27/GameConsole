@@ -17,6 +17,8 @@ SLOT_PX = 34
 SLOT_SPACING = 6
 
 COLOR_GRID = QColor(64, 64, 64, 70)
+COLOR_CANVAS_BORDER = QColor("#ff0000")  # bounding box around the whole grid
+CANVAS_BORDER_PX = 2
 COLOR_SWATCH_BORDER = QColor("#202020")
 COLOR_ACTIVE_BORDER = QColor("#ffd400")
 COLOR_CHECKER_LIGHT = QColor("#d4d4d4")
