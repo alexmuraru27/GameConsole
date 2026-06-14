@@ -56,7 +56,7 @@ ENTRY(Reset_Handler)
 _estack = ORIGIN(CONSOLE_RAM) + LENGTH(CONSOLE_RAM);    /* end of CONSOLE_RAM */
 /* Generate a link error if heap and stack don't fit into CONSOLE_RAM */
 _Min_Heap_Size = 0x0;  /* required amount of heap=0 -> use only static allocated memory  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+_Min_Stack_Size = 4K; /* required amount of stack */
 
 /* Define output sections */
 SECTIONS

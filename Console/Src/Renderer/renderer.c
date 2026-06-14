@@ -88,3 +88,13 @@ void rendererInit(void)
 void rendererRender(void)
 {
 }
+
+uint16_t rendererGetWidthPixels()
+{
+    return RENDERER_WIDTH;
+}
+
+uint16_t rendererGetHeightPixels()
+{
+    return RENDERER_HEIGHT;
+}

@@ -4,7 +4,7 @@ INCLUDE "../common.ld"
  * Assets live in GAME_RAM_ASSET (CCM, D-bus only — data, not code). */
 _estack = ORIGIN(GAME_RAM) + LENGTH(GAME_RAM);    /* top of SRAM (0x20020000) */
 _Min_Heap_Size = 0x0;
-_Min_Stack_Size = 0x400;
+_Min_Stack_Size = 4K;
 
 SECTIONS
 {
