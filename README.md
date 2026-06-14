@@ -1,6 +1,6 @@
 # GameConsole
 
-An embedded game console platform for the STM32F407VET6, with a NES-inspired tile renderer, SD card game loader, and a shared ConsoleAPI bridge that lets game binaries call into the firmware without linking against it.
+An embedded game console platform for the STM32F407VET6, with a [scanline sprite compositor](docu/renderer.md), SD card game loader, and a shared ConsoleAPI bridge that lets game binaries call into the firmware without linking against it.
 
 **Development board:** [STM32F407VET6 F4VE V2.0](https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html)
 
@@ -23,6 +23,7 @@ make clean     # remove all build artifacts
 | Topic                    | Location                                         |
 | ------------------------ | ------------------------------------------------ |
 | API & renderer internals | [docu/API_README.md](docu/API_README.md)         |
+| Renderer deep-dive       | [docu/renderer.md](docu/renderer.md)             |
 | Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                |
 | Hardware & pinout        | [docu/HW.md](docu/HW.md)                        |
 | Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
