@@ -1,0 +1,6 @@
+#ifndef __CONSOLE_CONFIG_H
+#define __CONSOLE_CONFIG_H
+
+#define RENDERER_TESTING
+
+#endif /* __CONSOLE_CONFIG_H */

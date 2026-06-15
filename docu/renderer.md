@@ -205,24 +205,26 @@ pixels at a time with a 32-bit store (see §7.4), which requires word alignment.
 
 ## 5. The frame pipeline
 
-`rendererRender()` runs two stages — sort, then a composite+DMA loop:
+`rendererRender()` runs three stages — sort, bin, then a composite+DMA loop:
 
 ```
  ┌─────────────────────────────────────────────────────────────────────────┐
  │ rendererRender()                                                         │
  │                                                                          │
- │  1. sortSpritesByZ()       counting sort each layer by z (ascending)     │
+ │  1. sortSpritesByZ()        counting sort each layer by z (ascending)    │
+ │  2. binSpritesIntoChunks()  append each sprite to every chunk it spans,  │
+ │                             in draw order (BG→FG→UI, z-ascending)         │
  │                                                                          │
- │  2. for chunk = 0..29:                                                   │
- │       renderScanlineChunk()   ── walk sorted sprites, composite the ones │
- │                                  overlapping this strip, in a back buffer│
+ │  3. for chunk = 0..14:                                                   │
+ │       renderScanlineChunk()   ── composite this chunk's bin into a back  │
+ │                                  buffer (no reject; the bin already fits) │
  │       ili9341DrawScanlines()  ── DMA the previous/this strip to the LCD  │
  │                                                                          │
  └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-The submit-side (`rendererClear` / `rendererSubmit`) just fills three flat
-arrays — one per layer — and bumps a counter. All the work is in `render`.
+The submit-side (`rendererClear` / `rendererSubmitLayer`) just borrows each
+layer's sprite array pointer + count. All the work is in `render`.
 
 ---
 
@@ -261,35 +263,50 @@ for (i) s_sorted[layer][z_count[z]++] = &sprite[i]; // 3) scatter (stable)
 It produces `s_sorted[layer][]` = pointers to sprites in ascending `z`. The sort
 is **stable**, so sprites with equal `z` keep submission order.
 
-### 6.3 Selecting a chunk's sprites (scan, not pre-bin)
+### 6.3 Selecting a chunk's sprites: per-chunk bins
 
-For each chunk, `renderScanlineChunk()` walks the z-sorted lists and composites
-the sprites that overlap this strip, skipping the rest with a one-line vertical
-test:
+Once the layers are z-sorted, `binSpritesIntoChunks()` distributes the sprites
+into one list per chunk — appending each sprite to every chunk its vertical
+extent covers:
 
 ```c
-for (layer in BG, FG, UI)                     // back-to-front layer order
-    for (sprite in s_sorted[layer])           // ascending z within the layer
-        if (sprite->y >= chunk_bottom ||      // wholly below this strip
-            sprite->y + sprite->h <= chunk_top) // wholly above this strip
-            continue;                         // ← cheap reject, any height
-        composite the sprite into this strip;
+for (layer in BG, FG, UI)                  // back-to-front layer order
+    for (sprite in s_sorted[layer])        // ascending z within the layer
+        first = clamp(sprite->y)            / RENDERER_SCANLINES;
+        last  = (sprite->y + sprite->h - 1) / RENDERER_SCANLINES;
+        for (c = first; c <= last; c++)
+            if (s_chunk_bin_count[c] < CHUNK_BIN_CAP)
+                s_chunk_bin[c][s_chunk_bin_count[c]++] = sprite;  // append
 ```
 
-Walking `BG → FG → UI`, ascending z within each, is exactly **back-to-front
-paint order** (`BG(low z) → BG(high z) → FG → UI`), so later sprites correctly
-overdraw earlier ones.
+Because the bins are filled **in draw order** — layers `BG → FG → UI`, ascending
+z within each — every chunk's bin already holds exactly the sprites it must paint,
+in the order it must paint them (`BG(low z) → BG(high z) → FG → UI`).
+`renderScanlineChunk()` then just walks its own bin, with **no vertical reject and
+no sprites that miss the strip**:
 
-> **Why a scan and not a pre-built per-chunk list?** An earlier design pre-binned
-> sprites into a flat `s_chunk_pool` (one entry per sprite-per-chunk-it-touches)
-> so each chunk could read just its own list. That pool has to be sized for the
-> worst case — *every* sprite at the *tallest* supported height — which for a
-> 200 px sprite at an 8-line chunk height is `ceil(200/8)+1 ≈ 26` entries each.
-> With variable-height sprites that array becomes either enormous or too small
-> (and an overflow silently blanks the frame). The scan needs **no pool at all**:
-> it is O(1) extra memory and correct for any sprite size, at the cost of a
-> vertical reject test per (sprite, chunk). The reject is a couple of loads and a
-> compare, and `composite*` still does the precise clip for the survivors.
+```c
+const Sprite *const *bin = s_chunk_bin[start_y / RENDERER_SCANLINES];
+for (i in 0 .. s_chunk_bin_count[chunk])
+    composite bin[i] into this strip;      // guaranteed to overlap
+```
+
+This replaced an earlier **scan**, where every chunk walked *all* sorted sprites
+and rejected the ones it didn't overlap with a cheap `y`/`h` compare. With ~725
+sprites over 15 chunks that is ~10,900 reject tests per frame — about **17 %** of
+the frame. Binning pays a single up-front pass (~1,100 appends for the same scene)
+and removes the reject entirely: measured **+3 to +5 FPS across every
+format/opacity mode**.
+
+> **Why this is safe where the old flat pool was not.** A still-earlier design
+> pre-binned into one flat `s_chunk_pool` that had to be sized for the worst case
+> — *every* sprite at the *tallest* height — so a few tall sprites could overflow
+> it and blank the frame; it was removed for that reason. The per-chunk bins are
+> sized by sprite **count**, not height: `s_chunk_bin[NUM_CHUNKS][CHUNK_BIN_CAP]`.
+> A tall sprite simply lands in more chunks' bins (one 4-byte pointer each), never
+> overflowing a height-based bound. A chunk that would exceed `CHUNK_BIN_CAP` (200,
+> far above any realistic per-chunk count) drops the extra sprites rather than
+> corrupting memory. Cost: `15 × 200 × 4 B = 12 KB`.
 
 ### 6.4 Per-chunk compositing
 
@@ -322,6 +339,36 @@ next transfer, by which time it is usually already done.
 Because compositing a busy strip takes far longer than its DMA (see §8), the DMA
 is essentially **free** — fully hidden behind the CPU work. Measured: turning the
 DMA off entirely only changed the render time by ~4 %.
+
+### 6.6 The decoded-tile cache
+
+Unpacking 2bpp/4bpp + a palette lookup *per pixel* is wasted work when the same
+tile is drawn many times — the result is always identical. So opaque, unflipped
+tiles up to 16×16 are decoded to a **ready-made RGB565 buffer once per frame**,
+keyed by `(pixels, palette, w, h)`; every later instance just **copies rows**.
+
+```c
+// renderScanlineChunk, per opaque sprite:
+const uint16_t *rgb = tileCacheLookup(sprite, is_4bpp); // decode-on-first-use
+if (rgb) compositeCachedOpaque(..., rgb);               // word-copy each row
+else     composite2bppOpaque / composite4bpp(...);      // miss → normal unpack
+```
+
+- **Decode-on-first-use.** The first time a `(pixels, palette, size)` is seen this
+  frame it is unpacked into the next free slot (`TILE_CACHE_SLOTS = 8`); later hits
+  return the slot. A miss — flipped, larger than 16×16, or the cache is full —
+  takes the normal compositor, so correctness never depends on the cache.
+- **Reset every frame.** A palette's *contents* can change under the same pointer
+  (animation), so slots are dropped at the top of `rendererRender()`.
+- **The copy is hand-rolled.** newlib-nano's `memcpy` is a **byte** loop — using it
+  made this path *3× slower* than the unpack it replaced. A word-copy loop (two
+  pixels per 32-bit store, taken only when the width is even so source alignment is
+  stable across rows) is what makes it a win.
+
+Result on the benchmark — opaque **2bpp 78 → 100 FPS**, **4bpp 55 → 101 FPS**: once
+decoded, 2bpp and 4bpp are the same RGB565 copy, so the 4bpp penalty vanishes. The
+gain scales with reuse; a tile drawn only once pays decode + copy for no benefit
+(see §11). **RAM: 5.3 KB.**
 
 ---
 
@@ -651,17 +698,50 @@ Rules of thumb:
 
 ## 11. Limitations & future work
 
-- **Overdraw.** The current design is pure painter's algorithm: a pixel hidden
-  behind an opaque sprite is still composited and then overwritten. The stress
-  scene composites 2.17× more pixels than the screen holds. A **front-to-back**
-  pass with a per-scanline **coverage mask** could skip occluded spans entirely.
-  It is the largest remaining lever but a more invasive change to the core loop —
-  deliberately deferred.
+### Current limitations
+
 - **No clipping rectangle / no rotation / no scaling.** Sprites are axis-aligned,
   1:1, full-screen-clipped only. This is intentional simplicity.
-- **Capacity is fixed at compile time** (`MAX_SPRITES_*`). Overflow drops sprites.
-- **`s_lut` / `s_pair` are shared scratch** — correct only because rendering is
-  single-threaded and non-reentrant. Do not call the renderer from an ISR.
+- **Capacity is fixed at compile time** (`MAX_SPRITES_*`, `CHUNK_BIN_CAP`).
+  Overflow drops sprites.
+- **`s_lut` / `s_pair` / the per-chunk bins are shared scratch** — correct only
+  because rendering is single-threaded and non-reentrant. Do not call the renderer
+  from an ISR.
+
+### Possible further optimizations
+
+Three architectural levers were identified once the per-instruction blits hit
+their floor. Two are implemented; the third is documented here with its RAM cost,
+expected gain, and risk so the trade-off is on record.
+
+1. **Per-chunk binning — _implemented_ (see §6.3).** Replaced the per-chunk
+   reject scan with pre-built per-chunk bins, removing ~17 % of the frame (the
+   reject) for **+3 to +5 FPS across every mode**. **RAM: 12 KB**
+   (`15 chunks × 200 × 4 B`); sized by sprite count, capped per chunk. This is a
+   pure, content-independent win — it does not depend on tile reuse or scene
+   layering.
+
+2. **Decoded-tile cache — _implemented_ (see §6.6).** Each opaque, unflipped,
+   small tile is unpacked to a ready-made RGB565 buffer once per frame (keyed by
+   `pixels` + `palette` + size); every instance then composites with a plain
+   word-copy instead of re-running the 2bpp/4bpp unpack + palette lookup. On the
+   benchmark (a few tiles drawn 700+ times) this took **opaque 2bpp 78 → 100 FPS**
+   and **opaque 4bpp 55 → 101 FPS** — 4bpp catches up to 2bpp completely, because
+   once decoded both formats are just RGB565. **RAM: 5.3 KB** (`TILE_CACHE_SLOTS =
+   8`, each ≤16×16). **Caveats:** the win scales with **tile reuse** — a tile drawn
+   once costs decode + copy, slightly *more* than a single unpack, so low-reuse
+   scenes gain nothing; transparent tiles keep the masking compositor; and the
+   `memcpy` from newlib-nano is a byte loop, so the copy is hand-rolled (a word
+   loop), which mattered a lot (the byte-loop version was **3× slower**).
+
+3. **Front-to-back + occlusion — _future_, biggest theoretical win, riskiest.**
+   The design is pure painter's algorithm: a pixel hidden behind an opaque sprite
+   is still composited then overwritten (the stress scene has **2.17× overdraw**).
+   Drawing front-to-back with a per-scanline **coverage mask** would skip occluded
+   spans. **RAM:** ~0 (a coverage bitmap per strip). **Caveats:** the optimized
+   blits are so cheap that the coverage bookkeeping only pays back above ~7×
+   overdraw — it can *lose* on lightly layered scenes — and it is the most
+   invasive change to the core loop.
 
 ---
 
@@ -669,7 +749,7 @@ Rules of thumb:
 
 | Term | Meaning |
 | ---- | ------- |
-| **Chunk** | A horizontal strip of `RENDERER_SCANLINES` (8) scanlines; the unit of compositing + DMA. |
+| **Chunk** | A horizontal strip of `RENDERER_SCANLINES` (16) scanlines; the unit of compositing + DMA. |
 | **Layer** | Coarse front/back grouping: `BG < FG < UI`. |
 | **`z`** | Fine draw order within a layer; low = behind. |
 | **2bpp / 4bpp** | 2 or 4 bits per pixel; 4 or 16 palette indices. |
@@ -677,15 +757,22 @@ Rules of thumb:
 | **`SPRITE_OPAQUE`** | Promise that a sprite has no index-0 pixels → branch-free fast blit. |
 | **`s_lut`** | Fixed-address SRAM copy of the active palette (fast per-pixel lookup). |
 | **`s_pair`** | 16-entry table packing two adjacent pixels into one 32-bit word. |
+| **`s_byte_full_2bpp`** | 256-entry table: is a 2bpp source byte fully opaque (no index-0 pixel)? Lets the transparent blit fast-path covered interior bytes. |
+| **Per-chunk bin** | `s_chunk_bin[chunk][]` — the sprites that touch a chunk, in draw order, built once per frame (replaces the per-chunk reject). |
+| **Tile cache** | `s_tile_cache[]` — opaque tiles decoded to RGB565 once per frame, keyed by `(pixels, palette, size)`; instances blit by row copy. |
 | **`.RamFunc`** | Linker section placing hot functions in SRAM for execution. |
 | **Painter's algorithm** | Draw back-to-front; later sprites overwrite earlier ones. |
 
 | Constant | Value | Where |
 | -------- | ----- | ----- |
 | `RENDERER_WIDTH` × `RENDERER_HEIGHT` | 320 × 240 | `renderer.h` |
-| `RENDERER_SCANLINES` | 8 (chunk height; 30 strips/frame) | `renderer.c` |
-| `MAX_SPRITES_BG / FG / UI` | 320 / 256 / 256 | `renderer.c` |
-| Scanline buffers | 2 × 8 × 320 × 2 B = 10,240 B | `renderer.c` |
+| `RENDERER_SCANLINES` | 16 (chunk height; 15 strips/frame) | `renderer.c` |
+| `MAX_SPRITES_BG / FG / UI` | 350 / 350 / 350 | `renderer.c` |
+| `CHUNK_BIN_CAP` | 200 (per-chunk sprite cap) | `renderer.c` |
+| `TILE_CACHE_SLOTS` | 8 (decoded opaque tiles, ≤16×16) | `renderer.c` |
+| Scanline buffers | 2 × 16 × 320 × 2 B = 20,480 B | `renderer.c` |
+| Per-chunk bins | 15 × 200 × 4 B = 12,000 B | `renderer.c` |
+| Tile cache | 8 × (12 + 512) B ≈ 5,376 B | `renderer.c` |
 
 ---
 

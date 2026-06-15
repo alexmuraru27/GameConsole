@@ -29,6 +29,21 @@ static const uint16_t s_max_sprites_per_layer[LAYER_COUNT] = {
 static const Sprite *s_sorted[LAYER_COUNT][MAX_SPRITES_BG];
 static uint16_t s_sorted_count[LAYER_COUNT];
 
+/* Per-chunk sprite bins, rebuilt each frame from the z-sorted lists. This replaces
+ * the old per-chunk reject scan: every sprite is appended once to each chunk it
+ * spans (in painter order — BG, then FG, then UI, z-ascending within each), so a
+ * chunk composites only the sprites that actually touch it instead of testing all of
+ * them. Capped per chunk to bound RAM; a chunk that would exceed the cap drops the
+ * extra sprites (the cap sits far above any realistic per-chunk count). Unlike the
+ * flat pool removed earlier, this is sized by sprite *count*, not sprite *height* — a
+ * tall sprite simply appears in more chunks' bins, never overflowing a height-based
+ * bound. 15 chunks * 200 * 4 B = 12000 B. */
+#define RENDERER_MAX_CHUNKS ((RENDERER_HEIGHT + RENDERER_SCANLINES - 1U) / RENDERER_SCANLINES)
+#define CHUNK_BIN_CAP 200U
+
+static const Sprite *s_chunk_bin[RENDERER_MAX_CHUNKS][CHUNK_BIN_CAP];
+static uint16_t s_chunk_bin_count[RENDERER_MAX_CHUNKS];
+
 /* Scratch palette copied out of (slow) flash once per sprite. Held at a fixed
  * address so the compositors index it with a single hoisted-base load per pixel
  * instead of recomputing a stack-relative address. Single-threaded renderer, so
@@ -36,9 +51,18 @@ static uint16_t s_sorted_count[LAYER_COUNT];
 static uint16_t s_lut[16];
 
 /* Adjacent-pixel pairs of s_lut packed into 32-bit words, indexed by a 4-bit
- * (two 2bpp pixels) source nibble. Lets the opaque blitter emit one 32-bit store
- * per two pixels. Rebuilt from s_lut for each opaque 2bpp sprite. */
+ * (two 2bpp pixels) source nibble. Lets the blitter emit one 32-bit store per two
+ * pixels. Rebuilt from s_lut whenever a 2bpp sprite's palette changes (used by the
+ * opaque path and by the transparent path's fully-covered bytes). */
 static uint32_t s_pair[16];
+
+/* "Has no transparent (index-0) pixel" lookup for 2bpp source bytes (4 px/byte):
+ * a non-zero entry means every pixel the byte encodes is opaque, so the transparent
+ * compositor can take the unconditional two-store pair path for that byte and only
+ * branch per-pixel on the partially-transparent edge bytes. Built once in
+ * rendererInit(); read-only in the hot path. (4bpp gains nothing from this — it has
+ * no two-for-one store — so only the 2bpp table exists.) */
+static uint8_t s_byte_full_2bpp[256];
 
 /* Palette pointer currently loaded into s_lut / s_pair. Consecutive sprites that
  * share a palette (the common case — a layer's tiles all use one) then skip the
@@ -53,10 +77,38 @@ static const uint16_t *s_pair_pal;
 static uint16_t s_bg_color;
 static bool s_bg_enabled;
 
+/* Decoded-tile cache: an opaque, unflipped, small tile is unpacked to ready-made
+ * RGB565 once per frame (keyed by its pixels+palette+size), then every instance is
+ * composited with a plain row copy instead of re-running the 2bpp/4bpp unpack +
+ * palette lookup. Pays off when a few tiles are drawn many times (the tile-game
+ * norm). Filled lazily; reset each frame (a palette may change under the same
+ * pointer between frames). Tiles larger than the cap, flipped, or transparent skip
+ * the cache and take the normal compositor. */
+#define TILE_CACHE_SLOTS 8U
+#define TILE_CACHE_MAX_PX 256U /* up to 16x16 */
+typedef struct
+{
+    const uint8_t *pixels;
+    const uint16_t *palette;
+    uint16_t w;
+    uint16_t h;
+    uint16_t rgb[TILE_CACHE_MAX_PX];
+} TileCacheSlot;
+static TileCacheSlot s_tile_cache[TILE_CACHE_SLOTS];
+static uint8_t s_tile_cache_count;
+
 void rendererInit(void)
 {
     memset(&s_scanline_buffer[0U], 0U, sizeof(s_scanline_buffer));
     memset(s_active_sprites, 0U, sizeof(s_active_sprites));
+
+    /* A 2bpp byte is "full" (no transparent pixel) when none of its four 2-bit
+     * fields is index 0. */
+    for (uint16_t b = 0U; b < 256U; b++)
+    {
+        bool full2 = (b & 0xC0U) && (b & 0x30U) && (b & 0x0CU) && (b & 0x03U);
+        s_byte_full_2bpp[b] = full2 ? 1U : 0U;
+    }
 }
 
 /* Start a new frame: drop every layer. Only the counts need clearing — a layer
@@ -126,6 +178,55 @@ static void sortSpritesByZ(void)
     }
 }
 
+/* Distribute the z-sorted sprites into per-chunk bins. Walking layers in painter
+ * order and, within each, sprites in z-ascending order (as the sort left them),
+ * means each bin ends up in the exact order a chunk must draw: lower layers first,
+ * lower z first. A chunk then iterates only its bin — no vertical reject, no walking
+ * sprites that miss the strip. */
+static void binSpritesIntoChunks(void)
+{
+    uint16_t num_chunks = RENDERER_MAX_CHUNKS;
+    for (uint16_t c = 0U; c < num_chunks; c++)
+    {
+        s_chunk_bin_count[c] = 0U;
+    }
+
+    for (uint8_t layer = 0U; layer < LAYER_COUNT; layer++)
+    {
+        const Sprite *const *sorted = s_sorted[layer];
+        uint16_t sprite_count = s_sorted_count[layer];
+        for (uint16_t i = 0U; i < sprite_count; i++)
+        {
+            const Sprite *sprite = sorted[i];
+            int top = (int)sprite->y;
+            int bottom = top + (int)sprite->h; /* exclusive */
+            if (bottom <= 0 || top >= (int)RENDERER_HEIGHT)
+            {
+                continue; /* sprite is entirely above or below the screen */
+            }
+            if (top < 0)
+            {
+                top = 0;
+            }
+            uint16_t first = (uint16_t)top / RENDERER_SCANLINES;
+            uint16_t last = (uint16_t)(bottom - 1) / RENDERER_SCANLINES;
+            if (last >= num_chunks)
+            {
+                last = num_chunks - 1U;
+            }
+            for (uint16_t c = first; c <= last; c++)
+            {
+                uint16_t n = s_chunk_bin_count[c];
+                if (n < CHUNK_BIN_CAP) /* drop beyond the cap (far above realistic) */
+                {
+                    s_chunk_bin[c][n] = sprite;
+                    s_chunk_bin_count[c] = n + 1U;
+                }
+            }
+        }
+    }
+}
+
 /* Clipped placement of a sprite inside a chunk: the screen rows it touches and
  * the matching source coordinates. Computed once per sprite, not per scanline. */
 typedef struct
@@ -175,60 +276,36 @@ __attribute__((always_inline)) static inline bool clipSprite(const Sprite *sprit
     return true;
 }
 
-/* Composite one 2bpp row span. `opaque` is passed as a compile-time constant
- * from the two call sites so the compiler emits a branch-free fast path (no
- * per-pixel transparency test) for sprites flagged SPRITE_OPAQUE, and the
- * index==0 skip path for the rest. Palette lookups hit the fixed-address s_lut
- * (one hoisted-base load per pixel). */
-__attribute__((always_inline)) static inline void blitRow2bpp(uint16_t *d, const uint8_t *row, uint16_t col,
-                                                              uint16_t n, bool opaque)
+/* Composite one opaque 2bpp row span — no per-pixel transparency test. A
+ * word-aligned destination emits two pixels per 32-bit store via the pair-LUT; the
+ * head loop first restores alignment for sprites whose left edge is unaligned.
+ * always_inline and deliberately lean: this is the most-common path (opaque tiles),
+ * so it is kept as a tight standalone loop and is *not* sharing a function body with
+ * the bulkier transparent path. */
+__attribute__((always_inline)) static inline void blitRow2bppOpaque(uint16_t *d, const uint8_t *row,
+                                                                    uint16_t col, uint16_t n)
 {
-    /* Head: advance to a 4-pixel (1 byte) boundary. */
-    while ((col & 3U) && n)
+    while ((col & 3U) && n) /* head: advance to a 4-pixel (1 byte) boundary */
     {
         uint8_t idx = (row[col >> 2] >> (6U - ((col & 3U) << 1U))) & 3U;
-        if (opaque || idx)
-        {
-            *d = s_lut[idx];
-        }
+        *d = s_lut[idx];
         d++;
         col++;
         n--;
     }
-    /* Body: one source byte = four pixels, constant shifts. */
     const uint8_t *p = &row[col >> 2];
-    if (opaque)
+    if (((uint32_t)(uintptr_t)d & 3U) == 0U)
     {
-        /* When the destination is word-aligned, emit two pixels per 32-bit store
-         * via the pair-LUT; the head loop above has already restored byte/word
-         * alignment for sprites whose left edge is unaligned. */
-        if (((uint32_t)(uintptr_t)d & 3U) == 0U)
+        uint32_t *q = (uint32_t *)(void *)d;
+        while (n >= 4U)
         {
-            uint32_t *q = (uint32_t *)(void *)d;
-            while (n >= 4U)
-            {
-                uint8_t b = *p++;
-                q[0] = s_pair[b >> 4];
-                q[1] = s_pair[b & 0x0FU];
-                q += 2;
-                d += 4;
-                col += 4U;
-                n -= 4U;
-            }
-        }
-        else
-        {
-            while (n >= 4U)
-            {
-                uint8_t b = *p++;
-                d[0] = s_lut[(b >> 6) & 3U];
-                d[1] = s_lut[(b >> 4) & 3U];
-                d[2] = s_lut[(b >> 2) & 3U];
-                d[3] = s_lut[b & 3U];
-                d += 4;
-                col += 4U;
-                n -= 4U;
-            }
+            uint8_t b = *p++;
+            q[0] = s_pair[b >> 4];
+            q[1] = s_pair[b & 0x0FU];
+            q += 2;
+            d += 4;
+            col += 4U;
+            n -= 4U;
         }
     }
     else
@@ -236,7 +313,100 @@ __attribute__((always_inline)) static inline void blitRow2bpp(uint16_t *d, const
         while (n >= 4U)
         {
             uint8_t b = *p++;
-            if (b) /* skip four fully-transparent pixels at once */
+            d[0] = s_lut[(b >> 6) & 3U];
+            d[1] = s_lut[(b >> 4) & 3U];
+            d[2] = s_lut[(b >> 2) & 3U];
+            d[3] = s_lut[b & 3U];
+            d += 4;
+            col += 4U;
+            n -= 4U;
+        }
+    }
+    while (n) /* tail: at most three trailing pixels */
+    {
+        uint8_t idx = (row[col >> 2] >> (6U - ((col & 3U) << 1U))) & 3U;
+        *d = s_lut[idx];
+        d++;
+        col++;
+        n--;
+    }
+}
+
+/* Composite one transparent 2bpp row span. A fully-covered byte (no index-0 pixel,
+ * the common interior case — flagged in s_byte_full_2bpp) takes the same two-store
+ * pair path as the opaque blit; only genuinely mixed edge bytes fall through to the
+ * per-pixel test, and an all-transparent byte is skipped four pixels at a time. So a
+ * transparent sprite's interior runs at opaque speed and only its edges pay for the
+ * masking. Inlined into composite2bppTransparent only (never into the opaque
+ * compositor), so the two paths never share — and bloat — one function body. */
+__attribute__((always_inline)) static inline void blitRow2bppTransparent(uint16_t *d, const uint8_t *row,
+                                                                         uint16_t col, uint16_t n)
+{
+    while ((col & 3U) && n)
+    {
+        uint8_t idx = (row[col >> 2] >> (6U - ((col & 3U) << 1U))) & 3U;
+        if (idx)
+        {
+            *d = s_lut[idx];
+        }
+        d++;
+        col++;
+        n--;
+    }
+    const uint8_t *p = &row[col >> 2];
+    if (((uint32_t)(uintptr_t)d & 3U) == 0U)
+    {
+        uint32_t *q = (uint32_t *)(void *)d;
+        while (n >= 4U)
+        {
+            uint8_t b = *p++;
+            if (s_byte_full_2bpp[b]) /* interior byte: write all four via the pair-LUT */
+            {
+                q[0] = s_pair[b >> 4];
+                q[1] = s_pair[b & 0x0FU];
+            }
+            else if (b) /* edge byte: composite only the non-zero pixels */
+            {
+                uint8_t i0 = (b >> 6) & 3U;
+                if (i0)
+                {
+                    d[0] = s_lut[i0];
+                }
+                uint8_t i1 = (b >> 4) & 3U;
+                if (i1)
+                {
+                    d[1] = s_lut[i1];
+                }
+                uint8_t i2 = (b >> 2) & 3U;
+                if (i2)
+                {
+                    d[2] = s_lut[i2];
+                }
+                uint8_t i3 = b & 3U;
+                if (i3)
+                {
+                    d[3] = s_lut[i3];
+                }
+            }
+            q += 2;
+            d += 4;
+            col += 4U;
+            n -= 4U;
+        }
+    }
+    else
+    {
+        while (n >= 4U)
+        {
+            uint8_t b = *p++;
+            if (s_byte_full_2bpp[b])
+            {
+                d[0] = s_lut[(b >> 6) & 3U];
+                d[1] = s_lut[(b >> 4) & 3U];
+                d[2] = s_lut[(b >> 2) & 3U];
+                d[3] = s_lut[b & 3U];
+            }
+            else if (b)
             {
                 uint8_t i0 = (b >> 6) & 3U;
                 if (i0)
@@ -264,11 +434,10 @@ __attribute__((always_inline)) static inline void blitRow2bpp(uint16_t *d, const
             n -= 4U;
         }
     }
-    /* Tail: at most three trailing pixels. */
     while (n)
     {
         uint8_t idx = (row[col >> 2] >> (6U - ((col & 3U) << 1U))) & 3U;
-        if (opaque || idx)
+        if (idx)
         {
             *d = s_lut[idx];
         }
@@ -297,6 +466,9 @@ __attribute__((always_inline)) static inline void blitRow4bpp(uint16_t *d, const
     const uint8_t *p = &row[col >> 1];
     if (opaque)
     {
+        /* Two independent 16-bit stores per byte. A 32-bit combine (orr + one store)
+         * was measured slower here: the orr serialises the two palette loads, while
+         * the separate stores pipeline freely through the M4 store buffer. */
         while (n >= 2U)
         {
             uint8_t b = *p++;
@@ -352,40 +524,52 @@ __attribute__((always_inline)) static inline void blitRowFlip(uint16_t *d, const
     }
 }
 
-/* 2bpp/4bpp compositors. Each copies its palette into the fixed s_lut once, then
- * walks the sprite's rows, advancing the source/destination pointers by a stride
- * per scanline (no per-row multiply). The non-flipped opaque/transparent split is
- * hoisted out of the row loop so each variant is a tight, specialised blit. */
-__attribute__((noinline, section(".RamFunc"))) static void composite2bpp(uint16_t *chunk_buffer, uint16_t start_y,
-                                                                         uint16_t count, const Sprite *sprite)
+/* Rebuild the 2bpp palette scratch: the 4-entry s_lut and the 16-entry s_pair pair
+ * table (feeding the 32-bit store used by the opaque path and the transparent path's
+ * covered bytes). Kept noinline so its unrolled build does not bloat the two
+ * compositors that call it — they stay small and the hot blit loops keep their
+ * registers. s_pair_pal doubles as the 2bpp cache key: a 4bpp sprite clears it, so a
+ * following 2bpp sprite always rebuilds both tables. */
+__attribute__((noinline, section(".RamFunc"))) static void build2bppPalette(const uint16_t *pal)
+{
+    s_lut[0] = pal[0];
+    s_lut[1] = pal[1];
+    s_lut[2] = pal[2];
+    s_lut[3] = pal[3];
+    for (uint8_t k = 0U; k < 16U; k++)
+    {
+        s_pair[k] = (uint32_t)s_lut[k >> 2] | ((uint32_t)s_lut[k & 3U] << 16);
+    }
+    s_lut_pal = pal;
+    s_pair_pal = pal;
+}
+
+/* Refresh the 2bpp scratch only when the palette changed since the last 2bpp sprite
+ * (the common case is a layer's tiles sharing one palette). Inlined: the unchanged
+ * path is a single pointer compare with no call. */
+__attribute__((always_inline)) static inline void load2bppPalette(const uint16_t *pal)
+{
+    if (pal != s_pair_pal)
+    {
+        build2bppPalette(pal);
+    }
+}
+
+/* Opaque and transparent 2bpp compositors are separate functions, each inlining
+ * only its own row blit, so the two paths never share — and grow — one .RamFunc. The
+ * hot opaque case stays as lean as the original single compositor. Each keeps the row
+ * walk in plain scalar locals (no address-taken struct) so they live in registers
+ * across the row loop. */
+__attribute__((noinline, section(".RamFunc"))) static void composite2bppOpaque(uint16_t *chunk_buffer,
+                                                                               uint16_t start_y, uint16_t count,
+                                                                               const Sprite *sprite)
 {
     SpriteClip clip;
     if (!clipSprite(sprite, start_y, count, &clip))
     {
         return;
     }
-
-    const uint16_t *pal = sprite->palette;
-    bool flip_h = (sprite->flags & SPRITE_FLIP_H) != 0U;
-    bool opaque = (sprite->flags & SPRITE_OPAQUE) != 0U;
-
-    if (pal != s_lut_pal) /* reload the 4-entry palette only when it changed */
-    {
-        s_lut[0] = pal[0];
-        s_lut[1] = pal[1];
-        s_lut[2] = pal[2];
-        s_lut[3] = pal[3];
-        s_lut_pal = pal;
-        s_pair_pal = NULL; /* s_lut changed -> the paired table is now stale */
-    }
-    if (opaque && pal != s_pair_pal) /* pack adjacent-pixel pairs for the 32-bit store */
-    {
-        for (uint8_t k = 0U; k < 16U; k++)
-        {
-            s_pair[k] = (uint32_t)s_lut[k >> 2] | ((uint32_t)s_lut[k & 3U] << 16);
-        }
-        s_pair_pal = pal;
-    }
+    load2bppPalette(sprite->palette);
 
     uint16_t stride = (sprite->w + 3U) >> 2U;
     int row_step = (sprite->flags & SPRITE_FLIP_V) ? -(int)stride : (int)stride;
@@ -393,22 +577,60 @@ __attribute__((noinline, section(".RamFunc"))) static void composite2bpp(uint16_
     uint16_t *dst = &chunk_buffer[(uint16_t)(clip.row_top - start_y) * RENDERER_WIDTH + clip.x_start];
     uint16_t rows = clip.row_bot - clip.row_top;
 
-    for (uint16_t r = 0U; r < rows; r++)
+    if (sprite->flags & SPRITE_FLIP_H)
     {
-        if (flip_h)
+        for (uint16_t r = 0U; r < rows; r++)
         {
             blitRowFlip(dst, row, sprite->w, clip.col_left, clip.span, false);
+            row += row_step;
+            dst += RENDERER_WIDTH;
         }
-        else if (opaque)
+    }
+    else
+    {
+        for (uint16_t r = 0U; r < rows; r++)
         {
-            blitRow2bpp(dst, row, clip.col_left, clip.span, true);
+            blitRow2bppOpaque(dst, row, clip.col_left, clip.span);
+            row += row_step;
+            dst += RENDERER_WIDTH;
         }
-        else
+    }
+}
+
+__attribute__((noinline, section(".RamFunc"))) static void composite2bppTransparent(uint16_t *chunk_buffer,
+                                                                                    uint16_t start_y, uint16_t count,
+                                                                                    const Sprite *sprite)
+{
+    SpriteClip clip;
+    if (!clipSprite(sprite, start_y, count, &clip))
+    {
+        return;
+    }
+    load2bppPalette(sprite->palette);
+
+    uint16_t stride = (sprite->w + 3U) >> 2U;
+    int row_step = (sprite->flags & SPRITE_FLIP_V) ? -(int)stride : (int)stride;
+    const uint8_t *row = &sprite->pixels[clip.src_top * stride];
+    uint16_t *dst = &chunk_buffer[(uint16_t)(clip.row_top - start_y) * RENDERER_WIDTH + clip.x_start];
+    uint16_t rows = clip.row_bot - clip.row_top;
+
+    if (sprite->flags & SPRITE_FLIP_H)
+    {
+        for (uint16_t r = 0U; r < rows; r++)
         {
-            blitRow2bpp(dst, row, clip.col_left, clip.span, false);
+            blitRowFlip(dst, row, sprite->w, clip.col_left, clip.span, false);
+            row += row_step;
+            dst += RENDERER_WIDTH;
         }
-        row += row_step;
-        dst += RENDERER_WIDTH;
+    }
+    else
+    {
+        for (uint16_t r = 0U; r < rows; r++)
+        {
+            blitRow2bppTransparent(dst, row, clip.col_left, clip.span);
+            row += row_step;
+            dst += RENDERER_WIDTH;
+        }
     }
 }
 
@@ -459,15 +681,137 @@ __attribute__((noinline, section(".RamFunc"))) static void composite4bpp(uint16_
     }
 }
 
-/* Render one chunk: walk the z-sorted lists back-to-front (BG low-z → BG high-z
- * → FG → UI) and composite the sprites that overlap this strip. A cheap vertical
- * reject skips the rest, so there is no per-chunk sprite list to build or bound —
- * sprites of any height are handled, and the renderer keeps O(1) extra memory
- * instead of a pool that would have to be sized for the tallest possible sprite.
- *
- * Each sprite fills all of its own rows in the chunk before the next (higher)
- * one paints over it, which keeps the painter's order identical to a
- * scanline-major walk while amortising the per-sprite setup across its rows. */
+/* Unpack a whole tile into a cache slot's RGB565 buffer (once per unique tile per
+ * frame). Runs rarely, so it stays in flash rather than spending .RamFunc space. */
+static void decodeTile(TileCacheSlot *slot, const uint16_t *pal, const uint8_t *pixels,
+                       uint16_t w, uint16_t h, bool is_4bpp)
+{
+    uint16_t *out = slot->rgb;
+    if (is_4bpp)
+    {
+        uint16_t stride = (w + 1U) >> 1U;
+        for (uint16_t y = 0U; y < h; y++)
+        {
+            const uint8_t *row = &pixels[y * stride];
+            for (uint16_t x = 0U; x < w; x++)
+            {
+                uint8_t idx = (x & 1U) ? (row[x >> 1] & 0x0FU) : (row[x >> 1] >> 4);
+                *out++ = pal[idx];
+            }
+        }
+    }
+    else
+    {
+        uint16_t stride = (w + 3U) >> 2U;
+        for (uint16_t y = 0U; y < h; y++)
+        {
+            const uint8_t *row = &pixels[y * stride];
+            for (uint16_t x = 0U; x < w; x++)
+            {
+                uint8_t idx = (row[x >> 2] >> (6U - ((x & 3U) << 1U))) & 3U;
+                *out++ = pal[idx];
+            }
+        }
+    }
+}
+
+/* Return a sprite's decoded RGB565 buffer, decoding it into a free slot on first
+ * use. NULL means "not cacheable" (flipped, larger than the cap, or the cache is
+ * full) — the caller then takes the normal compositor. */
+__attribute__((noinline, section(".RamFunc"))) static const uint16_t *tileCacheLookup(const Sprite *sprite,
+                                                                                      bool is_4bpp)
+{
+    if ((uint32_t)sprite->w * sprite->h > TILE_CACHE_MAX_PX)
+    {
+        return NULL;
+    }
+    if (sprite->flags & (SPRITE_FLIP_H | SPRITE_FLIP_V))
+    {
+        return NULL;
+    }
+    const uint8_t *pixels = sprite->pixels;
+    const uint16_t *pal = sprite->palette;
+    for (uint8_t i = 0U; i < s_tile_cache_count; i++)
+    {
+        if (s_tile_cache[i].pixels == pixels && s_tile_cache[i].palette == pal &&
+            s_tile_cache[i].w == sprite->w && s_tile_cache[i].h == sprite->h)
+        {
+            return s_tile_cache[i].rgb;
+        }
+    }
+    if (s_tile_cache_count >= TILE_CACHE_SLOTS)
+    {
+        return NULL;
+    }
+    TileCacheSlot *slot = &s_tile_cache[s_tile_cache_count++];
+    slot->pixels = pixels;
+    slot->palette = pal;
+    slot->w = sprite->w;
+    slot->h = sprite->h;
+    decodeTile(slot, pal, pixels, sprite->w, sprite->h, is_4bpp);
+    return slot->rgb;
+}
+
+/* Composite a cached (already-RGB565) opaque tile: a plain per-row copy, no unpack
+ * or palette lookup. Only reached for unflipped tiles, so the source advances by a
+ * positive row stride. */
+__attribute__((noinline, section(".RamFunc"))) static void compositeCachedOpaque(uint16_t *chunk_buffer,
+                                                                                 uint16_t start_y, uint16_t count,
+                                                                                 const Sprite *sprite,
+                                                                                 const uint16_t *rgb)
+{
+    SpriteClip clip;
+    if (!clipSprite(sprite, start_y, count, &clip))
+    {
+        return;
+    }
+    uint16_t w = sprite->w;
+    uint16_t span = clip.span;
+    const uint16_t *src = &rgb[(uint32_t)clip.src_top * w + clip.col_left];
+    uint16_t *dst = &chunk_buffer[(uint16_t)(clip.row_top - start_y) * RENDERER_WIDTH + clip.x_start];
+    uint16_t rows = clip.row_bot - clip.row_top;
+    uint16_t words = span >> 1U; /* two pixels per 32-bit word */
+
+    /* Take the word-copy path only when the source alignment is stable across rows:
+     * dst advances by an even stride, but an odd tile width shifts src every line, so
+     * require an even width (and both ends word-aligned on the first row). The check
+     * is hoisted — a per-row test measured ~8% slower on the common even-width tile. */
+    if (((((uintptr_t)dst | (uintptr_t)src) & 3U) == 0U) && ((w & 1U) == 0U))
+    {
+        for (uint16_t r = 0U; r < rows; r++)
+        {
+            uint32_t *d32 = (uint32_t *)(void *)dst;
+            const uint32_t *s32 = (const uint32_t *)(const void *)src;
+            for (uint16_t k = 0U; k < words; k++)
+            {
+                d32[k] = s32[k];
+            }
+            if (span & 1U)
+            {
+                dst[span - 1U] = src[span - 1U];
+            }
+            src += w;
+            dst += RENDERER_WIDTH;
+        }
+    }
+    else
+    {
+        for (uint16_t r = 0U; r < rows; r++)
+        {
+            for (uint16_t k = 0U; k < span; k++)
+            {
+                dst[k] = src[k];
+            }
+            src += w;
+            dst += RENDERER_WIDTH;
+        }
+    }
+}
+
+/* Render one chunk: paint the optional background, then composite the chunk's bin
+ * (already in back-to-front draw order — BG low-z → BG high-z → FG → UI) into the
+ * strip buffer. Opaque tiles that fit the decoded-tile cache blit by row copy; the
+ * rest take the unpacking compositors. */
 __attribute__((noinline, section(".RamFunc"))) static void renderScanlineChunk(uint16_t *chunk_buffer, uint16_t start_y, uint16_t count)
 {
     if (s_bg_enabled) /* paint the background; sprites composite over it */
@@ -490,29 +834,38 @@ __attribute__((noinline, section(".RamFunc"))) static void renderScanlineChunk(u
         }
     }
 
-    int chunk_top = (int)start_y;
-    int chunk_bottom = (int)start_y + (int)count; /* exclusive */
-
-    for (uint8_t layer = 0U; layer < LAYER_COUNT; layer++)
+    /* This chunk's sprites are already collected, in draw order, in its bin — so we
+     * just composite them. No vertical reject and no scanning sprites that miss the
+     * strip (binSpritesIntoChunks did that once per frame). */
+    uint16_t chunk_idx = start_y / RENDERER_SCANLINES;
+    const Sprite *const *bin = s_chunk_bin[chunk_idx];
+    uint16_t bin_count = s_chunk_bin_count[chunk_idx];
+    for (uint16_t i = 0U; i < bin_count; i++)
     {
-        const Sprite *const *sorted = s_sorted[layer];
-        uint16_t sprite_count = s_sorted_count[layer];
-        for (uint16_t i = 0U; i < sprite_count; i++)
+        const Sprite *sprite = bin[i];
+        uint8_t flags = sprite->flags;
+        if (flags & SPRITE_OPAQUE)
         {
-            const Sprite *sprite = sorted[i];
-            int top = (int)sprite->y;
-            if (top >= chunk_bottom || top + (int)sprite->h <= chunk_top)
+            /* Opaque tiles try the decoded-tile cache first; a miss (too big,
+             * flipped, or cache full) falls through to the unpacking compositor. */
+            const uint16_t *rgb = tileCacheLookup(sprite, (flags & SPRITE_IS_FMT_4BPP) != 0U);
+            if (rgb != NULL)
             {
-                continue; /* sprite does not touch this strip */
+                compositeCachedOpaque(chunk_buffer, start_y, count, sprite, rgb);
+                continue;
             }
-            if (sprite->flags & SPRITE_IS_FMT_4BPP)
-            {
-                composite4bpp(chunk_buffer, start_y, count, sprite);
-            }
-            else
-            {
-                composite2bpp(chunk_buffer, start_y, count, sprite);
-            }
+        }
+        if (flags & SPRITE_IS_FMT_4BPP)
+        {
+            composite4bpp(chunk_buffer, start_y, count, sprite);
+        }
+        else if (flags & SPRITE_OPAQUE)
+        {
+            composite2bppOpaque(chunk_buffer, start_y, count, sprite);
+        }
+        else
+        {
+            composite2bppTransparent(chunk_buffer, start_y, count, sprite);
         }
     }
 }
@@ -521,8 +874,10 @@ void rendererRender(void)
 {
     uint16_t scanline_y = 0U;
     sortSpritesByZ();
+    binSpritesIntoChunks();
     s_lut_pal = NULL; /* invalidate the palette cache (palettes may change per frame) */
     s_pair_pal = NULL;
+    s_tile_cache_count = 0U; /* decoded tiles are only valid within one frame */
 
     for (uint16_t chunk_index = 0U; scanline_y < RENDERER_HEIGHT; chunk_index++)
     {

@@ -47,7 +47,8 @@ Src/Network/network.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \
-Src/Renderer/renderer.c
+Src/Renderer/renderer.c \
+Src/Renderer/renderer_testing.c
 
 # ASM sources
 ASM_SOURCES =  \
