@@ -209,8 +209,18 @@ static void peripheralsClockEnable(void)
     RCC->APB2ENR |= RCC_APB2ENR_SDIOEN;
 }
 
+void enableFPU(void)
+{
+    /* Enable FPU coprocessors CP10/CP11 — required because we compile with
+     * -mfloat-abi=hard and GCC may emit VFP instructions (e.g. vstr for bulk
+     * zeroing).  Without this, a NOCP UsageFault escalates to HardFault. */
+    SCB->CPACR |= ((3UL << (10U * 2U)) | (3UL << (11U * 2U)));
+    __DSB();
+    __ISB();
+}
 void systemClockConfig(void)
 {
+    enableFPU();
     flashMemoryLatencyConfig();
     busClockConfig();
     pllSystemClockConfig();
