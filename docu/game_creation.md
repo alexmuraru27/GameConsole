@@ -22,43 +22,41 @@ Gives access to all Console API functions and asset macros.
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
 ```
 
-Use `api_hdr_ptr->` to call any API function, e.g. `api_hdr_ptr->renderer->...`.
+Call any API function through the `api` member, e.g. `api_hdr_ptr->api.rendererRender()` or `api_hdr_ptr->api.log("hi %d", n)`. Verify `api_hdr_ptr->magic == API_MAGIC` (and `version`) before the first call.
 
 ### 4. Define the game binary header
 
-At file scope (typically end of main file):
+At file scope (typically the end of the main file), pass your **entry function** — conventionally `_game_start` from the game's `startup.s`, which runs `__libc_init_array` and then calls `main()`:
 
 ```c
-DECLARE_GAME_BINARY_HEADER(game_header, main);
+extern void _game_start(void);
+DECLARE_GAME_BINARY_HEADER(_game_start);
 ```
 
-Required for the loader to recognize the binary layout and load the game.
+The macro takes a single argument and emits a `GameBinaryHeader` into the `.game_header` section (magic `"GAME"`, section boundaries, entry point) so the loader knows how to place each region and where to jump.
 
-### 5. Define assets
+### 5. Add assets
 
-Start with the asset header (required for asset discovery):
+Author assets with the desktop tools and bundle them into a `.pak`:
+
+- [Pixel Forge](../tools/graphics/README.md) exports `GfxAsset` `.bin`/`.c` graphics (2bpp/4bpp, console palette).
+- [Music Creator](../tools/music_creator/README.md) exports buzzer tracks as interleaved `(freq, ms)` `.bin`/`.c`.
+- The [Asset Packer](../tools/packer/README.md) bundles the loose `.bin` files from a YAML manifest into one `<name>.pak` container plus a generated `<name>AssetEnum.h` of asset IDs.
+
+At runtime, stream an asset by ID into a buffer carved from the CCM asset arena:
 
 ```c
-DEFINE_ASSET_HEADER(ASSET_MAGIC, ASSET_VERSION, ASSET_COUNT);
+AssetMetaData meta;
+api_hdr_ptr->api.assetLoaderGetAssetMetadata(ASSET_ID_HERO, &meta);
+uint8_t buffer[meta.asset_size];
+api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_ID_HERO, buffer, sizeof(buffer));
 ```
 
-Then define each asset:
-
-```c
-DEFINE_ASSET_8(my_data,      ASSET_ID_MY_DATA,       ASSET_TYPE_CUSTOM,         { /* uint8 data  */ });
-DEFINE_ASSET_16(audio_data,  ASSET_ID_AUDIO_DATA,    ASSET_TYPE_AUDIO_DATA,     { /* uint16 data */ });
-DEFINE_ASSET_16(audio_duration, ASSET_ID_AUDIO_DURATION, ASSET_TYPE_AUDIO_DURATION, { /* uint16 data */ });
-```
-
-Assets are lazy-loaded at runtime via `assetLoaderGetAssetData()`, so total asset data can exceed what fits in RAM at once.
-
-The `DEFINE_TILE(...)` macro from `Shared/TileUtils/tileCreator.h` is available for defining 2bpp planar pixel/tile data that plugs directly into `DEFINE_ASSET_8`.
-
-For free-form pictures, [Pixel Forge](../tools/graphics/README.md) exports `GfxAsset` `.bin`/`.c` files in the console's 2bpp/4bpp formats.
+> **Not implemented yet:** `asset_loader.c` is a stub — `assetLoaderGetAssetData()` returns `ASSET_NOT_FOUND`. The `.pak` format and packer exist, but the on-device read from `.pak` is still a TODO, so packed assets cannot be loaded at runtime yet.
 
 ### 6. Build and deploy
 
-Build with the provided Makefile and copy the resulting `.bin` to the SD card root directory.
+Build with the provided Makefile and copy the resulting `.bin` (and, once the asset loader lands, the matching `.pak`) to the SD card root. `make deploy` copies the built `.bin` to the SD mount point configured in `common.mk`.
 
 ## Minimal main.c example
 
@@ -69,18 +67,29 @@ DECLARE_API_HEADER_PTR(api_hdr_ptr);
 
 int main(void)
 {
-    if (api_hdr_ptr->magic == API_MAGIC && api_hdr_ptr->version == API_VERSION)
+    if (api_hdr_ptr->magic == API_MAGIC && api_hdr_ptr->version == 1U)
     {
-        printf("Hello from my game!\r\n");
+        // Game-local printf() has no backing _write — log through the API instead.
+        api_hdr_ptr->api.log("Hello from my game!");
+
+        while (true)
+        {
+            // update + render here
+            if (api_hdr_ptr->api.joystickGetSpecialBtn2())
+            {
+                break; // Special Button 2 returns to the console OS
+            }
+        }
     }
     return 0;
 }
 
-DECLARE_GAME_BINARY_HEADER(game_header, main);
+extern void _game_start(void);            // provided by the game's startup.s
+DECLARE_GAME_BINARY_HEADER(_game_start);
 ```
 
 ## Reference
 
 - [ConsoleAPI reference](API_README.md)
-- [Memory layout](../CLAUDE.md)
+- [Memory layout](memory.md)
 - [Example game source](../GameXO/)

@@ -153,9 +153,8 @@ first:
 
 A row uses `(w + 1) / 2` bytes. Again index 0 is transparent.
 
-> These formats are produced by **Pixel Forge** and the `DEFINE_TILE` /
-> `DEFINE_ASSET_*` macros — see [game_creation.md](game_creation.md) and
-> `Shared/TileUtils/tileCreator.h`.
+> These formats are produced by **Pixel Forge** (`.bin`/`.c` exports) — see
+> [game_creation.md](game_creation.md) and [tools/graphics/README.md](../tools/graphics/README.md).
 
 ---
 

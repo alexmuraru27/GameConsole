@@ -10,11 +10,11 @@ GameConsole is a modular embedded game console platform based on the STM32F407 m
 - [Main Loop](#main-loop)
 - [API Overview](#api-overview)
   - [System Time](#system-time)
-  - [Debug/USART](#debugusart)
   - [Sound (Buzzer)](#sound-buzzer)
   - [Joystick](#joystick)
   - [Renderer](#renderer)
   - [Asset Loader](#asset-loader)
+  - [Logging](#logging)
 - [Module Internals](#module-internals)
   - [System/Startup](#systemstartup)
   - [Renderer](#renderer-internal)
@@ -62,7 +62,7 @@ int main(void) {
 
 - **update()**: Reads joystick state, updates sprite positions.
 - **render()**: Renders the frame, handles sound triggers.
-- **syncFrame()**: Ensures a fixed frame rate (default 50 FPS).
+- **syncFrame()**: Busy-waits to hold a fixed frame rate (GameXO targets 30 FPS; the console main loop is written for 60 FPS and only frame-syncs when `MAIN_SYNC_FPS` is defined).
 
 ---
 
@@ -87,12 +87,19 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - `joystickGetRAnalogX/Y()`, `joystickGetLAnalogX/Y()`: Analog axes.
 
 ### Renderer
-- `rendererRender()`: Draw the current frame.
+A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). The two functions exposed through `ConsoleAPI`:
+- `rendererInit()`: Build the compositor tables and clear the scanline buffers.
+- `rendererRender()`: Sort sprites by `z`, bin them into 16-line chunks, composite back-to-front, and DMA the frame to the ILI9341.
+
+> The sprite-submission surface (`rendererSubmitLayer`, `rendererClear`, `rendererSetBackground`, and the `Sprite`/`Layer` types in `renderer.h`) is currently **console-internal** — exercised by `renderer_testing.c` and not yet added to the `ConsoleAPI` struct, so loaded games cannot submit sprites through the API yet.
 
 ### Asset Loader
-- `assetLoaderGetAssetMetadata(asset_id, *size)`: Get asset size.
-- `assetLoaderGetAssetData(asset_id, *buffer)`: Load asset data.
-- `assetLoaderGetAssetHeader(*header)`: Get asset metadata.
+- `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Get asset metadata (size, type).
+- `assetLoaderGetAssetData(asset_id, *buffer, size)`: Load asset bytes into a caller buffer.
+- `assetLoaderGetAssetHeader(*header)`: Read the asset-pack header.
+
+### Logging
+- `log(fmt, ...)`: printf-style line routed to the console's SWO/ITM trace, tagged `[GAME]`. This is the **only reliable game-side logging path** — a game's own `printf` has no backing `_write`. Console firmware logs with the `LOGGER_LOG_{ERROR,WARN,INFO,DEBUG}(channel, ...)` macros instead; see the Logging subsystem in `CLAUDE.md`.
 
 ---
 
@@ -104,13 +111,16 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - **stm32f4xx_it.c**: Defines interrupt handlers for faults and system exceptions (NMI, HardFault, etc.).
 
 ### Renderer (renderer.c/h)
-- Scanline-based graphics engine rendering to the ILI9341 display.
-- 320×240 pixel screen, double-buffered scanline approach for DMA-friendly rendering.
-- 64-color system palette (RGB565).
-- Internal functions:
-  - `rendererInit()`: Initialize scanline buffers.
-  - `rendererRender()`: Draws the current frame (currently a stub — rendering is being reworked).
-  - `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Query screen dimensions.
+- Scanline **sprite compositor** for the ILI9341 320×240 display. Games describe a frame as per-layer arrays of `Sprite` (indexed-color 2bpp/4bpp tiles with `x/y/w/h`, draw order `z`, flags, palette); the renderer z-sorts them, bins them into 16-line chunks, composites back-to-front, and DMA-streams each chunk to the panel while the next composites.
+- 64-color system palette (RGB565). Three layers: `LAYER_BG`, `LAYER_FG`, `LAYER_UI`.
+- Compiled `-O3` even in debug builds (it is the per-frame hot path); optimized from **24 → 76 FPS** on a full screen — see [`renderer.md`](renderer.md) for the full pipeline and optimization journey.
+- Public functions:
+  - `rendererInit()`: Build compositor tables, clear scanline buffers.
+  - `rendererClear()`: Drop all layers at the start of a frame.
+  - `rendererSetBackground(color)`: RGB565 fill for pixels no sprite covers.
+  - `rendererSubmitLayer(layer, sprites, count)`: Borrow a layer's sprite array for the frame.
+  - `rendererRender()`: Composite and present the frame.
+  - `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Screen dimensions (320×240).
 
 ### Joystick (joystick.c/h)
 - Reads analog and digital joystick inputs via ADC and GPIO.
@@ -159,10 +169,10 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 Read joystick input:
 ```c
 void update() {
-    if (joystickGetLAnalogX() == JoystickAnalogValueHighAxis) { /* move right */ }
-    if (joystickGetLAnalogX() == JoystickAnalogValueLowAxis)  { /* move left */ }
-    if (joystickGetLAnalogY() == JoystickAnalogValueHighAxis) { /* move down */ }
-    if (joystickGetLAnalogY() == JoystickAnalogValueLowAxis)  { /* move up */ }
+    if (joystickGetLAnalogX() == JoystickAxisStatePositive) { /* move right */ }
+    if (joystickGetLAnalogX() == JoystickAxisStateNegative) { /* move left */ }
+    if (joystickGetLAnalogY() == JoystickAxisStatePositive) { /* move down */ }
+    if (joystickGetLAnalogY() == JoystickAxisStateNegative) { /* move up */ }
 }
 ```
 
@@ -242,15 +252,15 @@ See `README.md` for license and authorship.
 #### Joystick
 - **Purpose:** Read analog and digital joystick input.
 - **Key Types:**
-  - `JoystickAnalogValue` enum: `Off`, `LowAxis`, `HighAxis`.
+  - `JoystickAxisState` enum: `JoystickAxisStateOff` (0), `JoystickAxisStateNegative` (1), `JoystickAxisStatePositive` (2). Returned by the analog-axis getters.
 - **Key Functions:**
   - `joystickInit()`: Initialize ADC/GPIO.
-  - `joystickGetLAnalogX/Y()`, `joystickGetRAnalogX/Y()`: Analog axes.
-  - `joystickGetLBtnUp/Down/Left/Right()`, etc.: Button states.
+  - `joystickGetLAnalogX/Y()`, `joystickGetRAnalogX/Y()`: Analog axes (`JoystickAxisState`).
+  - `joystickGetLBtnUp/Down/Left/Right()`, etc.: Button states (`bool`).
 - **Usage Example:**
   ```c
   if (joystickGetLBtnUp()) { /* move up */ }
-  if (joystickGetRAnalogX() == JoystickAnalogValueHighAxis) { /* move right */ }
+  if (joystickGetRAnalogX() == JoystickAxisStatePositive) { /* move right */ }
   ```
 
 #### ILI9341 (LCD)
@@ -324,32 +334,17 @@ See `README.md` for license and authorship.
   loaderCloseFile();
   ```
 
-# Renderer: Full Documentation
+# Renderer
 
-## Overview
-The renderer is a scanline-based graphics engine targeting the ILI9341 320×240 display. It uses double-buffered scanline strips for DMA-friendly pixel transfer to the LCD.
+The renderer is a scanline **sprite compositor** for the ILI9341 320×240 display: games describe a frame as per-layer `Sprite` lists, and the renderer z-sorts them, bins them into 16-line chunks, composites back-to-front (painter's algorithm), and DMA-streams each chunk to the panel while the next composites. The complete ground-up explanation — frame pipeline, the inner pixel loop, and the **24 → 76 FPS** optimization journey — lives in **[`renderer.md`](renderer.md)**, which is the source of truth.
 
-## Graphics Model
-- **Screen Size:** 320×240 pixels
-- **System Palette:** 64 fixed RGB565 colors
-- **Scanline Buffers:** Two buffers of 16 scanlines × 320 pixels each (`RENDERER_SCANLINE_BUFFERS` × `RENDERER_WIDTH`), enabling double-buffered rendering
-
-## API
-The renderer exposes a minimal public API:
-- `rendererInit()` — initialize scanline buffers
-- `rendererRender()` — render the current frame to the ILI9341
-- `rendererGetWidthPixels()` / `rendererGetHeightPixels()` — query screen dimensions
-
-## Usage
-```c
-rendererInit();
-// In your game loop:
-rendererRender();
-```
+Quick reference:
+- **Screen:** 320×240, RGB565
+- **System palette:** 64 fixed colors (below)
+- **Layers:** `LAYER_BG`, `LAYER_FG`, `LAYER_UI`
+- **Pixel formats:** 2bpp / 4bpp planar tiles; slot 0 transparent unless `SPRITE_OPAQUE`; `SPRITE_FLIP_H/V`
+- **Public API:** `rendererInit`, `rendererClear`, `rendererSetBackground`, `rendererSubmitLayer`, `rendererRender`, `rendererGetWidthPixels`, `rendererGetHeightPixels`
 
 ## System Palette
-![system_palette](docu/system_palette.png)
-
-## Reference
-- See `renderer.h` and `renderer.c` for implementation details.
+![system_palette](system_palette.png)
 

@@ -44,8 +44,7 @@ C_INCLUDES =  \
 -IAssets/Inc \
 -I../Assets/Tiles \
 -I../Shared \
--I../Shared/Api \
--I../Shared/TileUtils
+-I../Shared/Api
 
 
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections

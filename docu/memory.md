@@ -9,7 +9,7 @@ Defined in `common.ld`.
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
 | SHARED_RAM     | 0x20000000 | 2K   | rw    | `ConsoleAPIHeader` struct — games read it at runtime                              |
-| CONSOLE_RAM    | 0x20000800 | 62K  | rwx   | Console firmware .data, .bss, stack, heap, all DMA buffers, FatFs, SDIO, audio    |
+| CONSOLE_RAM    | 0x20000800 | 62K  | rw    | Console firmware .data, .bss, stack, heap, DMA buffers, renderer, FatFs, SDIO, audio |
 | GAME_RAM       | 0x20010000 | 64K  | rwx   | Game .text, .rodata, .data, .bss, stack, heap — loaded from .bin at runtime       |
 
 Total: 2K + 62K + 64K = 128K ✓
@@ -96,6 +96,8 @@ Games ship as **two files** on the SD card:
 | `GameXO.pak` | All tiles, audio, sprites in a [PAK1 container](../tools/packer/README.md) |
 
 Assets are **lazily loaded** at runtime. The game calls `assetLoaderGetAssetData(id, buffer, size)` with a buffer carved from the 64 KB `GAME_RAM_ASSET` arena (in CCM). The loader seeks the `.pak` file, walks the `PakEntry` table to find the matching ID, and copies the blob into the buffer. Nothing is pre-loaded — the game manages its own working set.
+
+> **Status:** this is the intended design. `asset_loader.c` is currently a **stub** (`assetLoaderGetAssetData()` returns `ASSET_NOT_FOUND` — `// TODO read from .pak`), so on-device asset loading is not wired up yet.
 
 The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a YAML manifest and emits:
 - `<name>.pak` — binary container with CRC32-verified entries
