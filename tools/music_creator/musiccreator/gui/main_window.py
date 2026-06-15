@@ -13,6 +13,7 @@ from PyQt6.QtGui import QKeySequence, QRegularExpressionValidator, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
+    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -75,7 +76,7 @@ class MusicCreatorWindow(QMainWindow):
         self.playhead_timer.setInterval(theme.PLAYHEAD_TIMER_MS)
         self.playhead_timer.timeout.connect(self._update_playhead)
 
-        self.setWindowTitle("Buzzer Music Creator")
+        self._update_title()
         self._build_ui(filename)
         self.gutter.set_octave(self.current_octave)
         self._update_status()
@@ -203,6 +204,7 @@ class MusicCreatorWindow(QMainWindow):
         for label, handler in [
             ("Save", self.save_clicked),
             ("Load", self.load_clicked),
+            ("Browse…", self.browse_clicked),
             ("Clear", self.clear_clicked),
         ]:
             button = QPushButton(label)
@@ -468,6 +470,20 @@ class MusicCreatorWindow(QMainWindow):
 
     # ---------------- save / load ----------------
 
+    def _update_title(self):
+        self.setWindowTitle(f"Buzzer Music Creator — {self.output_dir}")
+
+    def browse_clicked(self):
+        directory = QFileDialog.getExistingDirectory(
+            self, "Choose working directory", os.path.abspath(self.output_dir)
+        )
+        if not directory:  # dialog cancelled
+            return
+        self.output_dir = directory
+        self.refresh_filename_list()
+        self._update_title()
+        self.statusBar().showMessage(f"Working directory: {directory}", 5000)
+
     def refresh_filename_list(self, select=None):
         self.filename_combo.blockSignals(True)
         self.filename_combo.clear()
@@ -530,8 +546,6 @@ class MusicCreatorWindow(QMainWindow):
         name = self.current_filename()
         if name is None:
             self.statusBar().showMessage("Pick a file to load first", 3000)
-            return
-        if not self._confirm(f'Load "{name}"?'):
             return
         self.load()
 

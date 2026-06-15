@@ -13,6 +13,7 @@ from PyQt6.QtGui import QColor, QKeySequence, QRegularExpressionValidator, QShor
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -53,7 +54,7 @@ class PixelForgeWindow(QMainWindow):
         self.output_dir = output_dir
         self.active_slot = 1
 
-        self.setWindowTitle("Pixel Forge")
+        self._update_title()
         self._build_ui(canvas, filename)
         self._sync_controls()
         self.resize(1000, 760)
@@ -189,12 +190,15 @@ class PixelForgeWindow(QMainWindow):
         self.refresh_filename_list(select=filename)
         self.filename_combo.activated.connect(self._filename_selected)
         row.addWidget(self.filename_combo)
-        for label, handler in [
-            ("Save", self.save_clicked),
-            ("Load", self.load_clicked),
-            ("Clear", self.clear_clicked),
+        for label, handler, tip in [
+            ("Save", self.save_clicked, "Save the current picture (Ctrl+S)"),
+            ("Load", self.load_clicked, "Load the selected file (Ctrl+L)"),
+            ("Browse…", self.browse_clicked,
+             "Pick a different working directory and repopulate the file list"),
+            ("Clear", self.clear_clicked, "Erase the whole canvas"),
         ]:
             button = QPushButton(label)
+            button.setToolTip(tip)
             button.clicked.connect(handler)
             row.addWidget(button)
         row.addStretch()
@@ -334,6 +338,20 @@ class PixelForgeWindow(QMainWindow):
 
     # ---------------- save / load ----------------
 
+    def _update_title(self):
+        self.setWindowTitle(f"Pixel Forge — {self.output_dir}")
+
+    def browse_clicked(self):
+        directory = QFileDialog.getExistingDirectory(
+            self, "Choose working directory", os.path.abspath(self.output_dir)
+        )
+        if not directory:  # dialog cancelled
+            return
+        self.output_dir = directory
+        self.refresh_filename_list()
+        self._update_title()
+        self.statusBar().showMessage(f"Working directory: {directory}", 5000)
+
     def refresh_filename_list(self, select=None):
         self.filename_combo.blockSignals(True)
         self.filename_combo.clear()
@@ -386,8 +404,6 @@ class PixelForgeWindow(QMainWindow):
         name = self.current_filename()
         if name is None:
             self.statusBar().showMessage("Pick a file to load first", 3000)
-            return
-        if not confirm(self, f'Load "{name}"?'):
             return
         self.load()
 
