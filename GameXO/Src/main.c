@@ -1,7 +1,6 @@
 #include "game_console_api.h"
 #include "game_state_manager.h"
 #include "sound.h"
-#include "stdio.h"
 
 DECLARE_API_HEADER_PTR(api_hdr_ptr);
 #define FPS 30
@@ -18,8 +17,7 @@ static void syncFrame()
     }
     if (is_debug_fps)
     {
-        printf("%lu", 1000 / (api_hdr_ptr->api.getSysTime() - s_last_frame_time));
-        printf("\r\n");
+        api_hdr_ptr->api.log("FPS %lu", 1000U / (api_hdr_ptr->api.getSysTime() - s_last_frame_time));
     }
     s_last_frame_time = api_hdr_ptr->api.getSysTime();
 }
@@ -61,6 +59,7 @@ int main(void)
 {
     if (api_hdr_ptr->magic == API_MAGIC || api_hdr_ptr->version == 1U)
     {
+        api_hdr_ptr->api.log("GameXO started (API v%lu)", (unsigned long)api_hdr_ptr->version);
         api_hdr_ptr->api.buzzerPlay(
             0U, false,
             s_smoke_test_notes,

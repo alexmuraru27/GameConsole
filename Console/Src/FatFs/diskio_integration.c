@@ -1,7 +1,7 @@
 #include "diskio_integration.h"
 #include "sdio.h"
 #include "sysclock.h"
-#include "stdio.h"
+#include "logger.h"
 
 static uint32_t s_sd_rca = 0;
 static uint8_t s_sd_type = 0;
@@ -345,5 +345,5 @@ void sdWaitCardReady(void)
         }
         delay(1);
     }
-    printf("sdWaitCardReady timeout, state=%lu\r\n", state);
+    LOGGER_LOG_WARN(LOGGER_SDIO, "sdWaitCardReady timeout, state=%lu", state);
 }

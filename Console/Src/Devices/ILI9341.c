@@ -3,7 +3,7 @@
 #include "sysclock.h"
 #include "gpio.h"
 #include "dma.h"
-#include "stdio.h"
+#include "logger.h"
 
 // FSMC Bank1 Sub-bank1 (NE1, PD7):
 //   Command: A16=0 -> CPU address 0x60000000
@@ -264,22 +264,25 @@ void ili9341DrawScanlines(const uint8_t lines, const uint16_t lines_offset, cons
 {
     if (lines == 0)
     {
-        printf("DrawScanlines: lines=0\n");
+        LOGGER_LOG_ERROR(LOGGER_DISPLAY, "DrawScanlines: lines=0");
         return;
     }
     if (lines_offset >= s_window_height)
     {
-        printf("DrawScanlines: offset %u >= height %u\n", lines_offset, s_window_height);
+        LOGGER_LOG_ERROR(LOGGER_DISPLAY, "DrawScanlines: offset %u >= height %u",
+                         (unsigned)lines_offset, (unsigned)s_window_height);
         return;
     }
     if ((lines_offset + lines) > s_window_height)
     {
-        printf("DrawScanlines: offset %u + lines %u > height %u\n", lines_offset, lines, s_window_height);
+        LOGGER_LOG_ERROR(LOGGER_DISPLAY, "DrawScanlines: offset %u + lines %u > height %u",
+                         (unsigned)lines_offset, (unsigned)lines, (unsigned)s_window_height);
         return;
     }
     if (array_size != (uint32_t)s_window_width * lines)
     {
-        printf("DrawScanlines: array_size %u != width %u * lines %u\n", array_size, s_window_width, lines);
+        LOGGER_LOG_ERROR(LOGGER_DISPLAY, "DrawScanlines: array_size %u != width %u * lines %u",
+                         (unsigned)array_size, (unsigned)s_window_width, (unsigned)lines);
         return;
     }
 

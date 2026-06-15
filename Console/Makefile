@@ -47,6 +47,7 @@ Src/Network/network.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \
+Src/Logger/logger.c \
 Src/Renderer/renderer.c \
 Src/Renderer/renderer_testing.c
 
@@ -59,7 +60,8 @@ startup.s
 #######################################
 # C defines
 C_DEFS =  \
--DSTM32F407xx
+-DSTM32F407xx \
+-DRENDERER_TESTING
 
 # C includes
 C_INCLUDES =  \
@@ -73,6 +75,7 @@ C_INCLUDES =  \
 -IInc/Loader \
 -IInc/MainMenu \
 -IInc/Swo \
+-IInc/Logger \
 -IInc/SettingsStorage \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \

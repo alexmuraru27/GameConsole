@@ -7,8 +7,11 @@
 #include "main_menu.h"
 #include "stdio.h"
 #include "buzzer.h"
-#include "console_config.h"
 #include "renderer_testing.h"
+#include "logger.h"
+
+#define RENDERER_TESTING
+// #define MAIN_SYNC_FPS
 
 #define FPS 60
 #define FRAME_PERIOD (1000U / FPS)
@@ -60,13 +63,13 @@ int main(void)
     gameConsoleInit();
 
     init();
-    printf("Boot OK\n");
+    LOGGER_LOG_INFO(LOGGER_CORE, "Boot OK");
     int i = 0;
     while (1)
     {
         if (i % (FPS * 10) == 0)
         {
-            printf("Heartbeat %ds\n", i / FPS);
+            LOGGER_LOG_INFO(LOGGER_CORE, "Heartbeat %ds", i / FPS);
         }
         i++;
         update();

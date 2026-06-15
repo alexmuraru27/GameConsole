@@ -18,6 +18,7 @@
 #include "external_eeprom.h"
 #include "settings_storage.h"
 #include "swo.h"
+#include "logger.h"
 #include "stdio.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
@@ -61,7 +62,9 @@ static void gameConsoleExposeApi()
             // ASSETS
             .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
             .assetLoaderGetAssetData = &assetLoaderGetAssetData,
-            .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader};
+            .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader,
+            // LOGGING
+            .log = &loggerGameLog};
 
     const ConsoleAPIHeader api_header = {
         .magic = API_MAGIC,
@@ -109,7 +112,7 @@ static void beep_step(uint8_t step)
 {
     if (step >= (sizeof(s_step_notes) / sizeof(uint16_t) / 2U))
     {
-        printf("beep_step: step %u out of range\n", step);
+        LOGGER_LOG_ERROR(LOGGER_CORE, "beep_step: step %u out of range", step);
         return;
     }
     buzzerPlay(0, false, &s_step_notes[step * 2U], 1);

@@ -1,6 +1,5 @@
 #ifndef __RENDERER_TESTING_H
 #define __RENDERER_TESTING_H
-#include "console_config.h"
 
 #ifdef RENDERER_TESTING
 

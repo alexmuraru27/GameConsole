@@ -5,6 +5,7 @@
 #include "joystick.h"
 #include "string.h"
 #include "stdio.h"
+#include "logger.h"
 
 #ifdef RENDERER_TESTING
 /* A scrolling side-view castle level used to measure the renderer under a realistic,
@@ -316,7 +317,7 @@ void rendererTestingInit(void)
     packTile(s_slime, s_art_slime, true);
 
     rendererSetBackground(RGB(20, 18, 30)); /* shows only where nothing draws */
-    printf("Scrolling castle: move the hero with the right stick; the world follows.\n");
+    LOGGER_LOG_INFO(LOGGER_CORE, "Scrolling castle: move the hero with the right stick; the world follows.\n");
 }
 
 void rendererTestingUpdate(void)
@@ -353,10 +354,10 @@ void rendererTestingRender(void)
     if (getSysTime() - last >= 2000U)
     {
         uint32_t avg = csum / fc;
-        printf("FPS=%lu  render avg=%luus [%lu..%lu]us  cam=%lupx  (%lu cyc)\n",
-               (unsigned long)(fc * 1000U / (getSysTime() - last)),
-               (unsigned long)(avg / 168U), (unsigned long)(cmin / 168U),
-               (unsigned long)(cmax / 168U), (unsigned long)s_camera_x, (unsigned long)avg);
+        LOGGER_LOG_INFO(LOGGER_CORE, "FPS=%lu  render avg=%luus [%lu..%lu]us  cam=%lupx  (%lu cyc)",
+                        (unsigned long)(fc * 1000U / (getSysTime() - last)),
+                        (unsigned long)(avg / 168U), (unsigned long)(cmin / 168U),
+                        (unsigned long)(cmax / 168U), (unsigned long)s_camera_x, (unsigned long)avg);
         fc = 0U;
         cmin = 0xFFFFFFFFU;
         cmax = 0U;
