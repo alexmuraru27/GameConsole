@@ -20,28 +20,28 @@ make clean     # remove all build artifacts
 
 ## Documentation
 
-| Topic                    | Location                                         |
-| ------------------------ | ------------------------------------------------ |
-| API & renderer internals | [docu/API_README.md](docu/API_README.md)         |
-| Renderer deep-dive       | [docu/renderer.md](docu/renderer.md)             |
-| Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                |
-| Hardware & pinout        | [docu/HW.md](docu/HW.md)                        |
-| Game creation guide      | [docu/game_creation.md](docu/game_creation.md)  |
-| Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md) |
-| Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md) |
-| Asset Packer tool        | [tools/packer/README.md](tools/packer/README.md) |
+| Topic                    | Location                                                           |
+| ------------------------ | ------------------------------------------------------------------ |
+| API & renderer internals | [docu/API_README.md](docu/API_README.md)                           |
+| Renderer deep-dive       | [docu/renderer.md](docu/renderer.md)                               |
+| Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                                   |
+| Hardware & pinout        | [docu/HW.md](docu/HW.md)                                           |
+| Game creation guide      | [docu/game_creation.md](docu/game_creation.md)                     |
+| Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md)               |
+| Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md)     |
+| Asset Packer tool        | [tools/packer/README.md](tools/packer/README.md)                   |
 | Memory Analysis tool     | [tools/memory_analysis/README.md](tools/memory_analysis/README.md) |
 
 ## Naming Conventions
 
-| Element            | Convention       | Example                  |
-| ------------------ | ---------------- | ------------------------ |
-| Macros / Defines   | UPPER_SNAKE_CASE | `MAX_BUFFER_SIZE`        |
-| Constants          | UPPER_SNAKE_CASE | `DEFAULT_TIMEOUT`        |
-| Global variables   | g_snake_case     | `g_system_initialized`   |
-| Static globals     | s_snake_case     | `s_buffer_index`         |
-| Local variables    | snake_case       | `temp_value`             |
-| Functions          | snake_case       | `init_peripherals()`     |
-| Struct / Enum types| PascalCase       | `SensorData`, `PowerState` |
-| Struct members     | snake_case       | `adc_value`              |
-| Typedefs           | PascalCase       | `Byte`                   |
+| Element             | Convention       | Example                    |
+| ------------------- | ---------------- | -------------------------- |
+| Macros / Defines    | UPPER_SNAKE_CASE | `MAX_BUFFER_SIZE`          |
+| Constants           | UPPER_SNAKE_CASE | `DEFAULT_TIMEOUT`          |
+| Global variables    | g_snake_case     | `g_system_initialized`     |
+| Static globals      | s_snake_case     | `s_buffer_index`           |
+| Local variables     | snake_case       | `temp_value`               |
+| Functions           | camelCase        | `initPeripherals()`        |
+| Struct / Enum types | PascalCase       | `SensorData`, `PowerState` |
+| Struct members      | snake_case       | `adc_value`                |
+| Typedefs            | PascalCase       | `Byte`                     |

@@ -48,6 +48,10 @@ Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \
 Src/Logger/logger.c \
+Src/Fonts/font3x5.c \
+Src/Fonts/font5x5.c \
+Src/Fonts/font8x8.c \
+Src/Fonts/font_utils.c \
 Src/Renderer/renderer.c \
 Src/Renderer/renderer_testing.c
 
@@ -79,7 +83,7 @@ C_INCLUDES =  \
 -IInc/SettingsStorage \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
--I../Assets/Tiles \
+-IInc/Fonts \
 -I../Shared \
 -I../Shared/Api \
 -I../Shared/Esp01s

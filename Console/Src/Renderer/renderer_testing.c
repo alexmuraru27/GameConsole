@@ -4,8 +4,9 @@
 #include "sysclock.h"
 #include "joystick.h"
 #include "string.h"
-#include "stdio.h"
 #include "logger.h"
+#include "fonts.h"
+#include "font_utils.h"
 
 #ifdef RENDERER_TESTING
 /* A scrolling side-view castle level used to measure the renderer under a realistic,
@@ -37,6 +38,11 @@ static const uint16_t s_pal_hero[16] = {
     0, RGB(45, 65, 170), RGB(240, 195, 155), RGB(25, 18, 18),
     RGB(205, 55, 55), RGB(95, 72, 145), RGB(70, 45, 32)};
 static const uint16_t s_pal_slime[16] = {0, RGB(90, 205, 95), RGB(45, 130, 55), RGB(15, 15, 15)};
+
+/* ---- Font-colour palettes (slot 0 transparent, 1-3 the ink) ---- */
+static const uint16_t s_pal_font_white[4]  = {0x0000, 0xFFFF, 0xFFFF, 0xFFFF};
+static const uint16_t s_pal_font_green[4]  = {0x0000, 0x07E0, 0x07E0, 0x07E0};
+static const uint16_t s_pal_font_cyan[4]   = {0x0000, 0x07FF, 0x07FF, 0x07FF};
 
 /* ---- Tile art: one character per pixel, indices into the tile's palette ---- */
 static const char s_art_brick[] = /* opaque: running-bond brick */
@@ -171,7 +177,19 @@ static uint8_t s_slime[128] GAME_RAM_DATA;
 /* Scene arrays, borrowed by the renderer; sized for one visible window. */
 static Sprite s_bg[VIS_COLS * ROWS] GAME_RAM_DATA; /* 315 brick tiles */
 static Sprite s_fg[128] GAME_RAM_DATA;             /* ground, towers, props, hero */
-static Sprite s_ui[8] GAME_RAM_DATA;               /* HUD hearts */
+static Sprite s_ui[80] GAME_RAM_DATA;               /* HUD hearts + font text */
+
+/* Pool for scaled-glyph pixel data.  A draw_text_scaled call advances a
+ * write pointer through it; each glyph gets a fresh slot so every sprite's
+ * .pixels pointer stays valid until rendererRender() returns.
+ * 1,024 B holds ~17 glyphs of a 3×5 scaled 4× (60 B each). */
+#define SCALED_POOL_SIZE 1024U
+static uint8_t s_scaled_pool[SCALED_POOL_SIZE] GAME_RAM_DATA;
+
+/* Sprite counts from the last frame (for debug logging). */
+static uint16_t s_sceneBgSprites;
+static uint16_t s_sceneFgSprites;
+static uint16_t s_sceneUiSprites;
 
 /* World/camera state (world coords are in pixels; the level scrolls endlessly). */
 static int s_hero_world_x = 152;
@@ -204,6 +222,82 @@ static Sprite tile(int16_t x, int16_t y, uint8_t z, uint8_t flags,
                    const uint8_t *pixels, const uint16_t *palette)
 {
     return (Sprite){.x = x, .y = y, .w = TILE, .h = TILE, .z = z, .flags = flags, .pixels = pixels, .palette = palette};
+}
+
+/* ---- Text helpers --------------------------------------------------- */
+
+#define MAX_UI_TEXT (sizeof(s_ui) / sizeof(s_ui[0]))
+
+/* Render a C string into consecutive UI sprites.  Returns the next free
+ * index in the caller's sprite array. */
+static uint16_t draw_text(Sprite *ui, uint16_t idx, const Font *font,
+                           int16_t x, int16_t y, uint8_t z,
+                           const uint16_t *palette, const char *text)
+{
+    FontSize sizeEnum  = font->size;
+    uint16_t glyphW     = fontGlyphW(sizeEnum);
+    uint16_t glyphH     = fontGlyphH(sizeEnum);
+    const char *scan;
+
+    for (scan = text; *scan != '\0' && idx < MAX_UI_TEXT; scan++)
+    {
+        uint8_t ascii = (uint8_t)*scan;
+        if (ascii >= 0x20U && ascii <= 0x7EU)
+        {
+            const uint8_t *pixels;
+            fontGet(ascii, sizeEnum, &pixels);
+            ui[idx] = (Sprite){.x = x,
+                               .y = y,
+                               .w = glyphW,
+                               .h = glyphH,
+                               .z = z,
+                               .flags = 0U,
+                               .pixels = pixels,
+                               .palette = palette};
+            idx++;
+        }
+        x = (int16_t)(x + glyphW + 1U);
+    }
+    return idx;
+}
+
+/* Scale a string into a caller-owned buffer pool and emit sprites.
+ * *writeCursor advances by one glyph slot per character; the caller
+ * seeds it to the start of a pool large enough for the whole string
+ * and must keep the pool alive until rendererRender() returns. */
+static uint16_t draw_text_scaled(Sprite *ui, uint16_t idx, const Font *font,
+                                  int16_t x, int16_t y, uint8_t z,
+                                  uint8_t factor, const uint16_t *palette,
+                                  const char *text,
+                                  uint8_t **writeCursor, uint16_t poolRemain)
+{
+    FontSize sizeEnum  = font->size;
+    uint8_t  scaledW    = (uint8_t)(fontGlyphW(sizeEnum) * factor);
+    uint8_t  scaledH    = (uint8_t)(fontGlyphH(sizeEnum) * factor);
+    uint16_t slotBytes  = fontSize(sizeEnum, factor);
+    const char *scan;
+
+    for (scan = text; *scan != '\0' && idx < MAX_UI_TEXT; scan++)
+    {
+        uint8_t ascii = (uint8_t)*scan;
+        if (ascii >= 0x20U && ascii <= 0x7EU && poolRemain >= slotBytes)
+        {
+            scaleFont(ascii, sizeEnum, factor, *writeCursor);
+            ui[idx] = (Sprite){.x = x,
+                               .y = y,
+                               .w = scaledW,
+                               .h = scaledH,
+                               .z = z,
+                               .flags = 0U,
+                               .pixels = *writeCursor,
+                               .palette = palette};
+            idx++;
+            *writeCursor = *writeCursor + slotBytes;
+            poolRemain = (uint16_t)(poolRemain - slotBytes);
+        }
+        x = (int16_t)(x + scaledW + factor);
+    }
+    return idx;
 }
 
 /* Move the hero with the right stick and slide the camera so it follows him. */
@@ -299,10 +393,23 @@ static void buildVisibleScene(void)
     rendererSubmitLayer(LAYER_BG, s_bg, nb);
     rendererSubmitLayer(LAYER_FG, s_fg, nf);
 
+    {
+        uint8_t *poolCursor = s_scaled_pool;
+        nu = draw_text_scaled(s_ui, nu, &font3x5, 76, 50, 0U, 4U,
+                              s_pal_font_white, "GAMECONSOLE",
+                              &poolCursor, SCALED_POOL_SIZE);
+    }
+    nu = draw_text(s_ui, nu, &font8x8, 146,  4, 0U, s_pal_font_cyan, "8x8 Hello, Console!");
+    nu = draw_text(s_ui, nu, &font3x5, 225, 14, 0U, s_pal_font_green, "3x5 The quick brown fox");
+    nu = draw_text(s_ui, nu, &font5x5, 203, 21, 0U, s_pal_font_white, "5x5 0123456789 (?!)");
+
     for (uint8_t i = 0U; i < 3U; i++) /* HUD hearts, fixed to the screen */
     {
         s_ui[nu++] = tile((int16_t)(4 + i * 18), 4, 0U, 0U, s_heart, s_pal_heart);
     }
+    s_sceneBgSprites = nb;
+    s_sceneFgSprites = nf;
+    s_sceneUiSprites = nu;
     rendererSubmitLayer(LAYER_UI, s_ui, nu);
 }
 
@@ -354,10 +461,13 @@ void rendererTestingRender(void)
     if (getSysTime() - last >= 2000U)
     {
         uint32_t avg = csum / fc;
-        LOGGER_LOG_INFO(LOGGER_CORE, "FPS=%lu  render avg=%luus [%lu..%lu]us  cam=%lupx  (%lu cyc)",
+        LOGGER_LOG_INFO(LOGGER_CORE,
+                        "FPS=%lu  %luus [%lu..%lu]  sprites bg=%u fg=%u ui=%u",
                         (unsigned long)(fc * 1000U / (getSysTime() - last)),
                         (unsigned long)(avg / 168U), (unsigned long)(cmin / 168U),
-                        (unsigned long)(cmax / 168U), (unsigned long)s_camera_x, (unsigned long)avg);
+                        (unsigned long)(cmax / 168U),
+                        (unsigned)s_sceneBgSprites, (unsigned)s_sceneFgSprites,
+                        (unsigned)s_sceneUiSprites);
         fc = 0U;
         cmin = 0xFFFFFFFFU;
         cmax = 0U;
