@@ -18,14 +18,10 @@
 /* 4-byte aligned so the opaque blitter can write two pixels per 32-bit store. */
 static uint16_t s_scanline_buffer[2U][RENDERER_SCANLINE_BUF_SIZE] __attribute__((aligned(4)));
 
-/* The game owns the Sprite storage; the renderer only borrows pointers to it.
- * Each layer keeps a submission list (pointers, in submission order) that the
- * z-sort scatters into s_sorted. Submitted sprites must stay valid until
- * rendererRender() returns. */
-static const Sprite *s_submitted_bg[MAX_SPRITES_BG];
-static const Sprite *s_submitted_fg[MAX_SPRITES_FG];
-static const Sprite *s_submitted_ui[MAX_SPRITES_UI];
-static const Sprite **const s_submitted[LAYER_COUNT] = {s_submitted_bg, s_submitted_fg, s_submitted_ui};
+/* The game owns the Sprite storage and submits one contiguous array per layer;
+ * the renderer borrows just the base pointer + count. A submitted array must
+ * stay valid until rendererRender() returns. */
+static const Sprite *s_layer_sprites[LAYER_COUNT];
 static uint16_t s_active_sprites[LAYER_COUNT];
 static const uint16_t s_max_sprites_per_layer[LAYER_COUNT] = {
     MAX_SPRITES_BG, MAX_SPRITES_FG, MAX_SPRITES_UI};
@@ -44,40 +40,55 @@ static uint16_t s_lut[16];
  * per two pixels. Rebuilt from s_lut for each opaque 2bpp sprite. */
 static uint32_t s_pair[16];
 
+/* Palette pointer currently loaded into s_lut / s_pair. Consecutive sprites that
+ * share a palette (the common case — a layer's tiles all use one) then skip the
+ * reload and the pair rebuild. Reset each frame in case a palette was animated. */
+static const uint16_t *s_lut_pal;
+static const uint16_t *s_pair_pal;
+
+/* Optional background: when enabled, each chunk is filled with this color before
+ * compositing, so pixels no sprite covers show the background instead of stale
+ * buffer contents. Disabled by default (a scene that fully covers the screen
+ * pays nothing). */
+static uint16_t s_bg_color;
+static bool s_bg_enabled;
+
 void rendererInit(void)
 {
     memset(&s_scanline_buffer[0U], 0U, sizeof(s_scanline_buffer));
     memset(s_active_sprites, 0U, sizeof(s_active_sprites));
 }
 
+/* Start a new frame: drop every layer. Only the counts need clearing — a layer
+ * with count 0 is skipped by the sort, so its stale base pointer is never read.
+ * Call before the frame's rendererSubmitLayer() calls; any layer left
+ * unsubmitted simply renders nothing. */
 void rendererClear(void)
 {
-    s_active_sprites[LAYER_BG] = 0U;
-    s_active_sprites[LAYER_FG] = 0U;
-    s_active_sprites[LAYER_UI] = 0U;
-
-    s_sorted_count[LAYER_BG] = 0U;
-    s_sorted_count[LAYER_FG] = 0U;
-    s_sorted_count[LAYER_UI] = 0U;
-
-    memset(&s_submitted_bg[0U], 0U, sizeof(s_submitted_bg));
-    memset(&s_submitted_fg[0U], 0U, sizeof(s_submitted_fg));
-    memset(&s_submitted_ui[0U], 0U, sizeof(s_submitted_ui));
+    memset(s_active_sprites, 0U, sizeof(s_active_sprites));
 }
 
-void rendererSubmit(Layer layer, const Sprite *sprite)
+/* Set the color painted where no sprite draws (enables per-chunk background
+ * fill). RGB565. Until called, uncovered pixels keep stale buffer contents. */
+void rendererSetBackground(uint16_t color)
+{
+    s_bg_color = color;
+    s_bg_enabled = true;
+}
+
+/* Borrow a layer's whole sprite array (game-owned, kept alive until render). */
+void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count)
 {
     if (layer >= LAYER_COUNT)
     {
         return;
     }
-    uint16_t count = s_active_sprites[layer];
-    if (count >= s_max_sprites_per_layer[layer])
+    if (count > s_max_sprites_per_layer[layer])
     {
-        return;
+        count = s_max_sprites_per_layer[layer];
     }
-    s_submitted[layer][count] = sprite; /* borrow the pointer; the game owns the data */
-    s_active_sprites[layer] = count + 1U;
+    s_layer_sprites[layer] = sprites;
+    s_active_sprites[layer] = count;
 }
 
 /* Counting sort: sprites ordered by z ascending within each layer */
@@ -92,11 +103,12 @@ static void sortSpritesByZ(void)
             continue;
         }
 
+        const Sprite *sprites = s_layer_sprites[layer];
         uint16_t z_count[256];
         memset(z_count, 0, sizeof(z_count));
         for (uint16_t i = 0U; i < count; i++)
         {
-            z_count[s_submitted[layer][i]->z]++;
+            z_count[sprites[i].z]++;
         }
 
         uint16_t total = 0U;
@@ -108,8 +120,7 @@ static void sortSpritesByZ(void)
         }
         for (uint16_t i = 0U; i < count; i++)
         {
-            const Sprite *sprite = s_submitted[layer][i];
-            s_sorted[layer][z_count[sprite->z]++] = sprite;
+            s_sorted[layer][z_count[sprites[i].z]++] = &sprites[i];
         }
         s_sorted_count[layer] = count;
     }
@@ -355,23 +366,28 @@ __attribute__((noinline, section(".RamFunc"))) static void composite2bpp(uint16_
     }
 
     const uint16_t *pal = sprite->palette;
-    s_lut[0] = pal[0];
-    s_lut[1] = pal[1];
-    s_lut[2] = pal[2];
-    s_lut[3] = pal[3];
-
-    uint16_t stride = (sprite->w + 3U) >> 2U;
     bool flip_h = (sprite->flags & SPRITE_FLIP_H) != 0U;
     bool opaque = (sprite->flags & SPRITE_OPAQUE) != 0U;
 
-    if (opaque) /* pack adjacent-pixel pairs for the 32-bit-store fast path */
+    if (pal != s_lut_pal) /* reload the 4-entry palette only when it changed */
+    {
+        s_lut[0] = pal[0];
+        s_lut[1] = pal[1];
+        s_lut[2] = pal[2];
+        s_lut[3] = pal[3];
+        s_lut_pal = pal;
+        s_pair_pal = NULL; /* s_lut changed -> the paired table is now stale */
+    }
+    if (opaque && pal != s_pair_pal) /* pack adjacent-pixel pairs for the 32-bit store */
     {
         for (uint8_t k = 0U; k < 16U; k++)
         {
             s_pair[k] = (uint32_t)s_lut[k >> 2] | ((uint32_t)s_lut[k & 3U] << 16);
         }
+        s_pair_pal = pal;
     }
 
+    uint16_t stride = (sprite->w + 3U) >> 2U;
     int row_step = (sprite->flags & SPRITE_FLIP_V) ? -(int)stride : (int)stride;
     const uint8_t *row = &sprite->pixels[clip.src_top * stride];
     uint16_t *dst = &chunk_buffer[(uint16_t)(clip.row_top - start_y) * RENDERER_WIDTH + clip.x_start];
@@ -406,9 +422,14 @@ __attribute__((noinline, section(".RamFunc"))) static void composite4bpp(uint16_
     }
 
     const uint16_t *pal = sprite->palette;
-    for (uint8_t k = 0U; k < 16U; k++)
+    if (pal != s_lut_pal) /* reload the 16-entry palette only when it changed */
     {
-        s_lut[k] = pal[k];
+        for (uint8_t k = 0U; k < 16U; k++)
+        {
+            s_lut[k] = pal[k];
+        }
+        s_lut_pal = pal;
+        s_pair_pal = NULL;
     }
 
     uint16_t stride = (sprite->w + 1U) >> 1U;
@@ -449,6 +470,26 @@ __attribute__((noinline, section(".RamFunc"))) static void composite4bpp(uint16_
  * scanline-major walk while amortising the per-sprite setup across its rows. */
 __attribute__((noinline, section(".RamFunc"))) static void renderScanlineChunk(uint16_t *chunk_buffer, uint16_t start_y, uint16_t count)
 {
+    if (s_bg_enabled) /* paint the background; sprites composite over it */
+    {
+        uint32_t pair = (uint32_t)s_bg_color | ((uint32_t)s_bg_color << 16);
+        uint32_t *fill = (uint32_t *)(void *)chunk_buffer;
+        /* 2 px per word; RENDERER_WIDTH/2 (160) is a multiple of 8, so unroll x8. */
+        uint32_t blocks = (uint32_t)count * (RENDERER_WIDTH / 16U);
+        while (blocks--)
+        {
+            fill[0] = pair;
+            fill[1] = pair;
+            fill[2] = pair;
+            fill[3] = pair;
+            fill[4] = pair;
+            fill[5] = pair;
+            fill[6] = pair;
+            fill[7] = pair;
+            fill += 8;
+        }
+    }
+
     int chunk_top = (int)start_y;
     int chunk_bottom = (int)start_y + (int)count; /* exclusive */
 
@@ -464,13 +505,13 @@ __attribute__((noinline, section(".RamFunc"))) static void renderScanlineChunk(u
             {
                 continue; /* sprite does not touch this strip */
             }
-            if (sprite->format == GFX_FMT_2BPP)
+            if (sprite->flags & SPRITE_IS_FMT_4BPP)
             {
-                composite2bpp(chunk_buffer, start_y, count, sprite);
+                composite4bpp(chunk_buffer, start_y, count, sprite);
             }
             else
             {
-                composite4bpp(chunk_buffer, start_y, count, sprite);
+                composite2bpp(chunk_buffer, start_y, count, sprite);
             }
         }
     }
@@ -480,6 +521,8 @@ void rendererRender(void)
 {
     uint16_t scanline_y = 0U;
     sortSpritesByZ();
+    s_lut_pal = NULL; /* invalidate the palette cache (palettes may change per frame) */
+    s_pair_pal = NULL;
 
     for (uint16_t chunk_index = 0U; scanline_y < RENDERER_HEIGHT; chunk_index++)
     {

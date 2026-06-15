@@ -8,8 +8,10 @@
 #define GFX_PALETTE_COLORS_2BPP 4U
 #define GFX_PALETTE_COLORS_4BPP 16U
 
-// GfxAssetHeader.flags bits
-#define GFX_FLAG_OPAQUE 0x1U // picture has no transparent (slot 0) pixels
+// GfxAssetHeader.flags bits — laid out to match the renderer's SpriteFlags low
+// bits, so a game can use this byte directly as a sprite's format/opacity flags.
+#define GFX_FLAG_IS_4BPP 0x1U // pixel format: 0 = 2bpp, 1 = 4bpp (mirrors `format`)
+#define GFX_FLAG_OPAQUE  0x2U // picture has no transparent (slot 0) pixels
 
 typedef enum
 {
@@ -35,8 +37,9 @@ typedef struct __attribute__((packed))
 // The pixel data is followed by the palette: one byte per color (a system
 // palette index 0-63), GFX_PALETTE_COLORS_2BPP/_4BPP entries depending on
 // format. Entry 0 is the transparent/background slot; its stored color is the
-// picture's suggested backdrop color. GFX_FLAG_OPAQUE is set when the picture
-// uses no slot-0 pixels, so a consumer can render it on the fast opaque path.
+// picture's suggested backdrop color. The flags word mirrors the renderer's
+// sprite flags: bit 0 (GFX_FLAG_IS_4BPP) tracks the format, bit 1
+// (GFX_FLAG_OPAQUE) is set when the picture uses no slot-0 pixels (fast path).
 typedef struct __attribute__((packed))
 {
     GfxAssetHeader header;

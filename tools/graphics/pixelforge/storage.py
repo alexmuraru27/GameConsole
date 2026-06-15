@@ -8,7 +8,7 @@
         uint32 height      pixels
         uint32 format      GfxFormat (1 = 2bpp, 2 = 4bpp)
         uint32 dataSize    pixel data bytes after the header
-        uint32 flags       GFX_FLAG_* bitmask (GFX_FLAG_OPAQUE)
+        uint32 flags       GFX_FLAG_* bitmask (bit 0 = 4bpp, bit 1 = opaque)
     pixel rows:            dataSize bytes, row-major, each row padded to a
                            byte boundary; 2bpp = 4 px/byte MSB-first,
                            4bpp = 2 px/byte high nibble first
@@ -32,7 +32,9 @@ from .constants import (
     COLORS_PER_FORMAT,
     FORMAT_NAMES,
     GFX_ASSET_MAGIC,
+    GFX_FLAG_IS_4BPP,
     GFX_FLAG_OPAQUE,
+    GFX_FMT_4BPP,
     MAX_SIZE,
     SYSTEM_PALETTE_SIZE,
 )
@@ -43,8 +45,23 @@ _C_BYTES_PER_LINE = 16
 
 
 def header_flags(canvas):
-    """Header flags bitmask derived from the canvas content."""
-    return GFX_FLAG_OPAQUE if canvas.is_opaque() else 0
+    """Flags bitmask, laid out to match the renderer's SpriteFlags low bits."""
+    flags = 0
+    if canvas.format == GFX_FMT_4BPP:
+        flags |= GFX_FLAG_IS_4BPP
+    if canvas.is_opaque():
+        flags |= GFX_FLAG_OPAQUE
+    return flags
+
+
+def _flags_c_expr(canvas):
+    """The header flags as a C expression of the GFX_FLAG_* names (or '0')."""
+    names = []
+    if canvas.format == GFX_FMT_4BPP:
+        names.append("GFX_FLAG_IS_4BPP")
+    if canvas.is_opaque():
+        names.append("GFX_FLAG_OPAQUE")
+    return " | ".join(names) if names else "0"
 
 
 def row_stride(width, bits):
@@ -159,7 +176,7 @@ def save_c_file(canvas, c_path, name):
         f.write(f"    .height = {macro}_HEIGHT,\n")
         f.write(f"    .format = GFX_FMT_{format_name},\n")
         f.write(f"    .dataSize = {macro}_DATA_SIZE,\n")
-        f.write(f"    .flags = {'GFX_FLAG_OPAQUE' if canvas.is_opaque() else '0'},\n")
+        f.write(f"    .flags = {_flags_c_expr(canvas)},\n")
         f.write("};\n\n")
         f.write(
             "// system palette indices (slot 0 is transparent, its color is"
