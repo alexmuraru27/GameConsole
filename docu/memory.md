@@ -9,10 +9,10 @@ Defined in `common.ld`.
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
 | SHARED_RAM     | 0x20000000 | 2K   | rw    | `ConsoleAPIHeader` struct — games read it at runtime                              |
-| CONSOLE_RAM    | 0x20000800 | 62K  | rw    | Console firmware .data, .bss, stack, heap, DMA buffers, renderer, FatFs, SDIO, audio |
-| GAME_RAM       | 0x20010000 | 64K  | rwx   | Game .text, .rodata, .data, .bss, stack, heap — loaded from .bin at runtime       |
+| CONSOLE_RAM    | 0x20000800 | 82K  | rw    | Console firmware .data, .bss, stack, heap, DMA buffers, renderer, FatFs, SDIO, audio |
+| GAME_RAM       | 0x20015000 | 44K  | rwx   | Game .text, .rodata, .data, .bss, stack, heap — loaded from .bin at runtime       |
 
-Total: 2K + 62K + 64K = 128K ✓
+Total: 2K + 82K + 44K = 128K ✓
 
 ## CCM (Core-Coupled Memory)
 
@@ -57,7 +57,7 @@ Placed in `.game_header` at the start of the binary. The loader reads it to know
 | `ro_data_start / end` | Read-only data (SRAM)        |
 | `data_start / end`    | Initialized data (SRAM)      |
 | `bss_start / end`     | Zero-fill region (SRAM)      |
-| `stack_top`           | Initial PSP stack pointer (SRAM top, 0x20020000) |
+| `stack_top`           | Initial PSP stack pointer (top of GAME_RAM) |
 | `entry_point`         | Function pointer to `_game_start()` |
 
 The loader computes file offsets as `region_addr - header_start` — this works because the `.bin` starts at `header_start` and all regions are contiguous.
