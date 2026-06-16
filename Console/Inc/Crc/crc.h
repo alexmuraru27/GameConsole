@@ -5,4 +5,6 @@
 
 uint16_t crc16_calculate(const uint8_t *data, uint32_t length);
 
+uint32_t crc32_calculate(const uint8_t *data, uint32_t length);
+
 #endif

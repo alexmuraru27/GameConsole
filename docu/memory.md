@@ -97,7 +97,7 @@ Games ship as **two files** on the SD card:
 
 Assets are **lazily loaded** at runtime. The game calls `assetLoaderGetAssetData(id, buffer, size)` with a buffer carved from the 64 KB `GAME_RAM_ASSET` arena (in CCM). The loader seeks the `.pak` file, walks the `PakEntry` table to find the matching ID, and copies the blob into the buffer. Nothing is pre-loaded — the game manages its own working set.
 
-> **Status:** this is the intended design. `asset_loader.c` is currently a **stub** (`assetLoaderGetAssetData()` returns `ASSET_NOT_FOUND` — `// TODO read from .pak`), so on-device asset loading is not wired up yet.
+> **Status:** implemented. The game loader binds `<game>.pak` (derived from the `.bin` name) when a game starts and keeps it open for the game's lifetime; `assetLoaderGetAssetData()` resolves the `PakEntry` by id, copies the blob into the caller's buffer, and verifies its CRC32 before returning.
 
 The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a YAML manifest and emits:
 - `<name>.pak` — binary container with CRC32-verified entries

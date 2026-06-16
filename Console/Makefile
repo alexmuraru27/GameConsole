@@ -64,8 +64,8 @@ startup.s
 #######################################
 # C defines
 C_DEFS =  \
--DSTM32F407xx \
--DRENDERER_TESTING
+-DSTM32F407xx 
+# -DRENDERER_TESTING
 
 # C includes
 C_INCLUDES =  \
@@ -86,7 +86,8 @@ C_INCLUDES =  \
 -IInc/Fonts \
 -I../Shared \
 -I../Shared/Api \
--I../Shared/Esp01s
+-I../Shared/Esp01s \
+-I../tools/packer
 
 
 # compile gcc flags

@@ -94,9 +94,10 @@ A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)
 > The sprite-submission surface (`rendererSubmitLayer`, `rendererClear`, `rendererSetBackground`, and the `Sprite`/`Layer` types in `renderer.h`) is currently **console-internal** — exercised by `renderer_testing.c` and not yet added to the `ConsoleAPI` struct, so loaded games cannot submit sprites through the API yet.
 
 ### Asset Loader
-- `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Get asset metadata (size, type).
-- `assetLoaderGetAssetData(asset_id, *buffer, size)`: Load asset bytes into a caller buffer.
-- `assetLoaderGetAssetHeader(*header)`: Read the asset-pack header.
+Serves assets out of the `.pak` bound to the running game. The game loader opens `<game>.pak` (same base name as the `.bin`) when the game starts and keeps it open for the game's lifetime, so a game never names a file — it just asks by id. All three calls return `ASSET_LOADER_RET_OK` (`0`) on success; see `Console/Inc/Loader/asset_loader.h` for the other return codes.
+- `assetLoaderGetAssetHeader(*header)`: Read the bound pak's header (`magic`, `version`, `asset_count`).
+- `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Look up an asset's `id`, `size`, and `crc32` without loading it (e.g. to size a buffer).
+- `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
 
 ### Logging
 - `log(fmt, ...)`: printf-style line routed to the console's SWO/ITM trace, tagged `[GAME]`. This is the **only reliable game-side logging path** — a game's own `printf` has no backing `_write`. Console firmware logs with the `LOGGER_LOG_{ERROR,WARN,INFO,DEBUG}(channel, ...)` macros instead; see the Logging subsystem in `CLAUDE.md`.
@@ -139,12 +140,13 @@ A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)
   - `buzzerPlayWithFlag()`: Play sound and trigger callback on completion.
 
 ### Asset Loader (asset_loader.c/h)
-- Loads game assets (tiles, sounds, etc.) from SD card or flash.
-- Provides asset size, data, and header information to games.
+- Serves game assets (tiles, sounds, etc.) from the `.pak` bound to the running game on the SD card.
+- The game loader calls `assetLoaderOpenPak()`/`assetLoaderClosePak()` to bind/unbind `<game>.pak` around the game's run; the handle stays open so reads seek straight into the file.
 - Internal functions:
-  - `assetLoaderGetAssetMetadata()`: Query asset size by ID.
-  - `assetLoaderGetAssetData()`: Load asset data into buffer.
-  - `assetLoaderGetAssetHeader()`: Read asset metadata.
+  - `assetLoaderOpenPak()` / `assetLoaderClosePak()` / `assetLoaderIsPakOpen()`: Bind, unbind, and query the active pak (driven by the game loader).
+  - `assetLoaderGetAssetHeader()`: Read the bound pak's header.
+  - `assetLoaderGetAssetMetadata()`: Look up an asset's id/size/crc32 by id.
+  - `assetLoaderGetAssetData()`: Copy an asset blob into a caller buffer and verify its CRC32.
 
 ### SDIO & Filesystem (sdio.c/h, ff.c/h)
 - Manages SD card interface and FAT filesystem.
@@ -291,17 +293,20 @@ See `README.md` for license and authorship.
 
 ### Loader
 #### Asset Loader
-- **Purpose:** Load assets (tiles, sounds, etc.) from storage.
+- **Purpose:** Serve assets (tiles, sounds, etc.) from the game's bound `.pak` on the SD card.
 - **Key Functions:**
-  - `assetLoaderGetAssetMetadata(asset_id, *size)`: Get asset size.
-  - `assetLoaderGetAssetData(asset_id, *buffer)`: Load asset data.
-  - `assetLoaderGetAssetHeader(*header)`: Get asset metadata.
+  - `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Get an asset's `id`/`size`/`crc32`.
+  - `assetLoaderGetAssetData(asset_id, *buffer, buffer_size)`: Load (and CRC-verify) asset data into a buffer.
+  - `assetLoaderGetAssetHeader(*header)`: Get the bound pak's header.
 - **Usage Example:**
   ```c
-  uint32_t size;
-  assetLoaderGetAssetMetadata(15, &size);
-  uint8_t buffer[size];
-  assetLoaderGetAssetData(15, buffer);
+  AssetMetaData meta;
+  assetLoaderGetAssetMetadata(15, &meta);
+  uint8_t buffer[meta.size];
+  if (assetLoaderGetAssetData(15, buffer, sizeof(buffer)) == ASSET_LOADER_RET_OK)
+  {
+      // buffer holds the verified asset blob
+  }
   ```
 
 #### Game Loader

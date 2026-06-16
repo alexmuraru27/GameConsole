@@ -1,6 +1,8 @@
 #include "game_loader.h"
 #include "ff.h"
 #include "loader.h"
+#include "asset_loader.h"
+#include "logger.h"
 #include "sysclock.h"
 #include <string.h>
 
@@ -67,13 +69,43 @@ static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, c
 
     return FR_OK;
 }
+
+/* Derive the game's asset pak from its .bin name (GameXO.bin -> GameXO.pak) and
+ * bind it so the asset loader can serve this game's assets. The pak is optional:
+ * a game shipping no assets just has none, which the asset loader treats as OK. */
+static void bindGamePak(void)
+{
+    const FILINFO *finfo = loaderGetFileInfo();
+    if (finfo == NULL)
+    {
+        return;
+    }
+
+    char pak_name[FF_LFN_BUF];
+    strncpy(pak_name, finfo->fname, sizeof(pak_name) - 1U);
+    pak_name[sizeof(pak_name) - 1U] = '\0';
+
+    char *ext = strrchr(pak_name, '.');
+    if (ext == NULL)
+    {
+        return;
+    }
+    strcpy(ext, ".pak"); /* ".pak" is the same length as ".bin", so this fits in place */
+
+    assetLoaderOpenPak(pak_name);
+}
+
 uint8_t gameLoaderLoadGame(uint8_t binary_index)
 {
     FRESULT res;
     s_is_game_header_valid = false;
+
+    LOGGER_LOG_INFO(LOGGER_LOADER, "loading game index %u", binary_index);
+
     res = loaderOpenFile(binary_index);
     if (res != FR_OK)
     {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "open game %u failed (%d)", binary_index, res);
         return res;
     }
 
@@ -122,6 +154,12 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
             }
         }
 
+        // Bind the game's asset pak before handing over control, so asset
+        // requests during gameplay resolve against this game's .pak.
+        bindGamePak();
+
+        LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
+
         // Set PSP to the game's stack and switch Thread mode to use PSP.
         // This isolates the game's stack from the console: if the game faults,
         // the CPU enters Handler mode on MSP (console stack), leaving the
@@ -143,6 +181,9 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
         __asm volatile("msr control, %0" : : "r"(control));
         __asm volatile("isb" : : : "memory");
 
+        LOGGER_LOG_INFO(LOGGER_LOADER, "game returned to console");
+
+        assetLoaderClosePak();
         loaderCloseFile();
     }
 

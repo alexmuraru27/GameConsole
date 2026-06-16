@@ -48,15 +48,18 @@ At runtime, stream an asset by ID into a buffer carved from the CCM asset arena:
 ```c
 AssetMetaData meta;
 api_hdr_ptr->api.assetLoaderGetAssetMetadata(ASSET_ID_HERO, &meta);
-uint8_t buffer[meta.asset_size];
-api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_ID_HERO, buffer, sizeof(buffer));
+uint8_t buffer[meta.size];
+if (api_hdr_ptr->api.assetLoaderGetAssetData(ASSET_ID_HERO, buffer, sizeof(buffer)) == 0U)
+{
+    // buffer now holds the asset blob (CRC32-verified by the loader)
+}
 ```
 
-> **Not implemented yet:** `asset_loader.c` is a stub — `assetLoaderGetAssetData()` returns `ASSET_NOT_FOUND`. The `.pak` format and packer exist, but the on-device read from `.pak` is still a TODO, so packed assets cannot be loaded at runtime yet.
+> **Pak naming:** the console binds a game's assets automatically — it opens `<game>.pak` (same base name as `<game>.bin`) when the game starts, so the two files must share a name and both live in the SD card root. A game shipping no assets simply omits the `.pak`. The asset calls return `0` (`ASSET_LOADER_RET_OK`) on success; see `Console/Inc/Loader/asset_loader.h` for the full set of return codes.
 
 ### 6. Build and deploy
 
-Build with the provided Makefile and copy the resulting `.bin` (and, once the asset loader lands, the matching `.pak`) to the SD card root. `make deploy` copies the built `.bin` to the SD mount point configured in `common.mk`.
+Build with the provided Makefile and copy the resulting `.bin` and its matching `.pak` (same base name) to the SD card root. `make deploy` copies the built `.bin` to the SD mount point configured in `common.mk`.
 
 ## Minimal main.c example
 
