@@ -28,7 +28,7 @@ static void loggerEmit(LoggerLevel level, const char *channel, const char *fmt, 
         channel += sizeof(prefix) - 1U;
     }
 
-    printf("[%lu][%c][%.4s] ", (unsigned long)getSysTime(), loggerLevelChar(level), channel);
+    printf("[%c][%lu][%.4s] ", loggerLevelChar(level), (unsigned long)getSysTime(), channel);
     vprintf(fmt, args);
     printf("\r\n");
 }

@@ -35,6 +35,11 @@ static void fsmcDmaInit(uint32_t fsmcDataAddress)
         ;
 
     DMA2_Stream6->M0AR = fsmcDataAddress;
+    /* Memory-to-memory transfers MUST use the FIFO: on the STM32F4 direct mode
+     * is not allowed for M2M (RM0090). Running M2M in direct mode is out of spec
+     * and corrupts transfers intermittently (stray scanlines). Disable direct
+     * mode (enable the FIFO) at the full threshold. */
+    DMA2_Stream6->FCR = DMA_SxFCR_DMDIS | DMA_SxFCR_FTH;
     DMA2_Stream6->CR = (0U << DMA_SxCR_CHSEL_Pos) | // channel 0
                        DMA_SxCR_PL_1 |              // priority high
                        DMA_SxCR_MSIZE_0 |           // dest 16-bit
