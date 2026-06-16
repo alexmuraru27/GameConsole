@@ -99,6 +99,8 @@ void gameStateManagerInit(void)
     API.rendererInit();
     API.rendererSetBackground(COL_BG);
 
+    s_last_input_ms = API.getSysTime();
+
     gameAssetsInit();
     gameAssetsLoadSprite(GAMEXO_GFX_MARK_X, &s_spr_x, s_pal_x);
     gameAssetsLoadSprite(GAMEXO_GFX_MARK_O, &s_spr_o, s_pal_o);
@@ -135,14 +137,10 @@ static const Sprite *markFor(uint8_t cell)
 
 static uint16_t buildGrid(uint16_t n)
 {
-    s_fg[n++] = (Sprite){.x = BOARD_X + CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W,
-                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
-    s_fg[n++] = (Sprite){.x = BOARD_X + 2 * CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W,
-                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
-    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T,
-                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
-    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + 2 * CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T,
-                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X + CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W, .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X + 2 * CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W, .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T, .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + 2 * CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T, .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
     return n;
 }
 
