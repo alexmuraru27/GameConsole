@@ -282,7 +282,7 @@ static uint16_t draw_text_scaled(Sprite *ui, uint16_t idx, const Font *font,
         uint8_t ascii = (uint8_t)*scan;
         if (ascii >= 0x20U && ascii <= 0x7EU && poolRemain >= slotBytes)
         {
-            scaleFont(ascii, sizeEnum, factor, *writeCursor);
+            fontScale(ascii, sizeEnum, factor, *writeCursor);
             ui[idx] = (Sprite){.x = x,
                                .y = y,
                                .w = scaledW,

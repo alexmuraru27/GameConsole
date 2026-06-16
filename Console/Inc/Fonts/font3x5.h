@@ -2,7 +2,7 @@
 #ifndef __FONT3X5_H
 #define __FONT3X5_H
 
-#include "font_types.h"
+#include "font_interface.h"
 
 #define FONT3X5_GLYPH_W 3U
 #define FONT3X5_GLYPH_H 5U

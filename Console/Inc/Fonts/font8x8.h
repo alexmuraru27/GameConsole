@@ -2,7 +2,7 @@
 #ifndef __FONT8X8_H
 #define __FONT8X8_H
 
-#include "font_types.h"
+#include "font_interface.h"
 
 #define FONT8X8_GLYPH_W 8U
 #define FONT8X8_GLYPH_H 8U

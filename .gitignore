@@ -55,6 +55,10 @@ build/
 
 GeneratedTiles/
 
+# Generated asset packs (built from manifests + committed assets by the packer)
+*.pak
+*AssetEnum.h
+
 CLAUDE.md
 .claude
 __pycache__

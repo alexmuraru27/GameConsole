@@ -52,7 +52,7 @@ uint16_t fontSize(FontSize size, uint8_t scale)
     return (uint16_t)outStride * outH;
 }
 
-void scaleFont(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst)
+void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst)
 {
     const uint8_t *src;
     fontGet(ch, size, &src);

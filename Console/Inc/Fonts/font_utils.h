@@ -3,7 +3,7 @@
 #define __FONT_UTILS_H
 
 #include <stdint.h>
-#include "font_types.h"
+#include "font_interface.h"
 
 uint16_t fontGlyphW(FontSize size);
 uint16_t fontGlyphH(FontSize size);
@@ -16,6 +16,6 @@ uint16_t fontSize(FontSize size, uint8_t scale);
 
 /* Scale a printable-ASCII glyph into dst.  Nearest-neighbour integer
  * scaling; scale 1 is a copy.  Src and dst must not overlap. */
-void scaleFont(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);
+void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);
 
 #endif /* __FONT_UTILS_H */

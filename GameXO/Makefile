@@ -20,10 +20,8 @@ OPT = -Og
 C_SOURCES =  \
 Src/main.c \
 Src/game_state_manager.c \
-Src/level_manager.c \
 Src/tic_tac_toe_logic.c\
-Src/sound.c\
-Assets/Src/assets.c \
+Src/game_assets.c \
 Src/syscalls.c
 
 # ASM sources
@@ -41,10 +39,11 @@ C_DEFS =  \
 # C includes
 C_INCLUDES =  \
 -IInc \
--IAssets/Inc \
--I../Assets/Tiles \
+-IAssets/pak \
 -I../Shared \
--I../Shared/Api
+-I../Shared/Api \
+-I../tools/graphics \
+-I../tools/music_creator
 
 
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
@@ -67,10 +66,30 @@ LIBS = -lc -lm -lnosys
 LIBDIR = 
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
+#######################################
+# asset pack (.pak)
+#######################################
+# The game's assets are authored with the in-repo tools and committed under
+# Assets/{Graphics,Music}; the packer bundles them (per Assets/manifest.yaml)
+# into GameXO.pak + a GameXOAssetEnum.h of asset ids the game includes. The
+# .pak ships next to GameXO.bin on the SD card and is loaded at runtime.
+PACKER     = python3 ../tools/packer/packer.py
+ASSET_DIR  = Assets
+MANIFEST   = $(ASSET_DIR)/manifest.yaml
+PAK_DIR    = $(ASSET_DIR)/pak
+PAK        = $(PAK_DIR)/$(TARGET).pak
+ASSET_ENUM = $(PAK_DIR)/$(TARGET)AssetEnum.h
+ASSET_BINS = $(wildcard $(ASSET_DIR)/Graphics/*.bin $(ASSET_DIR)/Music/*.bin)
 
+# The enum header is a by-product of the same packer run as the .pak.
+$(ASSET_ENUM): $(PAK)
+$(PAK): $(MANIFEST) $(ASSET_BINS)
+	@mkdir -p $(PAK_DIR)
+	$(PACKER) $(MANIFEST) --output-name $(TARGET) --output-dir $(PAK_DIR) --assets-root $(ASSET_DIR)
 
+pak: $(PAK)
 
-all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
+all: $(BUILD_DIR) $(PAK) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
 
 #######################################
 # build the application
@@ -85,7 +104,7 @@ vpath %.s $(sort $(dir $(ASM_SOURCES)))
 ######################################
 # targets
 ######################################
-$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
+$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) $(ASSET_ENUM)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
@@ -111,10 +130,11 @@ flash: $(BUILD_DIR)/$(TARGET).elf
 	@echo "GameXO — nothing to flash -> .bin loaded at runtime"
 
 
-deploy: $(BUILD_DIR)/$(TARGET).bin
+deploy: $(BUILD_DIR)/$(TARGET).bin $(PAK)
 	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_CARD_PATH)/
+	cp -f $(PAK) $(SD_CARD_PATH)/
 	sync
-	@echo "$(TARGET).bin copied to SD card $(SD_CARD_PATH)"
+	@echo "$(TARGET).bin + $(TARGET).pak copied to SD card $(SD_CARD_PATH)"
 #######################################
 # clean up
 #######################################

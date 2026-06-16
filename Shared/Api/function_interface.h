@@ -35,12 +35,25 @@ typedef struct
 
     // RENDERING
     void (*rendererInit)(void);
+    void (*rendererClear)(void);
+    void (*rendererSetBackground)(uint16_t color);
+    void (*rendererSubmitLayer)(Layer layer, const Sprite *sprites, uint16_t count);
     void (*rendererRender)(void);
+    uint16_t (*rendererGetWidthPixels)(void);
+    uint16_t (*rendererGetHeightPixels)(void);
+    uint16_t (*rendererSystemColor)(uint8_t system_index);
 
     // ASSETS
     uint8_t (*assetLoaderGetAssetHeader)(AssetHeader *asset_header_out);
     uint8_t (*assetLoaderGetAssetMetadata)(uint32_t asset_id, AssetMetaData *asset_metadata_out);
     uint8_t (*assetLoaderGetAssetData)(uint32_t asset_id, uint8_t *const buffer, const uint32_t buffer_size_bytes);
+
+    // FONTS (glyph data lives once in console flash; games draw text through these)
+    uint16_t (*fontGlyphW)(FontSize size);
+    uint16_t (*fontGlyphH)(FontSize size);
+    void (*fontGet)(uint8_t ch, FontSize size, const uint8_t **pixels);
+    uint16_t (*fontSize)(FontSize size, uint8_t scale); /* scaled-glyph buffer size, bytes */
+    void (*fontScale)(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);
 
     void (*log)(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 } ConsoleAPI;

@@ -1,186 +1,367 @@
 #include "game_state_manager.h"
 #include "game_console_api.h"
-#include "level_manager.h"
+#include "game_assets.h"
+#include "tic_tac_toe_logic.h"
+#include "GameXOAssetEnum.h"
+#include <string.h>
+
+DECLARE_API_HEADER_PTR(s_api);
+#define API (s_api->api)
+
+#define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
+
+/* Slate + cyan palette, matching the console menu. */
+#define COL_BG RGB(16, 20, 28)
+#define COL_GRID RGB(70, 120, 140)
+#define COL_TITLE RGB(120, 220, 235)
+#define COL_TEXT RGB(206, 220, 232)
+#define COL_WIN RGB(90, 220, 120)
+#define COL_LOSE RGB(235, 90, 90)
+#define COL_DRAW RGB(240, 180, 60)
+
+/* Board geometry (320x240). */
+#define CELL 56
+#define MARK 40
+#define MARK_OFF ((CELL - MARK) / 2)
+#define BOARD_W (3 * CELL)
+#define BOARD_X ((320 - BOARD_W) / 2)
+#define BOARD_Y 56
+#define GRID_T 4 /* grid line thickness */
+
+#define INPUT_DEBOUNCE_MS 200U
 
 typedef enum
 {
-    GAME_STATE_INIT,
-    GAME_STATE_CHOOSE_SYMBOL,
-    GAME_STATE_PLAYING,
-    GAME_STATE_END
-} GameState;
+    PHASE_CHOOSE,
+    PHASE_PLAYING,
+    PHASE_END
+} Phase;
 
-DECLARE_API_HEADER_PTR(s_api_ptr);
-static GameState s_game_state = {GAME_STATE_INIT};
-static bool s_is_state_transition = {true};
+static uint8_t s_board[3][3];
+static bool s_player_is_x;
+static uint8_t s_cursor_x, s_cursor_y;
+static Phase s_phase;
+static uint8_t s_result;
+static bool s_result_handled;
+static uint32_t s_last_input_ms;
 
-// static void fillPatternTable()
-// {
-//     const uint8_t asset_ids[] = {ASSET_ID_FONT_A,
-//                                  ASSET_ID_FONT_B,
-//                                  ASSET_ID_FONT_C,
-//                                  ASSET_ID_FONT_D,
-//                                  ASSET_ID_FONT_E,
-//                                  ASSET_ID_FONT_F,
-//                                  ASSET_ID_FONT_G,
-//                                  ASSET_ID_FONT_H,
-//                                  ASSET_ID_FONT_I,
-//                                  ASSET_ID_FONT_J,
-//                                  ASSET_ID_FONT_K,
-//                                  ASSET_ID_FONT_L,
-//                                  ASSET_ID_FONT_M,
-//                                  ASSET_ID_FONT_N,
-//                                  ASSET_ID_FONT_O,
-//                                  ASSET_ID_FONT_P,
-//                                  ASSET_ID_FONT_Q,
-//                                  ASSET_ID_FONT_R,
-//                                  ASSET_ID_FONT_S,
-//                                  ASSET_ID_FONT_T,
-//                                  ASSET_ID_FONT_U,
-//                                  ASSET_ID_FONT_V,
-//                                  ASSET_ID_FONT_W,
-//                                  ASSET_ID_FONT_X,
-//                                  ASSET_ID_FONT_Y,
-//                                  ASSET_ID_FONT_Z,
-//                                  ASSET_ID_FONT_0,
-//                                  ASSET_ID_FONT_1,
-//                                  ASSET_ID_FONT_2,
-//                                  ASSET_ID_FONT_3,
-//                                  ASSET_ID_FONT_4,
-//                                  ASSET_ID_FONT_5,
-//                                  ASSET_ID_FONT_6,
-//                                  ASSET_ID_FONT_7,
-//                                  ASSET_ID_FONT_8,
-//                                  ASSET_ID_FONT_9,
-//                                  ASSET_ID_FONT_STAR,
-//                                  ASSET_ID_SPRITE_X,
-//                                  ASSET_ID_SPRITE_O,
-//                                  ASSET_ID_SPRITE_SELECTION,
-//                                  ASSET_ID_BACKGROUND_CORNER,
-//                                  ASSET_ID_BACKGROUND_V_BAR,
-//                                  ASSET_ID_BACKGROUND_H_BAR};
+/* Loaded once into the CCM arena; reused every frame. */
+static Sprite s_spr_x, s_spr_o, s_spr_cursor;
+static uint16_t s_pal_x[16], s_pal_o[16], s_pal_cursor[4];
 
-//     uint8_t tile_buffer[64U];
-//     uint32_t res = 0U;
-//     for (uint16_t idx = 0U; idx < sizeof(asset_ids) / sizeof(uint8_t); idx++)
-//     {
-//         res = s_api_ptr->api.assetLoaderGetAssetData(asset_ids[idx], tile_buffer, sizeof(tile_buffer) / sizeof(uint8_t));
-//         if (!res)
-//         {
-//             // TODO renderer
-//             // s_api_ptr->api.rendererPatternTableSetTile(asset_ids[idx], tile_buffer, 64U);
-//         }
-//     }
-// }
+/* Grid line tiles: solid (index 1) 2bpp, built once. 0x55 = four index-1 px. */
+static uint8_t s_vline[GRID_T * BOARD_W / 4]; /* 4 wide x 168 tall */
+static uint8_t s_hline[BOARD_W * GRID_T / 4]; /* 168 wide x 4 tall */
+static const uint16_t s_pal_grid[4] = {0, COL_GRID, COL_GRID, COL_GRID};
 
-// static void fillFramePalette()
-// {
-//     // TODO renderer
-//     // // WHITE
-//     // s_api_ptr->api.rendererFramePaletteSetBackgroundMultiple(FRAME_PALETTE_IDX_BG_FONT, 0x20, 0x20, 0x20);
+/* Font palettes (2bpp: slot 0 transparent, ink in 1-3). */
+static const uint16_t s_pal_title[4] = {0, COL_TITLE, COL_TITLE, COL_TITLE};
+static const uint16_t s_pal_text[4] = {0, COL_TEXT, COL_TEXT, COL_TEXT};
 
-//     // // GRAY
-//     // s_api_ptr->api.rendererFramePaletteSetBackgroundMultiple(FRAME_PALETTE_IDX_BG_BACKGROUND, 0x2D, 0x2D, 0x2D);
+/* Per-frame sprite scratch + scaled-text pool. */
+#define UI_MAX 96U
+static Sprite s_fg[32];
+static Sprite s_ui[UI_MAX];
+static uint8_t s_text_pool[2048];
 
-//     // // GREEN
-//     // s_api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_SELECTION, 0x1B, 0x1B, 0x1B);
+static bool debounced(void)
+{
+    const uint32_t now = API.getSysTime();
+    if (now > s_last_input_ms + INPUT_DEBOUNCE_MS)
+    {
+        s_last_input_ms = now;
+        return true;
+    }
+    return false;
+}
 
-//     // // BLUE
-//     // s_api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_X, 0x02, 0x02, 0x02);
+static Sprite placed(Sprite tmpl, int16_t x, int16_t y, uint8_t z)
+{
+    tmpl.x = x;
+    tmpl.y = y;
+    tmpl.z = z;
+    return tmpl;
+}
 
-//     // // BROWN
-//     // s_api_ptr->api.rendererFramePaletteSetSpriteMultiple(FRAME_PALETTE_IDX_SPRITE_O, 0x06, 0x06, 0x06);
-// }
+static void resetRound(void)
+{
+    ticTacToeInitBoard(s_board);
+    s_player_is_x = true;
+    s_cursor_x = 1U;
+    s_cursor_y = 1U;
+    s_result = TIC_TAC_TOE_GAME_STATE_CONTINUE;
+    s_result_handled = false;
+    s_phase = PHASE_CHOOSE;
+}
 
 void gameStateManagerInit(void)
 {
-    s_api_ptr->api.rendererInit();
-    s_game_state = GAME_STATE_INIT;
+    API.rendererInit();
+    API.rendererSetBackground(COL_BG);
 
-    // fillPatternTable();
-    // fillFramePalette();
+    gameAssetsInit();
+    gameAssetsLoadSprite(GAMEXO_GFX_MARK_X, &s_spr_x, s_pal_x);
+    gameAssetsLoadSprite(GAMEXO_GFX_MARK_O, &s_spr_o, s_pal_o);
+    gameAssetsLoadSprite(GAMEXO_GFX_CURSOR, &s_spr_cursor, s_pal_cursor);
 
-    // TODO renderer
-    // s_api_ptr->api.rendererNameTableSetTile(5U, 6U, ASSET_ID_FONT_A);
-    // s_api_ptr->api.rendererAttributeTableSetPalette(5U, 6U, FRAME_PALETTE_IDX_BG_FONT);
+    for (uint16_t i = 0U; i < sizeof(s_vline); i++)
+    {
+        s_vline[i] = 0x55U;
+    }
+    for (uint16_t i = 0U; i < sizeof(s_hline); i++)
+    {
+        s_hline[i] = 0x55U;
+    }
+
+    gameAssetsPlaySound(GAMEXO_SFX_INTRO);
+    resetRound();
+    API.log("GameXO ready");
 }
 
-static void handleStateInit()
+/* ---- per-mark helpers ------------------------------------------------ */
+
+static const Sprite *markFor(uint8_t cell)
 {
-    s_is_state_transition = true;
-    s_game_state = GAME_STATE_CHOOSE_SYMBOL;
-    levelManagerInit();
+    if (cell == TIC_TAC_TOE_BOARD_PLAYER_X)
+    {
+        return &s_spr_x;
+    }
+    if (cell == TIC_TAC_TOE_BOARD_PLAYER_O)
+    {
+        return &s_spr_o;
+    }
+    return NULL;
 }
 
-static void handleStateChooseSymbol()
+static uint16_t buildGrid(uint16_t n)
 {
-    const bool is_symbol_selected = levelManagerChooseSymbol(s_is_state_transition);
-    if (s_is_state_transition)
+    s_fg[n++] = (Sprite){.x = BOARD_X + CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W,
+                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X + 2 * CELL - GRID_T / 2, .y = BOARD_Y, .w = GRID_T, .h = BOARD_W,
+                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_vline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T,
+                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
+    s_fg[n++] = (Sprite){.x = BOARD_X, .y = BOARD_Y + 2 * CELL - GRID_T / 2, .w = BOARD_W, .h = GRID_T,
+                         .z = 0U, .flags = SPRITE_OPAQUE, .pixels = s_hline, .palette = s_pal_grid};
+    return n;
+}
+
+static uint16_t buildMarks(uint16_t n)
+{
+    for (uint8_t row = 0U; row < 3U; row++)
     {
-        s_is_state_transition = false;
+        for (uint8_t col = 0U; col < 3U; col++)
+        {
+            const Sprite *mark = markFor(s_board[row][col]);
+            if (mark != NULL)
+            {
+                const int16_t x = (int16_t)(BOARD_X + col * CELL + MARK_OFF);
+                const int16_t y = (int16_t)(BOARD_Y + row * CELL + MARK_OFF);
+                s_fg[n++] = placed(*mark, x, y, 2U);
+            }
+        }
     }
-    if (is_symbol_selected)
+    return n;
+}
+
+/* ---- rendering per phase --------------------------------------------- */
+
+static void renderChoose(void)
+{
+    const int16_t left_x = 100, right_x = 172, mark_y = 120;
+    uint16_t nf = 0U, nu = 0U;
+
+    const int16_t sel_x = s_player_is_x ? left_x : right_x;
+    s_fg[nf++] = placed(s_spr_cursor, (int16_t)(sel_x - MARK_OFF), (int16_t)(mark_y - MARK_OFF), 1U);
+    s_fg[nf++] = placed(s_spr_x, left_x, mark_y, 2U);
+    s_fg[nf++] = placed(s_spr_o, right_x, mark_y, 2U);
+
+    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
+                                   (int16_t)((320 - 11 * 18) / 2), 12, 0U, 2U,
+                                   s_pal_title, "TIC TAC TOE", s_text_pool, sizeof(s_text_pool));
+    const char *prompt = "PICK YOUR MARK";
+    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_8x8,
+                             (int16_t)((320 - gameAssetsTextWidth(FONT_8x8, prompt)) / 2), 78, 0U,
+                             s_pal_text, prompt);
+    const char *hint = "LEFT / RIGHT  choose      A  start";
+    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
+                             (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 210, 0U,
+                             s_pal_text, hint);
+
+    API.rendererClear();
+    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    API.rendererRender();
+}
+
+static void renderPlaying(void)
+{
+    uint16_t nf = 0U, nu = 0U;
+
+    nf = buildGrid(nf);
+    nf = buildMarks(nf);
+    s_fg[nf++] = placed(s_spr_cursor,
+                        (int16_t)(BOARD_X + s_cursor_x * CELL),
+                        (int16_t)(BOARD_Y + s_cursor_y * CELL), 3U);
+
+    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
+                                   (int16_t)((320 - 11 * 18) / 2), 12, 0U, 2U,
+                                   s_pal_title, "TIC TAC TOE", s_text_pool, sizeof(s_text_pool));
+    const char *hint = "D-PAD move      A  place      SP2  quit";
+    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
+                             (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
+                             s_pal_text, hint);
+
+    API.rendererClear();
+    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    API.rendererRender();
+}
+
+static void renderEnd(void)
+{
+    uint16_t nf = 0U, nu = 0U;
+
+    nf = buildGrid(nf);
+    nf = buildMarks(nf);
+
+    const char *banner;
+    const uint16_t *banner_pal;
+    static const uint16_t pal_win[4] = {0, COL_WIN, COL_WIN, COL_WIN};
+    static const uint16_t pal_lose[4] = {0, COL_LOSE, COL_LOSE, COL_LOSE};
+    static const uint16_t pal_draw[4] = {0, COL_DRAW, COL_DRAW, COL_DRAW};
+
+    if (s_result == TIC_TAC_TOE_GAME_STATE_DRAW)
     {
-        s_game_state = GAME_STATE_PLAYING;
-        s_is_state_transition = true;
+        banner = "DRAW";
+        banner_pal = pal_draw;
+    }
+    else
+    {
+        const bool player_won = (s_result == TIC_TAC_TOE_GAME_STATE_WIN_X) == s_player_is_x;
+        banner = player_won ? "YOU WIN" : "YOU LOSE";
+        banner_pal = player_won ? pal_win : pal_lose;
+    }
+
+    /* A scaled banner across the middle of the board (z above the marks). */
+    const int16_t banner_w = (int16_t)(strlen(banner) * (8 * 3 + 3));
+    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
+                                   (int16_t)((320 - banner_w) / 2), 118, 0U, 3U,
+                                   banner_pal, banner, s_text_pool, sizeof(s_text_pool));
+    const char *hint = "A  play again        SP2  quit";
+    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
+                             (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
+                             s_pal_text, hint);
+
+    API.rendererClear();
+    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    API.rendererRender();
+}
+
+/* ---- input + logic per phase ----------------------------------------- */
+
+static void updateChoose(void)
+{
+    if ((API.joystickGetRBtnLeft() || API.joystickGetRBtnRight()) && debounced())
+    {
+        s_player_is_x = !s_player_is_x;
+        gameAssetsPlaySound(GAMEXO_SFX_MOVE);
+    }
+    if (API.joystickGetSpecialBtn1() && debounced())
+    {
+        s_phase = PHASE_PLAYING;
+        gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
 }
 
-static void handleStatePlaying()
+static void aiMove(void)
 {
-    const bool is_game_in_progress = levelManagerPlay(s_is_state_transition);
-
-    if (s_is_state_transition)
+    const uint8_t player = s_player_is_x ? TIC_TAC_TOE_BOARD_PLAYER_X : TIC_TAC_TOE_BOARD_PLAYER_O;
+    const uint8_t ai = s_player_is_x ? TIC_TAC_TOE_BOARD_PLAYER_O : TIC_TAC_TOE_BOARD_PLAYER_X;
+    uint8_t r = 0xFFU, c = 0xFFU;
+    ticTacToeFindBestMove(s_board, ai, player, &r, &c);
+    if (r < 3U && c < 3U)
     {
-        s_is_state_transition = false;
-    }
-
-    if (!is_game_in_progress)
-    {
-        s_game_state = GAME_STATE_END;
-        s_is_state_transition = true;
+        ticTacToeMakeMove(s_board, r, c, ai);
     }
 }
 
-static void handleStateEnd()
+static void updatePlaying(void)
 {
-    const bool is_game_ended = levelManagerEnd(s_is_state_transition);
-
-    if (s_is_state_transition)
+    if (API.joystickGetRBtnLeft() && s_cursor_x > 0U && debounced())
     {
-        s_is_state_transition = false;
+        s_cursor_x--;
     }
-
-    if (is_game_ended)
+    else if (API.joystickGetRBtnRight() && s_cursor_x < 2U && debounced())
     {
-        s_game_state = GAME_STATE_INIT;
-        s_is_state_transition = true;
+        s_cursor_x++;
+    }
+    else if (API.joystickGetRBtnUp() && s_cursor_y > 0U && debounced())
+    {
+        s_cursor_y--;
+    }
+    else if (API.joystickGetRBtnDown() && s_cursor_y < 2U && debounced())
+    {
+        s_cursor_y++;
+    }
+    else if (API.joystickGetSpecialBtn1() && debounced())
+    {
+        const uint8_t player = s_player_is_x ? TIC_TAC_TOE_BOARD_PLAYER_X : TIC_TAC_TOE_BOARD_PLAYER_O;
+        if (ticTacToeMakeMove(s_board, s_cursor_y, s_cursor_x, player))
+        {
+            gameAssetsPlaySound(GAMEXO_SFX_MOVE);
+            if (ticTacToeGetGameState(s_board) == TIC_TAC_TOE_GAME_STATE_CONTINUE)
+            {
+                aiMove();
+            }
+            s_result = ticTacToeGetGameState(s_board);
+            if (s_result != TIC_TAC_TOE_GAME_STATE_CONTINUE)
+            {
+                s_phase = PHASE_END;
+                s_result_handled = false;
+            }
+        }
+    }
+}
+
+static void updateEnd(void)
+{
+    if (!s_result_handled)
+    {
+        s_result_handled = true;
+        s_last_input_ms = API.getSysTime(); /* hold off the restart press briefly */
+        if (s_result == TIC_TAC_TOE_GAME_STATE_DRAW)
+        {
+            gameAssetsPlaySound(GAMEXO_SFX_DRAW);
+        }
+        else
+        {
+            const bool player_won = (s_result == TIC_TAC_TOE_GAME_STATE_WIN_X) == s_player_is_x;
+            gameAssetsPlaySound(player_won ? GAMEXO_SFX_WIN : GAMEXO_SFX_LOSE);
+        }
+    }
+    if (API.joystickGetSpecialBtn1() && debounced())
+    {
+        resetRound();
     }
 }
 
 void gameStateManagerUpdate(void)
 {
-    switch (s_game_state)
+    switch (s_phase)
     {
-    case GAME_STATE_INIT:
-    {
-        handleStateInit();
+    case PHASE_CHOOSE:
+        updateChoose();
+        renderChoose();
         break;
-    }
-    case GAME_STATE_CHOOSE_SYMBOL:
-    {
-        handleStateChooseSymbol();
+    case PHASE_PLAYING:
+        updatePlaying();
+        renderPlaying();
         break;
-    }
-    case GAME_STATE_PLAYING:
-    {
-        handleStatePlaying();
+    case PHASE_END:
+        updateEnd();
+        renderEnd();
         break;
-    }
-    case GAME_STATE_END:
-    {
-        handleStateEnd();
-        break;
-    }
     }
 }

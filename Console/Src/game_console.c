@@ -19,6 +19,8 @@
 #include "settings_storage.h"
 #include "swo.h"
 #include "logger.h"
+#include "fonts.h"
+#include "font_utils.h"
 #include "stdio.h"
 
 extern uint32_t __game_console_api_start; // Linker symbol
@@ -58,11 +60,23 @@ static void gameConsoleExposeApi()
             .joystickIsAnyButtonPressed = &joystickIsAnyButtonPressed,
             // RENDERING
             .rendererInit = &rendererInit,
+            .rendererClear = &rendererClear,
+            .rendererSetBackground = &rendererSetBackground,
+            .rendererSubmitLayer = &rendererSubmitLayer,
             .rendererRender = &rendererRender,
+            .rendererGetWidthPixels = &rendererGetWidthPixels,
+            .rendererGetHeightPixels = &rendererGetHeightPixels,
+            .rendererSystemColor = &rendererSystemColor,
             // ASSETS
             .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
             .assetLoaderGetAssetData = &assetLoaderGetAssetData,
             .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader,
+            // FONTS
+            .fontGlyphW = &fontGlyphW,
+            .fontGlyphH = &fontGlyphH,
+            .fontGet = &fontGet,
+            .fontSize = &fontSize,
+            .fontScale = &fontScale,
             // LOGGING
             .log = &loggerGameLog};
 

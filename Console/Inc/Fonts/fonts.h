@@ -4,7 +4,7 @@
 #ifndef __FONTS_H
 #define __FONTS_H
 
-#include "font_types.h"
+#include "font_interface.h"
 #include "font3x5.h"
 #include "font5x5.h"
 #include "font8x8.h"

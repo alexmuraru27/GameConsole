@@ -2,7 +2,7 @@
 #ifndef __FONT5X5_H
 #define __FONT5X5_H
 
-#include "font_types.h"
+#include "font_interface.h"
 
 #define FONT5X5_GLYPH_W 5U
 #define FONT5X5_GLYPH_H 5U

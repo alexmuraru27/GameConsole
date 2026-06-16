@@ -1,0 +1,34 @@
+# GameXO asset pack manifest.
+#
+# The .bin assets are authored with the in-repo tools (Pixel Forge for graphics,
+# Music Creator for the buzzer tracks) and committed under Graphics/ and Music/.
+# The GameXO Makefile runs the packer (tools/packer/packer.py) over this manifest
+# to produce GameXO.pak + GameXOAssetEnum.h. Text is drawn with the console fonts
+# exposed through the ConsoleAPI, so no glyphs are packed here.
+version: 1
+assets:
+  - id: 1
+    name: GAMEXO_GFX_MARK_X
+    path: Graphics/mark_x.bin
+  - id: 2
+    name: GAMEXO_GFX_MARK_O
+    path: Graphics/mark_o.bin
+  - id: 3
+    name: GAMEXO_GFX_CURSOR
+    path: Graphics/cursor.bin
+
+  - id: 20
+    name: GAMEXO_SFX_INTRO
+    path: Music/sfx_intro.bin
+  - id: 21
+    name: GAMEXO_SFX_MOVE
+    path: Music/sfx_move.bin
+  - id: 22
+    name: GAMEXO_SFX_WIN
+    path: Music/sfx_win.bin
+  - id: 23
+    name: GAMEXO_SFX_LOSE
+    path: Music/sfx_lose.bin
+  - id: 24
+    name: GAMEXO_SFX_DRAW
+    path: Music/sfx_draw.bin

@@ -91,13 +91,25 @@ A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)
 - `rendererInit()`: Build the compositor tables and clear the scanline buffers.
 - `rendererRender()`: Sort sprites by `z`, bin them into 16-line chunks, composite back-to-front, and DMA the frame to the ILI9341.
 
-> The sprite-submission surface (`rendererSubmitLayer`, `rendererClear`, `rendererSetBackground`, and the `Sprite`/`Layer` types in `renderer.h`) is currently **console-internal** — exercised by `renderer_testing.c` and not yet added to the `ConsoleAPI` struct, so loaded games cannot submit sprites through the API yet.
+The full sprite-submission surface is exposed through `ConsoleAPI`, so loaded games draw the same way the console does. The `Sprite`/`Layer`/`SpriteFlags` types live in the shared API (`Shared/Api/renderer_interface.h`):
+- `rendererClear()`: drop all layers (start of a frame).
+- `rendererSetBackground(color)`: RGB565 fill where no sprite draws.
+- `rendererSubmitLayer(layer, sprites, count)`: submit a game-owned `Sprite[]` for `LAYER_BG/FG/UI`.
+- `rendererGetWidthPixels()` / `rendererGetHeightPixels()`: panel size (320x240).
+- `rendererSystemColor(index)`: map a Pixel Forge system-palette index (0-63) to RGB565 — used to turn a loaded `GfxAsset`'s index palette into a render-ready RGB565 palette.
 
 ### Asset Loader
 Serves assets out of the `.pak` bound to the running game. The game loader opens `<game>.pak` (same base name as the `.bin`) when the game starts and keeps it open for the game's lifetime, so a game never names a file — it just asks by id. All three calls return `ASSET_LOADER_RET_OK` (`0`) on success; see `Console/Inc/Loader/asset_loader.h` for the other return codes.
 - `assetLoaderGetAssetHeader(*header)`: Read the bound pak's header (`magic`, `version`, `asset_count`).
 - `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Look up an asset's `id`, `size`, and `crc32` without loading it (e.g. to size a buffer).
 - `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
+
+### Fonts
+The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are drawn by games through the API — no game ships glyph data. Types (`Font`, `FontSize`) are in `Shared/Api/font_interface.h`.
+- `fontGlyphW(size)` / `fontGlyphH(size)`: glyph dimensions for `FONT_3x5` / `FONT_5x5` / `FONT_8x8`.
+- `fontGet(ch, size, *pixels)`: pointer to a glyph's 2bpp pixels — drops straight into a `Sprite` (pair it with your own RGB565 palette for color).
+- `fontSize(size, scale)`: byte size of a glyph scaled by `scale` (to size a scratch buffer).
+- `fontScale(ch, size, scale, *dst)`: nearest-neighbour scale a glyph into `dst`.
 
 ### Logging
 - `log(fmt, ...)`: printf-style line routed to the console's SWO/ITM trace, tagged `[GAME]`. This is the **only reliable game-side logging path** — a game's own `printf` has no backing `_write`. Console firmware logs with the `LOGGER_LOG_{ERROR,WARN,INFO,DEBUG}(channel, ...)` macros instead; see the Logging subsystem in `CLAUDE.md`.
