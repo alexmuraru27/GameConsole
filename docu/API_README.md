@@ -103,6 +103,12 @@ Serves assets out of the `.pak` bound to the running game. The game loader opens
 - `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Look up an asset's `id`, `size`, and `crc32` without loading it (e.g. to size a buffer).
 - `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
 
+### Settings
+Persistent per-game storage in the EEPROM, keyed by the running game's `.bin` name. A game opts in by setting `has_settings` in its `DECLARE_GAME_BINARY_HEADER`; the loader then binds a 1 KB save slot (created on first need), so the game never names a file. All three return a `SettingsStorageStatus` (`0` = `OK`; `NOT_FOUND` on first run, `STORAGE_FULL` when no slot is free, etc. — see `Shared/Api/settings_interface.h`).
+- `settingsWrite(version, *data, size)`: Persist up to `SETTINGS_GAME_MAX_DATA` (1018) bytes tagged with a struct version.
+- `settingsRead(expected_version, *buffer, *size)`: Load the save; `*size` is in=capacity / out=actual, and a version bump yields `VERSION_MISMATCH`.
+- `settingsClear()`: Delete this game's save.
+
 ### Fonts
 The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are drawn by games through the API — no game ships glyph data. Types (`Font`, `FontSize`) are in `Shared/Api/font_interface.h`.
 - `fontGlyphW(size)` / `fontGlyphH(size)`: glyph dimensions for `FONT_3x5` / `FONT_5x5` / `FONT_8x8`.

@@ -2,6 +2,7 @@
 #include "ff.h"
 #include "loader.h"
 #include "asset_loader.h"
+#include "settings_storage.h"
 #include "logger.h"
 #include "sysclock.h"
 #include <string.h>
@@ -95,6 +96,25 @@ static void bindGamePak(void)
     assetLoaderOpenPak(pak_name);
 }
 
+/* If the game declares it persists settings, bind a save slot keyed by its .bin
+ * name (created on first need). The game then reaches it via the settings
+ * ConsoleAPI; the binding is dropped when the game returns. */
+static void bindGameSettings(void)
+{
+    if (!s_game_header.has_settings)
+    {
+        return;
+    }
+
+    const FILINFO *finfo = loaderGetFileInfo();
+    if (finfo == NULL)
+    {
+        return;
+    }
+
+    settingsStorageBindGame(finfo->fname);
+}
+
 uint8_t gameLoaderLoadGame(uint8_t binary_index)
 {
     FRESULT res;
@@ -158,6 +178,9 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
         // requests during gameplay resolve against this game's .pak.
         bindGamePak();
 
+        // Bind this game's settings slot (no-op unless the header opts in).
+        bindGameSettings();
+
         LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
 
         // Set PSP to the game's stack and switch Thread mode to use PSP.
@@ -183,6 +206,7 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 
         LOGGER_LOG_INFO(LOGGER_LOADER, "game returned to console");
 
+        settingsStorageUnbindGame();
         assetLoaderClosePak();
         loaderCloseFile();
     }

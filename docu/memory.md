@@ -105,16 +105,19 @@ The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a
 
 ## EEPROM layout
 
-AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c` with CRC-16 protection.
+AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c`, split into a **16 KB console partition** and a **48 KB games partition**. Every persisted record ends in a CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`).
 
-| Offset | Size   | Content                                                                      |
-| ------ | ------ | ---------------------------------------------------------------------------- |
-| 0x0000 | 0x0200 | **System header** — version magic, entry count, CRC                          |
-| 0x0200 | 0x01FE | **Directory** — 30 entries × 17 bytes (game ID, active flag, CRC per entry)  |
-| 0x0400 | 0x0400 | **Console settings** — `ConsoleSettings` struct (audio enabled flag)         |
-| 0x0800 | 0x7800 | **Data blocks** — 30 × 1024-byte `SettingsEntity` slots (version, data, CRC) |
+**Console partition — 16 KB (0x0000–0x3FFF)**
 
-All writes are CRC-16-CCITT validated (polynomial `0x1021`, initial `0xFFFF`). Corrupt directory entries or data blocks are auto-cleaned on init by `sanityCleanup()`.
+| Offset | Size   | Content                                                                          |
+| ------ | ------ | -------------------------------------------------------------------------------- |
+| 0x0000 | 0x0100 | **System header** — magic/version, game count, monotonic write sequence, CRC     |
+| 0x0100 | 0x0F00 | **Game directory** — 48 × `GameDirectoryEntry` (name key, state, write seq, CRC) |
+| 0x1000 | 0x3000 | **Console settings** — one entity (version, data, CRC); remainder reserved       |
+
+**Games partition — 48 KB (0x4000–0xFFFF)**: 48 × 1 KB slots; directory entry *i* ↔ data slot *i*. Each slot holds a `GameDataEntity` (version, size, ≤1018 B data, CRC).
+
+Game saves are keyed by the game's `.bin` name (extension stripped, matched case-insensitively). A game declares `has_settings` in its binary header; the loader then binds a slot for it (created on first need) and the running game reads/writes it through the settings `ConsoleAPI`. When all 48 slots are taken, writes return `STORAGE_FULL` — nothing is evicted automatically; callers free space via the list / delete / evict-oldest APIs. Corrupt directory entries or data slots are freed automatically on init by `settingsStorageCleanupCorrupted()`.
 
 ## Linker scripts
 

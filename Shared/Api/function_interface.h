@@ -47,6 +47,12 @@ typedef struct
     uint8_t (*assetLoaderGetAssetMetadata)(uint32_t asset_id, AssetMetaData *asset_metadata_out);
     uint8_t (*assetLoaderGetAssetData)(uint32_t asset_id, uint8_t *const buffer, const uint32_t buffer_size_bytes);
 
+    // SETTINGS (persisted for the running game, keyed by its .bin name; bound by the loader).
+    // Return values are SettingsStorageStatus (0 == OK); size is in=capacity / out=actual on read.
+    uint8_t (*settingsRead)(uint16_t expected_version, uint8_t *buffer, uint16_t *size);
+    uint8_t (*settingsWrite)(uint16_t version, const uint8_t *data, uint16_t size);
+    uint8_t (*settingsClear)(void);
+
     // FONTS (glyph data lives once in console flash; games draw text through these)
     uint16_t (*fontGlyphW)(FontSize size);
     uint16_t (*fontGlyphH)(FontSize size);

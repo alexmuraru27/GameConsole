@@ -16,10 +16,12 @@ typedef struct
     uint32_t bss_end;
     uint32_t stack_top;
     uint32_t entry_point;
+    uint32_t has_settings; // non-zero if the game persists settings (loader reserves a save slot)
 } GameBinaryHeader;
 
-// MAGIC = GAME in ASCII
-#define DECLARE_GAME_BINARY_HEADER(entry_func)                          \
+// MAGIC = GAME in ASCII. `has_settings` is non-zero when the game uses the
+// settings API; the loader then binds a save slot keyed by the game's .bin name.
+#define DECLARE_GAME_BINARY_HEADER(entry_func, game_has_settings)       \
     extern uint32_t __game_header_start, __game_header_end;             \
     extern uint32_t __game_text_start, __game_text_end;                 \
     extern uint32_t __game_ro_data_start, __game_ro_data_end;           \
@@ -40,6 +42,7 @@ typedef struct
         .bss_start = (uint32_t)&__game_data_no_init_start,              \
         .bss_end = (uint32_t)&__game_data_no_init_end,                  \
         .stack_top = (uint32_t)&_estack,                                \
-        .entry_point = (uint32_t)&entry_func}
+        .entry_point = (uint32_t)&entry_func,                           \
+        .has_settings = (game_has_settings)}
 
 #endif

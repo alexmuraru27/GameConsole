@@ -10,7 +10,7 @@ void externalEepromInit(const uint32_t device_address)
     s_device_address = device_address;
 }
 
-static uint8_t externalEepromWritePage(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
+static uint8_t externalEepromWritePage(const uint16_t mem_addr, const uint8_t *const data, const uint16_t length)
 {
     if (data == NULL || length == 0U || length > EXTERNAL_EEPROM_AT24C512_PAGE_SIZE)
     {
@@ -62,9 +62,12 @@ static uint8_t externalEepromWritePage(const uint16_t mem_addr, uint8_t *const d
     return I2C_OK;
 }
 
-uint8_t externalEepromWrite(const uint16_t mem_addr, uint8_t *const data, const uint16_t length)
+uint8_t externalEepromWrite(const uint16_t mem_addr, const uint8_t *const data, const uint16_t length)
 {
-    if (data == NULL || length == 0U || mem_addr > EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR)
+    // Reject a write that would run past the end of the device. The end address
+    // is computed in 32-bit math so the check itself can't overflow a uint16_t.
+    if (data == NULL || length == 0U ||
+        ((uint32_t)mem_addr + length - 1U) > EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR)
     {
         return I2C_ERROR;
     }
@@ -181,18 +184,36 @@ uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const u
     return I2C_OK;
 }
 
-uint8_t externalEepromClear()
+uint8_t externalEepromClearRange(const uint16_t mem_addr, const uint32_t length)
 {
-    uint8_t data[EXTERNAL_EEPROM_AT24C512_PAGE_SIZE] = {0U};
-    I2C_Status_t status;
-    for (uint16_t i = 0U; i <= EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR / EXTERNAL_EEPROM_AT24C512_PAGE_SIZE; i++)
+    if (((uint32_t)mem_addr + length) > ((uint32_t)EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR + 1U))
     {
-        status = externalEepromWrite(i * EXTERNAL_EEPROM_AT24C512_PAGE_SIZE, data, EXTERNAL_EEPROM_AT24C512_PAGE_SIZE);
+        return I2C_ERROR;
+    }
+
+    const uint8_t zero_page[EXTERNAL_EEPROM_AT24C512_PAGE_SIZE] = {0U};
+    uint32_t cleared = 0U;
+
+    while (cleared < length)
+    {
+        const uint32_t remaining = length - cleared;
+        const uint16_t chunk = (remaining < EXTERNAL_EEPROM_AT24C512_PAGE_SIZE)
+                                   ? (uint16_t)remaining
+                                   : EXTERNAL_EEPROM_AT24C512_PAGE_SIZE;
+
+        const uint8_t status = externalEepromWrite((uint16_t)(mem_addr + cleared), zero_page, chunk);
         if (status != I2C_OK)
         {
             return status;
         }
+
+        cleared += chunk;
     }
 
     return I2C_OK;
+}
+
+uint8_t externalEepromClear()
+{
+    return externalEepromClearRange(0U, (uint32_t)EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR + 1U);
 }

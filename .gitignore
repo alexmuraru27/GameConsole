@@ -59,6 +59,5 @@ GeneratedTiles/
 *.pak
 *AssetEnum.h
 
-CLAUDE.md
 .claude
 __pycache__

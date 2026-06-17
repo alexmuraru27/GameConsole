@@ -26,6 +26,24 @@
 extern uint32_t __game_console_api_start; // Linker symbol
 #define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
 
+/* Game-facing settings shims: route the running game's read/write/clear to its
+ * bound save slot and narrow the SettingsStorageStatus result to the uint8_t the
+ * ConsoleAPI table exposes (0 == OK). */
+static uint8_t apiSettingsRead(uint16_t expected_version, uint8_t *buffer, uint16_t *size)
+{
+    return (uint8_t)settingsStorageCurrentGameRead(expected_version, buffer, size);
+}
+
+static uint8_t apiSettingsWrite(uint16_t version, const uint8_t *data, uint16_t size)
+{
+    return (uint8_t)settingsStorageCurrentGameWrite(version, data, size);
+}
+
+static uint8_t apiSettingsClear(void)
+{
+    return (uint8_t)settingsStorageCurrentGameDelete();
+}
+
 static void gameConsoleExposeApi()
 {
     const ConsoleAPI api =
@@ -70,6 +88,10 @@ static void gameConsoleExposeApi()
             // ASSETS
             .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
             .assetLoaderGetAssetData = &assetLoaderGetAssetData,
+            // SETTINGS
+            .settingsRead = &apiSettingsRead,
+            .settingsWrite = &apiSettingsWrite,
+            .settingsClear = &apiSettingsClear,
             // FONTS
             .fontGlyphW = &fontGlyphW,
             .fontGlyphH = &fontGlyphH,
@@ -81,7 +103,7 @@ static void gameConsoleExposeApi()
 
     const ConsoleAPIHeader api_header = {
         .magic = API_MAGIC,
-        .version = 1U,
+        .version = 2U, /* v2: added the SETTINGS calls */
         .api = api};
 
     *API_PTR = api_header;
