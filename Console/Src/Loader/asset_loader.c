@@ -1,9 +1,9 @@
 #include "asset_loader.h"
-#include "asset_format.h"
+#include "pak_format.h"
 #include "crc.h"
 #include "logger.h"
 #include "ff.h"
-#include <string.h>
+#include <stddef.h>
 
 /*
  * Asset loader: serves asset blobs out of the .pak bound to the running game.
@@ -13,7 +13,7 @@
  * Games never see the pak — they ask for an asset by id and the loader resolves
  * the entry, copies the blob into their buffer, and verifies its CRC32.
  *
- * On-disk layout (asset_format.h): PakHeader (24B) | PakEntry[] | raw blobs.
+ * On-disk layout (pak_format.h): PakHeader (24B) | PakEntry[] | raw blobs.
  */
 
 /* Entries scanned per f_read while resolving an id (256 B of stack). */
@@ -120,23 +120,6 @@ static uint8_t findEntry(uint32_t asset_id, PakEntry *const entry_out)
     }
 
     return ASSET_LOADER_RET_ASSET_NOT_FOUND;
-}
-
-uint8_t assetLoaderGetAssetHeader(AssetHeader *asset_header_out)
-{
-    if (!s_is_pak_open)
-    {
-        return ASSET_LOADER_RET_NO_PAK;
-    }
-    if (asset_header_out == NULL)
-    {
-        return ASSET_LOADER_RET_ERR;
-    }
-
-    memcpy(asset_header_out->magic, &s_pak_header.magic, sizeof(asset_header_out->magic));
-    asset_header_out->version = s_pak_header.version;
-    asset_header_out->asset_count = s_pak_header.assetCount;
-    return ASSET_LOADER_RET_OK;
 }
 
 uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_metadata_out)

@@ -44,7 +44,6 @@ typedef struct
     uint16_t (*rendererSystemColor)(uint8_t system_index);
 
     // ASSETS
-    uint8_t (*assetLoaderGetAssetHeader)(AssetHeader *asset_header_out);
     uint8_t (*assetLoaderGetAssetMetadata)(uint32_t asset_id, AssetMetaData *asset_metadata_out);
     uint8_t (*assetLoaderGetAssetData)(uint32_t asset_id, uint8_t *const buffer, const uint32_t buffer_size_bytes);
 

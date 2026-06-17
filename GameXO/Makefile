@@ -81,11 +81,20 @@ PAK        = $(PAK_DIR)/$(TARGET).pak
 ASSET_ENUM = $(PAK_DIR)/$(TARGET)AssetEnum.h
 ASSET_BINS = $(wildcard $(ASSET_DIR)/Graphics/*.bin $(ASSET_DIR)/Music/*.bin)
 
-# The enum header is a by-product of the same packer run as the .pak.
+# The enum header is a by-product of the same packer run as the .pak. The .pak
+# is re-packed on every build via the FORCE prerequisite — assets are edited in
+# place under Assets/, so we never want make to skip the packer just because the
+# committed .pak looks newer than its inputs. FORCE has no recipe and no matching
+# file, so it is always considered out of date. The packer is cheap; re-packing
+# rewrites GameXOAssetEnum.h, so the lone source that includes it recompiles and
+# the game relinks each build, but unrelated objects are untouched.
 $(ASSET_ENUM): $(PAK)
-$(PAK): $(MANIFEST) $(ASSET_BINS)
+$(PAK): $(MANIFEST) $(ASSET_BINS) FORCE
 	@mkdir -p $(PAK_DIR)
 	$(PACKER) $(MANIFEST) --output-name $(TARGET) --output-dir $(PAK_DIR) --assets-root $(ASSET_DIR)
+
+FORCE:
+.PHONY: FORCE
 
 pak: $(PAK)
 

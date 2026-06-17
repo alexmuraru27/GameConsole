@@ -4,7 +4,7 @@
 emits a C enum of their ids. A game loads the one `.pak` from the SD card and
 looks assets up by id instead of shipping dozens of loose `.bin` files.
 
-The on-disk format is defined once, in C, in [`asset_format.h`](asset_format.h).
+The on-disk format is defined once, in C, in [`pak_format.h`](pak_format.h).
 That header is the contract: the packer writes bytes that match it exactly, and
 console/game code includes it to read them back.
 
@@ -23,7 +23,7 @@ directory:
 | `Level1.pak`        | The binary container (header + entries + raw asset blobs).               |
 | `Level1AssetEnum.h` | `typedef enum { ... } Level1AssetId;` mapping each asset name to its id. |
 
-The game includes `Level1AssetEnum.h` (for the ids) and `asset_format.h` (for the
+The game includes `Level1AssetEnum.h` (for the ids) and `pak_format.h` (for the
 `PakHeader` / `PakEntry` structs) to read the pak at runtime.
 
 The enum type is named after the output (`Level1AssetId`, `<name>AssetId` in
@@ -83,7 +83,7 @@ so a corrupt pak is never emitted.
 ## Binary layout
 
 All fields are little-endian `uint32`. Because every field is a `uint32`, the
-structs in `asset_format.h` are naturally contiguous (no padding) and map directly
+structs in `pak_format.h` are naturally contiguous (no padding) and map directly
 onto the file bytes.
 
 ```
@@ -176,7 +176,7 @@ and point at any `.pak` bytes.
 ## Using a pak from C
 
 ```c
-#include "asset_format.h"
+#include "pak_format.h"
 #include "Level1AssetEnum.h"   // ASSET_PLAYER_CHR, ..., Level1AssetId
 
 // pak_base points at the loaded .pak file bytes.
@@ -196,19 +196,19 @@ static const uint8_t *asset_data(const uint8_t *pak_base, Level1AssetId id, uint
 
 ## Code layout
 
-The logic lives in the `pak` package; `packer.py` is just the CLI front end:
+The logic lives in the `assetpacker` package; `packer.py` is just the CLI front end:
 
-| File              | Responsibility                                                                  |
-| ----------------- | ------------------------------------------------------------------------------- |
-| `pak/format.py`   | Constants, struct layouts, CRC helpers (the Python mirror of `asset_format.h`). |
-| `pak/manifest.py` | Manifest model + YAML loader/validation.                                        |
-| `pak/builder.py`  | `build_pak()` — assemble the container bytes.                                   |
-| `pak/verify.py`   | `verify_pak()` — re-parse and validate.                                         |
-| `pak/codegen.py`  | `render_enum_header()` — the C asset-id enum.                                   |
-| `pak/report.py`   | `format_summary()` — the printed summary.                                       |
-| `packer.py`       | Argument parsing and orchestration.                                             |
+| File                      | Responsibility                                                                |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `assetpacker/format.py`   | Constants, struct layouts, CRC helpers (the Python mirror of `pak_format.h`). |
+| `assetpacker/manifest.py` | Manifest model + YAML loader/validation.                                      |
+| `assetpacker/builder.py`  | `build_pak()` — assemble the container bytes.                                 |
+| `assetpacker/verify.py`   | `verify_pak()` — re-parse and validate.                                       |
+| `assetpacker/codegen.py`  | `render_enum_header()` — the C asset-id enum.                                 |
+| `assetpacker/report.py`   | `format_summary()` — the printed summary.                                     |
+| `packer.py`               | Argument parsing and orchestration.                                           |
 
-You can also use the library directly: `from pak import build_pak, verify_pak`.
+You can also use the library directly: `from assetpacker.builder import build_pak`.
 
 ## Example
 

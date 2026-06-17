@@ -5,8 +5,8 @@ Reads a YAML manifest of assets (id, name, path), writes ``<name>.pak`` and a
 ``<name>AssetEnum.h`` C header, and prints a summary. The pak is self-verified
 before anything is written to disk.
 
-The format and all logic live in the ``pak`` package; this file is just the CLI.
-See README.md for the manifest format, binary layout, and CRC details.
+The format and all logic live in the ``assetpacker`` package; this file is just
+the CLI. See README.md for the manifest format, binary layout, and CRC details.
 """
 
 from __future__ import annotations
@@ -15,14 +15,12 @@ import argparse
 import sys
 from pathlib import Path
 
-from pak import (
-    PakError,
-    build_pak,
-    format_summary,
-    load_manifest,
-    render_enum_header,
-    verify_pak,
-)
+from assetpacker.builder import build_pak
+from assetpacker.codegen import render_enum_header
+from assetpacker.errors import PakError
+from assetpacker.manifest import load_manifest
+from assetpacker.report import format_summary
+from assetpacker.verify import verify_pak
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

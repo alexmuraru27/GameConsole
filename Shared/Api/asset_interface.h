@@ -5,18 +5,10 @@
 #include "stdbool.h"
 
 /*
- * Game-facing view of an asset pak. These mirror the relevant fields of the
- * on-disk .pak format (tools/packer/asset_format.h), which the console parses on
+ * Game-facing view of an asset pak. This mirrors the relevant fields of the
+ * on-disk .pak format (tools/packer/pak_format.h), which the console parses on
  * the game's behalf — games never read the SD card or the raw pak directly.
  */
-
-/* Summary of the .pak bound to the running game (from its PakHeader). */
-typedef struct
-{
-    char magic[4];        /* "PAK1" */
-    uint32_t version;     /* pak format version */
-    uint32_t asset_count; /* number of assets in the pak */
-} __attribute__((packed, aligned(1))) AssetHeader;
 
 /* Per-asset descriptor (from the matching PakEntry). */
 typedef struct

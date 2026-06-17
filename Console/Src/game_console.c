@@ -70,7 +70,6 @@ static void gameConsoleExposeApi()
             // ASSETS
             .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
             .assetLoaderGetAssetData = &assetLoaderGetAssetData,
-            .assetLoaderGetAssetHeader = &assetLoaderGetAssetHeader,
             // FONTS
             .fontGlyphW = &fontGlyphW,
             .fontGlyphH = &fontGlyphH,

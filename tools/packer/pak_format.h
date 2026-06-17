@@ -1,5 +1,5 @@
-#ifndef ASSET_FORMAT_H
-#define ASSET_FORMAT_H
+#ifndef PAK_FORMAT_H
+#define PAK_FORMAT_H
 
 #include <stdint.h>
 
@@ -39,4 +39,4 @@ typedef struct
     PakEntry entries[];  /* assetCount entries, followed by the raw blobs */
 } PakHeader;
 
-#endif /* ASSET_FORMAT_H */
+#endif /* PAK_FORMAT_H */

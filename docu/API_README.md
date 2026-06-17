@@ -99,8 +99,7 @@ The full sprite-submission surface is exposed through `ConsoleAPI`, so loaded ga
 - `rendererSystemColor(index)`: map a Pixel Forge system-palette index (0-63) to RGB565 — used to turn a loaded `GfxAsset`'s index palette into a render-ready RGB565 palette.
 
 ### Asset Loader
-Serves assets out of the `.pak` bound to the running game. The game loader opens `<game>.pak` (same base name as the `.bin`) when the game starts and keeps it open for the game's lifetime, so a game never names a file — it just asks by id. All three calls return `ASSET_LOADER_RET_OK` (`0`) on success; see `Console/Inc/Loader/asset_loader.h` for the other return codes.
-- `assetLoaderGetAssetHeader(*header)`: Read the bound pak's header (`magic`, `version`, `asset_count`).
+Serves assets out of the `.pak` bound to the running game. The game loader opens `<game>.pak` (same base name as the `.bin`) when the game starts and keeps it open for the game's lifetime, so a game never names a file — it just asks by id. Both calls return `ASSET_LOADER_RET_OK` (`0`) on success; see `Console/Inc/Loader/asset_loader.h` for the other return codes.
 - `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Look up an asset's `id`, `size`, and `crc32` without loading it (e.g. to size a buffer).
 - `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
 
@@ -156,7 +155,6 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 - The game loader calls `assetLoaderOpenPak()`/`assetLoaderClosePak()` to bind/unbind `<game>.pak` around the game's run; the handle stays open so reads seek straight into the file.
 - Internal functions:
   - `assetLoaderOpenPak()` / `assetLoaderClosePak()` / `assetLoaderIsPakOpen()`: Bind, unbind, and query the active pak (driven by the game loader).
-  - `assetLoaderGetAssetHeader()`: Read the bound pak's header.
   - `assetLoaderGetAssetMetadata()`: Look up an asset's id/size/crc32 by id.
   - `assetLoaderGetAssetData()`: Copy an asset blob into a caller buffer and verify its CRC32.
 
@@ -309,7 +307,6 @@ See `README.md` for license and authorship.
 - **Key Functions:**
   - `assetLoaderGetAssetMetadata(asset_id, *metadata)`: Get an asset's `id`/`size`/`crc32`.
   - `assetLoaderGetAssetData(asset_id, *buffer, buffer_size)`: Load (and CRC-verify) asset data into a buffer.
-  - `assetLoaderGetAssetHeader(*header)`: Get the bound pak's header.
 - **Usage Example:**
   ```c
   AssetMetaData meta;

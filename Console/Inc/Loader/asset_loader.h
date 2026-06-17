@@ -29,10 +29,9 @@ void assetLoaderClosePak(void);
 bool assetLoaderIsPakOpen(void);
 
 /*
- * Game-facing API, exposed through the ConsoleAPI table. All three operate on the
+ * Game-facing API, exposed through the ConsoleAPI table. Both operate on the
  * currently bound pak and return ASSET_LOADER_RET_NO_PAK if none is bound.
  */
-uint8_t assetLoaderGetAssetHeader(AssetHeader *asset_header_out);
 uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_metadata_out);
 uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *const buffer, const uint32_t buffer_size_bytes);
 
