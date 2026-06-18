@@ -143,6 +143,11 @@ static void remoteRender(void)
 
 static void enterScreen(MenuScreen screen)
 {
+    static const char *const k_screen_names[] = {
+        [SCREEN_ROOT] = "root", [SCREEN_GAMES] = "games",
+        [SCREEN_SETTINGS] = "settings", [SCREEN_REMOTE] = "remote"};
+    LOGGER_LOG_DEBUG(LOGGER_MENU, "enter screen: %s", k_screen_names[screen]);
+
     s_screen = screen;
     switch (screen)
     {

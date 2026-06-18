@@ -77,11 +77,13 @@ static void beep_step(uint8_t step)
 static void coreInit()
 {
     swoInit(2000000);
+    LOGGER_LOG_INFO(LOGGER_CORE, "=== GameConsole boot ===");
     faultsInit();   /* enable + decode MemManage/Bus/Usage faults once SWO is up */
     syscallInit();  /* set SVC/PendSV priorities for the game syscall trap */
     gpioInit();
     timerInit();
     buzzerInit();
+    LOGGER_LOG_INFO(LOGGER_CORE, "core up: trace/faults/syscall/gpio/timers/buzzer");
 }
 
 /* The I2C storage stack (EEPROM + settings). Brought up on its own, before any
@@ -92,6 +94,7 @@ static void storageInit()
     i2cInit();
     externalEepromInit(EXTERNAL_EEPROM_AT24C512_ADDRESS);
     settingsStorageInit();
+    LOGGER_LOG_INFO(LOGGER_CORE, "storage up: I2C/EEPROM/settings");
 }
 
 /* Apply the persisted console settings to the hardware. Runs before the boot
@@ -113,6 +116,7 @@ static void peripheralsInit()
     usartInit();
     beep_step(2);
     adcInit();
+    LOGGER_LOG_INFO(LOGGER_CORE, "peripherals up: DMA/USART/ADC");
 }
 
 static void devicesInit()
@@ -126,6 +130,7 @@ static void devicesInit()
     beep_step(6);
     loaderMediaInit();
     beep_step(7);
+    LOGGER_LOG_INFO(LOGGER_CORE, "devices up: display/renderer/joystick/SD");
 }
 
 void gameConsoleInit()
@@ -139,4 +144,5 @@ void gameConsoleInit()
     mpuInit(); /* arm MPU confinement before any game can run */
     beep_step(8);
     playBootSong();
+    LOGGER_LOG_INFO(LOGGER_CORE, "console ready");
 }

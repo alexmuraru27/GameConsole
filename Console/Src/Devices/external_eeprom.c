@@ -2,12 +2,14 @@
 #include "i2c.h"
 #include "sysclock.h"
 #include "stddef.h"
+#include "logger.h"
 
 static uint32_t s_device_address = 0U;
 
 void externalEepromInit(const uint32_t device_address)
 {
     s_device_address = device_address;
+    LOGGER_LOG_INFO(LOGGER_EEPROM, "init: device addr 0x%02lX", (unsigned long)device_address);
 }
 
 static uint8_t externalEepromWritePage(const uint16_t mem_addr, const uint8_t *const data, const uint16_t length)
@@ -69,6 +71,7 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, const uint8_t *const data, 
     if (data == NULL || length == 0U ||
         ((uint32_t)mem_addr + length - 1U) > EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR)
     {
+        LOGGER_LOG_ERROR(LOGGER_EEPROM, "write rejected: addr=0x%04X len=%u data=%p", (unsigned)mem_addr, (unsigned)length, (const void *)data);
         return I2C_ERROR;
     }
 
@@ -94,6 +97,7 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, const uint8_t *const data, 
 
         if (status != I2C_OK)
         {
+            LOGGER_LOG_ERROR(LOGGER_EEPROM, "write failed @ 0x%04X (%u/%u bytes): i2c=%u", (unsigned)current_addr, (unsigned)bytes_written, (unsigned)length, (unsigned)status);
             return status;
         }
 
@@ -104,6 +108,7 @@ uint8_t externalEepromWrite(const uint16_t mem_addr, const uint8_t *const data, 
         delay(5U);
     }
 
+    LOGGER_LOG_DEBUG(LOGGER_EEPROM, "write ok: %u bytes @ 0x%04X", (unsigned)length, (unsigned)mem_addr);
     return I2C_OK;
 }
 
@@ -111,6 +116,7 @@ uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const u
 {
     if (mem_addr > EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR)
     {
+        LOGGER_LOG_ERROR(LOGGER_EEPROM, "read rejected: addr=0x%04X out of range", (unsigned)mem_addr);
         return I2C_ERROR;
     }
 
@@ -181,6 +187,7 @@ uint8_t externalEepromRead(const uint16_t mem_addr, uint8_t *const data, const u
             }
         }
     }
+    LOGGER_LOG_DEBUG(LOGGER_EEPROM, "read ok: %u bytes @ 0x%04X", (unsigned)length, (unsigned)mem_addr);
     return I2C_OK;
 }
 

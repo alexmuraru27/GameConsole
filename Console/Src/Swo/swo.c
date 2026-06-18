@@ -1,4 +1,5 @@
 #include "swo.h"
+#include "logger.h"
 
 void swoInit(uint32_t swoFreqHz)
 {
@@ -21,4 +22,7 @@ void swoInit(uint32_t swoFreqHz)
     ITM->TER = 1;
 
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+    /* SWO/ITM is live from here — this is the first line that can be traced. */
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "SWO/ITM up @ %lu Hz", (unsigned long)swoFreqHz);
 }

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "sysclock.h"
 #include "sdio.h"
+#include "logger.h"
 
 #define CMD41 41 // SD_SEND_OP_COND (ACMD)
 
@@ -29,6 +30,7 @@ void sdioInit(void)
 
     // Configure timeouts
     SDIO->DTIMER = 0xFFFFFFFF; // Maximum data timeout
+    LOGGER_LOG_INFO(LOGGER_SDIO, "init: powered on, 400kHz init clock");
 }
 
 void sdioRaiseClock(void)
@@ -37,6 +39,7 @@ void sdioRaiseClock(void)
     // CLKDIV = 22 → 48/(22+2) = 2 MHz
     SDIO->CLKCR = (SDIO->CLKCR & ~0xFF) | 22U;
     delay(10U);
+    LOGGER_LOG_DEBUG(LOGGER_SDIO, "clock raised to 2MHz transfer speed");
 }
 
 uint8_t sdSwitchTo4bitMode(const uint32_t rca)
@@ -47,6 +50,7 @@ uint8_t sdSwitchTo4bitMode(const uint32_t rca)
     ret = sdioSendCommand(CMD55, rca, SD_RESP_SHORT);
     if (ret != SD_OK)
     {
+        LOGGER_LOG_ERROR(LOGGER_SDIO, "4-bit mode: CMD55 failed (%u)", (unsigned)ret);
         return ret;
     }
 
@@ -54,11 +58,13 @@ uint8_t sdSwitchTo4bitMode(const uint32_t rca)
     ret = sdioSendCommand(ACMD6, 2, SD_RESP_SHORT);
     if (ret != SD_OK)
     {
+        LOGGER_LOG_ERROR(LOGGER_SDIO, "4-bit mode: ACMD6 failed (%u)", (unsigned)ret);
         return ret;
     }
 
     // Update SDIO controller for 4-bit mode
     SDIO->CLKCR |= SDIO_CLKCR_WIDBUS_0; // Set 4-bit mode
+    LOGGER_LOG_DEBUG(LOGGER_SDIO, "switched to 4-bit bus mode");
     return SD_OK;
 }
 
@@ -184,11 +190,12 @@ uint8_t sdioSendRobustAcmd41(void)
         // Check if card is ready (bit 31 set)
         if (response & 0x80000000)
         {
-
+            LOGGER_LOG_DEBUG(LOGGER_SDIO, "ACMD41 ready after %lu attempt(s)", (unsigned long)attempt);
             return SD_OK;
         }
 
         delay(25); // 25ms delay between attempts
     }
+    LOGGER_LOG_ERROR(LOGGER_SDIO, "ACMD41 timeout after %lu attempt(s)", (unsigned long)attempt);
     return SD_TIMEOUT;
 }

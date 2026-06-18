@@ -1,5 +1,6 @@
 #include "gpio.h"
 #include <stm32f407xx.h>
+#include "logger.h"
 
 static void initGpioUsart3()
 {
@@ -238,4 +239,5 @@ void gpioInit(void)
     initSdio();
     initI2C1();
     initGpioFsmc();
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "gpio init: joystick/ADC/buzzer/SDIO/I2C/FSMC pins");
 }

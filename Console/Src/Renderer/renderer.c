@@ -3,6 +3,7 @@
 #include "ILI9341.h"
 #include "sysclock.h"
 #include "stdio.h"
+#include "logger.h"
 
 /* The renderer is the per-frame hot path, so it is compiled optimised even in
  * debug builds; the rest of the firmware stays at -Og for debuggability. */
@@ -109,6 +110,8 @@ void rendererInit(void)
         bool full2 = (b & 0xC0U) && (b & 0x30U) && (b & 0x0CU) && (b & 0x03U);
         s_byte_full_2bpp[b] = full2 ? 1U : 0U;
     }
+    /* Init only — the per-frame render path is never logged (hot loop). */
+    LOGGER_LOG_INFO(LOGGER_RENDERER, "init: %ux%u RGB565, 3 layers", (unsigned)rendererGetWidthPixels(), (unsigned)rendererGetHeightPixels());
 }
 
 /* Start a new frame: drop every layer. Only the counts need clearing — a layer

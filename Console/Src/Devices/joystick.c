@@ -2,6 +2,7 @@
 #include "adc.h"
 #include "gpio.h"
 #include "sysclock.h"
+#include "logger.h"
 #include <stdio.h>
 // Button bits (within s_btn_data)
 typedef enum JoystickBtnBit
@@ -155,6 +156,7 @@ void joystickInit(void)
         s_analog_debounce_timer[i] = now;
     }
     s_initialized = true;
+    LOGGER_LOG_INFO(LOGGER_JOYSTICK, "init: %u buttons, %u analog axes", (unsigned)BTN_COUNT, (unsigned)ANALOG_COUNT);
 }
 
 bool joystickGetRBtnUp(void)

@@ -1,5 +1,6 @@
 #include "adc.h"
 #include <stm32f407xx.h>
+#include "logger.h"
 
 #define ADC_BUFFER_SIZE 4U
 volatile uint16_t g_adc_buffer[ADC_BUFFER_SIZE] = {0U};
@@ -46,4 +47,5 @@ void adcInit(void)
 
     // start ADC conversion
     ADC1->CR2 |= ADC_CR2_SWSTART;
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "ADC1 init: %u channels (CH10-13), DMA circular", (unsigned)ADC_BUFFER_SIZE);
 }

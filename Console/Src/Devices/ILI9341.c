@@ -261,6 +261,7 @@ void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height
     ili9341SetDisplayRotation(rotation, window_width, window_height);
 
     ili9341FillScreen(ILI9341_BLACK);
+    LOGGER_LOG_INFO(LOGGER_DISPLAY, "ILI9341 init: %ux%u, rotation %u", (unsigned)window_width, (unsigned)window_height, (unsigned)rotation);
 }
 
 void ili9341DrawScanlines(const uint8_t lines, const uint16_t lines_offset, const uint16_t array_size, const uint16_t *data)

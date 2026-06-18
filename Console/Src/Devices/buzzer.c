@@ -4,6 +4,7 @@
 #include "stm32f4xx.h"
 #include "timer.h"
 #include "stddef.h"
+#include "logger.h"
 
 #define SOUND_TRACKS 5
 #define INVALID_TRACK 255
@@ -38,6 +39,7 @@ void buzzerInit(void)
         s_track_data_queue[track_id].note_idx = 0U;
         s_track_data_queue[track_id].ms_counter = 0U;
     }
+    LOGGER_LOG_INFO(LOGGER_BUZZER, "init: %u tracks", (unsigned)SOUND_TRACKS);
 }
 
 static bool clearTrack(const uint8_t track_number)
@@ -165,6 +167,7 @@ bool buzzerStop(const uint8_t track_number)
 
 void buzzerStopAll()
 {
+    LOGGER_LOG_DEBUG(LOGGER_BUZZER, "stop all tracks");
     for (uint8_t track_number = 0U; track_number < SOUND_TRACKS; track_number++)
     {
         buzzerStop(track_number);
@@ -218,8 +221,10 @@ bool buzzerPlayWithFlag(const uint8_t track_number, const bool is_looped, const 
         s_track_data_queue[track_number].is_looped = is_looped;
         s_track_data_queue[track_number].is_playing = true;
         updatePWM(track_number);
+        LOGGER_LOG_DEBUG(LOGGER_BUZZER, "play track %u: %u notes, loop=%d", (unsigned)track_number, (unsigned)notes, (int)is_looped);
         return true;
     }
+    LOGGER_LOG_WARN(LOGGER_BUZZER, "play rejected: track=%u notes=%u data=%p", (unsigned)track_number, (unsigned)notes, (const void *)notes_data);
     return false;
 }
 
@@ -230,6 +235,7 @@ bool buzzerPlay(const uint8_t track_number, const bool is_looped, const uint16_t
 
 void buzzerSetMute(const bool muted)
 {
+    LOGGER_LOG_INFO(LOGGER_BUZZER, "mute=%d", (int)muted);
     s_muted = muted;
     if (muted)
     {

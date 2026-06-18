@@ -1,6 +1,7 @@
 #include "i2c.h"
 #include <stm32f407xx.h>
 #include "stddef.h"
+#include "logger.h"
 
 #define I2C_CCR_VALUE 0x23U   // Calculated for 400kHz with 42MHz APB1
 #define I2C_TRISE_VALUE 14U   // Rise time for fast mode
@@ -31,6 +32,7 @@ void i2cInit(void)
 
     // enable ack for the 1st operation
     I2C1->CR1 |= I2C_CR1_ACK;
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "I2C1 init: fast mode 400kHz");
 }
 
 I2C_Status_t i2cStart(void)

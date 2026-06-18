@@ -2,6 +2,7 @@
 #include "syscall.h"
 #include "syscall_numbers.h"
 #include "mpu.h"
+#include "logger.h"
 
 #include <stm32f407xx.h>
 
@@ -70,9 +71,22 @@ void kernelRunGame(uint32_t entry_point)
     s_game_crashed = false;
     s_game_active = true;
 
+    LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game @ 0x%08lX, psp=0x%08lX", (unsigned long)(entry_point & ~0x1U), (unsigned long)s_game_psp);
     mpuConfigureForGame();
     kernelTriggerLaunch();
     /* --- resumes here once the game has exited or crashed (via PendSV) --- */
+
+    /* Back in privileged thread context. Safe to log: the per-game lifecycle ends
+     * here, not on a hot path. (The leave itself happens in PendSV, which stays
+     * silent.) */
+    if (s_game_crashed)
+    {
+        LOGGER_LOG_ERROR(LOGGER_KERNEL, "game crashed; recovered to console");
+    }
+    else
+    {
+        LOGGER_LOG_INFO(LOGGER_KERNEL, "game exited cleanly");
+    }
 }
 
 /* Teardown shared by the clean-exit and crash paths. Runs in PendSV (privileged).

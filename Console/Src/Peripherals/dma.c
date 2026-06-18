@@ -2,6 +2,7 @@
 #include "adc.h"
 #include <stm32f407xx.h>
 #include <stdbool.h>
+#include "logger.h"
 
 static bool s_fsmc_dma_active = false;
 
@@ -77,4 +78,5 @@ void dmaInit(uint32_t fsmcDataAddress)
 {
     adc1DmaInit();
     fsmcDmaInit(fsmcDataAddress);
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "DMA init: ADC1 (DMA2 S0) + FSMC (DMA2 S6)");
 }

@@ -2,6 +2,7 @@
 #include "joystick.h"
 #include "buzzer.h"
 #include "stm32f407xx.h"
+#include "logger.h"
 
 void TIM6_DAC_IRQHandler()
 {
@@ -117,4 +118,5 @@ void timerInit(void)
     timer6Init();
     // timer 7 - period of 50ms
     timer7Init(50U);
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "timers init: TIM3 PWM (buzzer), TIM6 1ms, TIM7 50ms");
 }

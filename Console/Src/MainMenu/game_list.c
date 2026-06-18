@@ -105,10 +105,15 @@ MenuTransition gameListUpdate(void)
         menuResetSurface();
         if (result == GAME_LOADER_RET_CRASHED)
         {
+            LOGGER_LOG_WARN(LOGGER_MENU, "game '%s' crashed", s_names[s_selected]);
             s_crash_banner = true;
             s_crash_banner_until = getSysTime() + GL_CRASH_BANNER_MS;
             strncpy(s_crash_name, s_names[s_selected], sizeof(s_crash_name) - 1U);
             s_crash_name[sizeof(s_crash_name) - 1U] = '\0';
+        }
+        else
+        {
+            LOGGER_LOG_INFO(LOGGER_MENU, "game '%s' returned (code %u)", s_names[s_selected], (unsigned)result);
         }
     }
 

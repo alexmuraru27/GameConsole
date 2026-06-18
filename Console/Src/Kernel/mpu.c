@@ -1,6 +1,7 @@
 #include "mpu.h"
 #include <stm32f407xx.h>
 #include "mpu_armv7.h"
+#include "logger.h"
 
 /* GAME_RAM / CCM arena bounds come from common.ld. */
 extern uint32_t __game_ram_start;
@@ -22,6 +23,7 @@ void mpuInit(void)
      * gets only what later regions grant. No game is running yet, so no
      * unprivileged regions are programmed. */
     ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
+    LOGGER_LOG_INFO(LOGGER_KERNEL, "MPU enabled (PRIVDEFENA, no game regions yet)");
 }
 
 void mpuConfigureForGame(void)
@@ -42,6 +44,7 @@ void mpuConfigureForGame(void)
 
     __DSB();
     __ISB();
+    LOGGER_LOG_DEBUG(LOGGER_KERNEL, "MPU: game regions armed (GAME_RAM rwx, CCM rw/xn)");
 }
 
 void mpuReleaseGame(void)
