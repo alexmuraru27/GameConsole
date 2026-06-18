@@ -25,7 +25,14 @@ void TIM7_IRQHandler()
 
 void timer3Disable(void)
 {
+    // Stop the counter, then force the output compare to its inactive (low) level.
+    // Just clearing CEN freezes the counter and leaves PB5 driven at whatever the last
+    // comparison produced — which can be a constant 3.3V. The buzzer pin is AF push-pull,
+    // so that DC bias keeps current flowing through the passive buzzer and heats it up.
+    // OC2M = 0b100 (force inactive) drives OC2REF low independent of the counter, so with
+    // active-high polarity (CC2P = 0) PB5 is actively held at 0V while idle.
     TIM3->CR1 &= ~TIM_CR1_CEN;
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | TIM_CCMR1_OC2M_2;
 }
 
 void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
@@ -48,6 +55,8 @@ void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
     TIM3->PSC = psc;
     TIM3->ARR = arr - 1U;
     TIM3->CCR2 = (arr * duty) / 100U;
+    // Restore PWM mode 1 (timer3Disable forces the output to inactive/low when idle)
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1);
     TIM3->CR1 |= TIM_CR1_CEN;
 }
 

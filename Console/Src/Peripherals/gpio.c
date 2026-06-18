@@ -136,6 +136,10 @@ static void initGpioBuzzer()
     GPIOB->MODER |= GPIO_MODER_MODER5_1;
     GPIOB->AFR[0] &= ~(GPIO_AFRL_AFSEL5_Msk);
     GPIOB->AFR[0] |= (2U << GPIO_AFRL_AFSEL5_Pos);
+    // Internal pull-down so the buzzer pin is held at 0V during the reset/boot window,
+    // before the timer drives it — keeps it from floating high and biasing the buzzer.
+    GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD5);
+    GPIOB->PUPDR |= (2U << GPIO_PUPDR_PUPD5_Pos);
 }
 
 static void initSdio()
