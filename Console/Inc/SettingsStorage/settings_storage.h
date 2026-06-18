@@ -25,13 +25,13 @@ typedef struct
 
 /*
  * Settings storage — a small CRC-protected key/value store on the AT24C512
- * (64 KB) EEPROM, split into a 16 KB console partition and a 48 KB games
- * partition (see docu/memory.md for the on-EEPROM map).
+ * (64 KB) EEPROM, packed flat with no arbitrary padding (see docu/memory.md
+ * for the on-EEPROM map).
  *
- *   - The console keeps one settings blob (settingsStorageConsole*).
- *   - Each game gets a 1 KB slot keyed by its .bin name (settingsStorageGame*).
+ *   - The console keeps one 2 KB settings blob (settingsStorageConsole*).
+ *   - Each game gets a 2 KB slot keyed by its .bin name (settingsStorageGame*).
  *     A directory entry is created on demand (settingsStorageGameEnsure, or the
- *     first write). When all 48 slots are taken, writes return STORAGE_FULL —
+ *     first write). When all 29 slots are taken, writes return STORAGE_FULL —
  *     the store never evicts on its own; callers manage space with the listing
  *     / delete / evict-oldest helpers.
  *   - Corrupted entries are freed automatically on init and can be re-swept with
@@ -43,12 +43,6 @@ typedef struct
  *
  * Every function returns SETTINGS_STORAGE_STATUS_OK (0) on success.
  */
-
-/* Largest console-settings payload (single blob in the console partition). */
-#define SETTINGS_CONSOLE_MAX_DATA 1024U
-
-/* Number of game save slots (games partition size / per-slot size). */
-#define SETTINGS_GAME_SLOTS 48U
 
 /* ----- lifecycle ----- */
 SettingsStorageStatus settingsStorageInit(void);

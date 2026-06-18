@@ -25,7 +25,7 @@ typedef enum
     SETTINGS_STORAGE_STATUS_EEPROM_ERROR = 8U,     /* I2C / EEPROM access failed */
 } SettingsStorageStatus;
 
-/* Largest payload a single game save can hold (one 1 KB slot minus its header/CRC). */
-#define SETTINGS_GAME_MAX_DATA 1018U
+/* Largest payload a single game save can hold (one 2 KB slot minus its header/CRC). */
+#define SETTINGS_GAME_MAX_DATA 2042U
 
 #endif /* __SETTINGS_API_H */

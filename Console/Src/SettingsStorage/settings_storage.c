@@ -8,32 +8,40 @@
 
 /*
  * On-EEPROM layout (AT24C512, 64 KB, uint16 addressing) — see docu/memory.md.
+ * Packed flat with no arbitrary padding; every entity is exactly 2 KB.
  *
- *   Console partition  16 KB  0x0000-0x3FFF
- *     0x0000  256 B   SystemHeader
- *     0x0100  3840 B  Game directory (SETTINGS_GAME_SLOTS x GameDirectoryEntry)
- *     0x1000  12 KB   Console settings entity (uses its head; rest reserved)
- *   Games partition    48 KB  0x4000-0xFFFF
- *     48 slots x 1 KB; directory entry i <-> data slot i.
+ *   0x0000   256 B    SystemHeader  (magic/version, game count, write seq, CRC)
+ *   0x0100  2117 B    Game directory (29 × GameDirectoryEntry, 73 B each)
+ *   0x0945  2048 B    Console settings entity
+ *   0x1145    58 KB   Game data (29 slots × 2048 B each)
+ *   0xF945   1.7 KB   (unused tail — not enough for another full slot)
  *
+ * Directory entry i <-> game data slot i (same index, different regions).
  * Every persisted struct ends in a crc16 (CCITT) over all preceding bytes.
  */
 
-#define SETTINGS_MAGIC_VERSION 0x5332U /* "S2" — bump if the on-EEPROM layout changes */
+#define SETTINGS_MAGIC_VERSION 0x5333U /* "S3" — 2 KB entities, 29 slots */
 
-#define EEPROM_TOTAL_SIZE 65536U
-#define CONSOLE_REGION_SIZE 16384U
-#define GAMES_REGION_SIZE 49152U
+/* Number of game save slots and the usable-data payload per entity.
+ * Both entities are exactly 2048 B (= 6 B header/CRC + 2042 B data). */
+#define SETTINGS_GAME_SLOTS     29U
+#define SETTINGS_CONSOLE_MAX_DATA 2042U
 
-#define ADDR_SYS_HEADER 0x0000U
-#define SYS_HEADER_REGION_SIZE 0x0100U
-#define ADDR_DIRECTORY 0x0100U
-#define DIRECTORY_REGION_SIZE 0x0F00U
-#define ADDR_CONSOLE_SETTINGS 0x1000U
-#define CONSOLE_SETTINGS_REGION_SIZE 0x3000U
+/* These are verified by static_assert below. */
+#define EEPROM_TOTAL_SIZE     65536U
+#define DIRECTORY_ENTRY_SIZE  73U      /* == sizeof(GameDirectoryEntry) */
 
-#define ADDR_GAMES 0x4000U
-#define GAME_SLOT_SIZE 1024U
+#define ADDR_SYS_HEADER       0x0000U
+#define SYS_HEADER_REGION_SIZE 0x0100U /* 256 B */
+
+#define ADDR_DIRECTORY        0x0100U
+/* 29 × 73 = 2117 B (0x0845); ADDR_CONSOLE_SETTINGS = 0x0100 + 2117 = 0x0945 */
+
+#define ADDR_CONSOLE_SETTINGS (ADDR_DIRECTORY + SETTINGS_GAME_SLOTS * DIRECTORY_ENTRY_SIZE)
+#define CONSOLE_ENTITY_SIZE   2048U
+
+#define ADDR_GAMES            (ADDR_CONSOLE_SETTINGS + CONSOLE_ENTITY_SIZE)
+#define GAME_SLOT_SIZE        2048U
 
 typedef enum
 {
@@ -74,20 +82,20 @@ typedef struct
     uint16_t crc16;
 } __attribute__((packed)) ConsoleSettingsEntity;
 
-static_assert(CONSOLE_REGION_SIZE + GAMES_REGION_SIZE == EEPROM_TOTAL_SIZE,
-              "console + games partitions must fill the 64 KB device");
-static_assert(SYS_HEADER_REGION_SIZE + DIRECTORY_REGION_SIZE + CONSOLE_SETTINGS_REGION_SIZE == CONSOLE_REGION_SIZE,
-              "console partition sub-regions must sum to 16 KB");
-static_assert(sizeof(SystemHeader) <= SYS_HEADER_REGION_SIZE, "SystemHeader overflows its region");
-static_assert(SETTINGS_GAME_SLOTS * sizeof(GameDirectoryEntry) <= DIRECTORY_REGION_SIZE,
-              "directory entries overflow the directory region");
-static_assert(sizeof(ConsoleSettingsEntity) <= CONSOLE_SETTINGS_REGION_SIZE,
-              "console settings entity overflows its region");
-static_assert(sizeof(GameDataEntity) == GAME_SLOT_SIZE, "GameDataEntity must be exactly one slot");
-static_assert(SETTINGS_GAME_SLOTS * GAME_SLOT_SIZE == GAMES_REGION_SIZE,
-              "game slots must fill the games partition");
-static_assert(ADDR_GAMES + SETTINGS_GAME_SLOTS * GAME_SLOT_SIZE - 1U == EXTERNAL_EEPROM_AT24C512_MAX_MEMORY_ADDR,
-              "last game slot must end at the top of the device");
+static_assert(DIRECTORY_ENTRY_SIZE == sizeof(GameDirectoryEntry),
+              "DIRECTORY_ENTRY_SIZE must match the packed struct size");
+static_assert(sizeof(GameDataEntity) == GAME_SLOT_SIZE,
+              "GameDataEntity must be exactly one 2 KB slot");
+static_assert(sizeof(ConsoleSettingsEntity) == CONSOLE_ENTITY_SIZE,
+              "ConsoleSettingsEntity must be exactly 2 KB");
+static_assert(sizeof(SystemHeader) <= SYS_HEADER_REGION_SIZE,
+              "SystemHeader overflows its region");
+static_assert(SETTINGS_GAME_SLOTS * GAME_SLOT_SIZE + ADDR_GAMES <= EEPROM_TOTAL_SIZE,
+              "game slots overflow the EEPROM");
+static_assert(ADDR_CONSOLE_SETTINGS == ADDR_DIRECTORY + SETTINGS_GAME_SLOTS * DIRECTORY_ENTRY_SIZE,
+              "console address must follow the directory exactly");
+static_assert(ADDR_GAMES == ADDR_CONSOLE_SETTINGS + CONSOLE_ENTITY_SIZE,
+              "game data must follow the console entity exactly");
 
 static SystemHeader s_header;
 static bool s_initialized = false;
@@ -361,7 +369,7 @@ SettingsStorageStatus settingsStorageInit(void)
     {
         LOGGER_LOG_WARN(LOGGER_SETTINGS, "no valid header — formatting storage");
         /* Wipe the directory so no stale entry survives the reformat. */
-        if (externalEepromClearRange(ADDR_DIRECTORY, DIRECTORY_REGION_SIZE) != 0U)
+        if (externalEepromClearRange(ADDR_DIRECTORY, SETTINGS_GAME_SLOTS * DIRECTORY_ENTRY_SIZE) != 0U)
         {
             return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
         }

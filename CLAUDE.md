@@ -97,11 +97,11 @@ Two analog joysticks with digital d-pads + 2 special buttons. Polled by TIM7 ISR
 5-track software synthesizer (`buzzer.c`). TIM6 fires at 1ms, advances each active track's note counter. Notes are interleaved `uint16` pairs: `{frequency_hz, duration_ms}…`; frequency 0 = pause. The highest-numbered playing track drives TIM3 PWM output on PB5 at 50% duty. Supports play with optional done-flag, pause, resume, stop, loop. Frequency constants from C2 (65 Hz) through B8 (7902 Hz) defined in `buzzer.h`.
 
 ### EEPROM Settings
-AT24C512 (64KB) on I2C1 at 400kHz. `settings_storage.c` provides a CRC-16 protected key/value store, split into a 16KB console partition and a 48KB games partition:
+AT24C512 (64KB) on I2C1 at 400kHz. `settings_storage.c` provides a CRC-16 protected key/value store, packed flat with no arbitrary padding:
 - System header at 0x0000 (magic/version, game count, monotonic write sequence, CRC)
-- Game directory at 0x0100 (48 × `GameDirectoryEntry`: name key, state, write seq, CRC)
-- Console settings at 0x1000 (one entity: version, data, CRC; remainder reserved)
-- Game data at 0x4000 (48 × 1KB `GameDataEntity` slots: version, size, ≤1018B data, CRC)
+- Game directory at 0x0100 (29 × `GameDirectoryEntry`: name key, state, write seq, CRC)
+- Console settings at 0x0945 (one 2 KB `ConsoleSettingsEntity`: version, size, ≤2042B data, CRC)
+- Game data at 0x1145 (29 × 2 KB `GameDataEntity` slots: version, size, ≤2042B data, CRC)
 
 Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). A game opts in via `has_settings` in its binary header; the loader binds a slot (`settingsStorageBindGame`) and the game reaches it through the settings `ConsoleAPI`. When all 48 slots are full, writes return `STORAGE_FULL` — nothing is auto-evicted; callers manage space with the list / delete / `settingsStorageEvictOldest` APIs. All writes validate with CRC-16-CCITT (polynomial 0x1021, initial 0xFFFF). Corrupt entries are auto-cleaned on init via `settingsStorageCleanupCorrupted()`. The typed console blob lives in `console_settings_storage.c`.
 

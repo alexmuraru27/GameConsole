@@ -105,17 +105,17 @@ The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a
 
 ## EEPROM layout
 
-AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c`, split into a **16 KB console partition** and a **48 KB games partition**. Every persisted record ends in a CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`).
+AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c`, packed flat with no arbitrary padding. Both the console entity and each game entity are exactly **2048 B (2 KB)**. Every persisted record ends in a CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`).
 
-**Console partition — 16 KB (0x0000–0x3FFF)**
+| Offset | Size   | Content                                                                        |
+| ------ | ------ | ------------------------------------------------------------------------------ |
+| 0x0000 | 0x0100 | **System header** — magic/version, game count, monotonic write sequence, CRC   |
+| 0x0100 | 0x0845 | **Game directory** — 29 × `GameDirectoryEntry` (73 B each: name key, state, write seq, CRC) |
+| 0x0945 | 0x0800 | **Console settings** — one `ConsoleSettingsEntity` (2 KB)                      |
+| 0x1145 | 0xE800 | **Game data** — 29 slots × 2048 B each; directory entry *i* ↔ data slot *i*  |
+| 0xF945 | 0x06BB | (unused — not enough for another full slot)                                    |
 
-| Offset | Size   | Content                                                                          |
-| ------ | ------ | -------------------------------------------------------------------------------- |
-| 0x0000 | 0x0100 | **System header** — magic/version, game count, monotonic write sequence, CRC     |
-| 0x0100 | 0x0F00 | **Game directory** — 48 × `GameDirectoryEntry` (name key, state, write seq, CRC) |
-| 0x1000 | 0x3000 | **Console settings** — one entity (version, data, CRC); remainder reserved       |
-
-**Games partition — 48 KB (0x4000–0xFFFF)**: 48 × 1 KB slots; directory entry *i* ↔ data slot *i*. Each slot holds a `GameDataEntity` (version, size, ≤1018 B data, CRC).
+Each data slot holds a `GameDataEntity` (version, size, ≤2042 B data, CRC).
 
 Game saves are keyed by the game's `.bin` name (extension stripped, matched case-insensitively). A game declares `has_settings` in its binary header; the loader then binds a slot for it (created on first need) and the running game reads/writes it through the settings `ConsoleAPI`. When all 48 slots are taken, writes return `STORAGE_FULL` — nothing is evicted automatically; callers free space via the list / delete / evict-oldest APIs. Corrupt directory entries or data slots are freed automatically on init by `settingsStorageCleanupCorrupted()`.
 
