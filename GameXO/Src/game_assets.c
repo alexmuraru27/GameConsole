@@ -3,8 +3,6 @@
 #include "music_track.h"   /* MusicTrackHeader / NOT1 format (tools/music_creator) */
 #include <string.h>
 
-DECLARE_API_HEADER_PTR(s_api);
-#define API (s_api->api)
 
 /* The CCM asset arena reserved by game.ld (.asset_area over GAME_RAM_ASSET).
  * Graphics are bump-allocated here; it is never reset after the one-time load. */
@@ -31,7 +29,7 @@ static uint8_t *arenaAlloc(uint32_t size)
 bool gameAssetsLoadSprite(uint32_t asset_id, Sprite *sprite_out, uint16_t *palette_out)
 {
     AssetMetaData meta;
-    if (API.assetLoaderGetAssetMetadata(asset_id, &meta) != 0U)
+    if (assetLoaderGetAssetMetadata(asset_id, &meta) != 0U)
     {
         return false;
     }
@@ -41,7 +39,7 @@ bool gameAssetsLoadSprite(uint32_t asset_id, Sprite *sprite_out, uint16_t *palet
     {
         return false;
     }
-    if (API.assetLoaderGetAssetData(asset_id, blob, meta.size) != 0U)
+    if (assetLoaderGetAssetData(asset_id, blob, meta.size) != 0U)
     {
         return false;
     }
@@ -60,7 +58,7 @@ bool gameAssetsLoadSprite(uint32_t asset_id, Sprite *sprite_out, uint16_t *palet
     const uint32_t colors = (header->format == GFX_FMT_4BPP) ? 16U : 4U;
     for (uint32_t i = 0U; i < colors; i++)
     {
-        palette_out[i] = API.rendererSystemColor(index_palette[i]);
+        palette_out[i] = rendererSystemColor(index_palette[i]);
     }
 
     *sprite_out = (Sprite){
@@ -83,7 +81,7 @@ static uint8_t s_sound_buffer[SOUND_BUFFER_BYTES] __attribute__((aligned(4)));
 bool gameAssetsPlaySound(uint32_t asset_id)
 {
     AssetMetaData meta;
-    if (API.assetLoaderGetAssetMetadata(asset_id, &meta) != 0U)
+    if (assetLoaderGetAssetMetadata(asset_id, &meta) != 0U)
     {
         return false;
     }
@@ -91,7 +89,7 @@ bool gameAssetsPlaySound(uint32_t asset_id)
     {
         return false;
     }
-    if (API.assetLoaderGetAssetData(asset_id, s_sound_buffer, meta.size) != 0U)
+    if (assetLoaderGetAssetData(asset_id, s_sound_buffer, meta.size) != 0U)
     {
         return false;
     }
@@ -103,14 +101,14 @@ bool gameAssetsPlaySound(uint32_t asset_id)
     }
 
     const uint16_t *notes = (const uint16_t *)(s_sound_buffer + sizeof(MusicTrackHeader));
-    API.buzzerStopAll();
-    API.buzzerPlay(0U, false, notes, (uint16_t)header->noteCount);
+    buzzerStopAll();
+    buzzerPlay(0U, false, notes, (uint16_t)header->noteCount);
     return true;
 }
 
 uint16_t gameAssetsTextWidth(FontSize size, const char *text)
 {
-    const uint16_t advance = (uint16_t)(API.fontGlyphW(size) + 1U);
+    const uint16_t advance = (uint16_t)(fontGlyphW(size) + 1U);
     const uint16_t n = (uint16_t)strlen(text);
     return (n == 0U) ? 0U : (uint16_t)(n * advance - 1U);
 }
@@ -119,8 +117,8 @@ uint16_t gameAssetsDrawText(Sprite *out, uint16_t max, FontSize size,
                             int16_t x, int16_t y, uint8_t z,
                             const uint16_t *palette, const char *text)
 {
-    const uint16_t gw = API.fontGlyphW(size);
-    const uint16_t gh = API.fontGlyphH(size);
+    const uint16_t gw = fontGlyphW(size);
+    const uint16_t gh = fontGlyphH(size);
     uint16_t count = 0U;
 
     for (const char *scan = text; *scan != '\0' && count < max; scan++)
@@ -129,7 +127,7 @@ uint16_t gameAssetsDrawText(Sprite *out, uint16_t max, FontSize size,
         if (ascii >= 0x20U && ascii <= 0x7EU)
         {
             const uint8_t *pixels;
-            API.fontGet(ascii, size, &pixels);
+            fontGet(ascii, size, &pixels);
             out[count++] = (Sprite){.x = x, .y = y, .w = gw, .h = gh, .z = z,
                                     .flags = 0U, .pixels = pixels, .palette = palette};
         }
@@ -143,9 +141,9 @@ uint16_t gameAssetsDrawTextScaled(Sprite *out, uint16_t max, FontSize size,
                                   const uint16_t *palette, const char *text,
                                   uint8_t *pool, uint16_t pool_size)
 {
-    const uint8_t sw = (uint8_t)(API.fontGlyphW(size) * factor);
-    const uint8_t sh = (uint8_t)(API.fontGlyphH(size) * factor);
-    const uint16_t slot = API.fontSize(size, factor);
+    const uint8_t sw = (uint8_t)(fontGlyphW(size) * factor);
+    const uint8_t sh = (uint8_t)(fontGlyphH(size) * factor);
+    const uint16_t slot = fontSize(size, factor);
     uint16_t count = 0U;
 
     for (const char *scan = text; *scan != '\0' && count < max; scan++)
@@ -153,7 +151,7 @@ uint16_t gameAssetsDrawTextScaled(Sprite *out, uint16_t max, FontSize size,
         const uint8_t ascii = (uint8_t)*scan;
         if (ascii >= 0x20U && ascii <= 0x7EU && pool_size >= slot)
         {
-            API.fontScale(ascii, size, factor, pool);
+            fontScale(ascii, size, factor, pool);
             out[count++] = (Sprite){.x = x, .y = y, .w = sw, .h = sh, .z = z,
                                     .flags = 0U, .pixels = pool, .palette = palette};
             pool += slot;

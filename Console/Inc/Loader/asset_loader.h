@@ -3,7 +3,7 @@
 
 #include "stdint.h"
 #include "stdbool.h"
-#include "game_console_api.h"
+#include "asset_interface.h"
 
 /* Return codes shared by every asset-loader entry point. */
 #define ASSET_LOADER_RET_OK 0U                /* success */

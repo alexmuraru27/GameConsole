@@ -1,4 +1,5 @@
 #include "stm32f4xx_it.h"
+#include "faults.h"
 #include <stdio.h>
 #include <stm32f407xx.h>
 
@@ -10,67 +11,38 @@ void NMI_Handler(void)
   }
 }
 
-void hard_fault_dump(uint32_t *stack)
-{
-    printf("=== HARD FAULT ===\n");
-    printf("PC  =0x%08lX\n", stack[6]);
-    printf("LR  =0x%08lX\n", stack[5]);
-    printf("PSR =0x%08lX\n", stack[7]);
-    printf("HFSR=0x%08lX\n", SCB->HFSR);
-    printf("CFSR=0x%08lX\n", SCB->CFSR);
-    if (SCB->CFSR & SCB_CFSR_MMARVALID_Msk)
-        printf("MMFAR=0x%08lX\n", SCB->MMFAR);
-    if (SCB->CFSR & SCB_CFSR_BFARVALID_Msk)
-        printf("BFAR=0x%08lX\n", SCB->BFAR);
-    while (1) {}
-}
+/* The four fault vectors share one decoder. Each naked handler selects the
+ * faulting stack (MSP if EXC_RETURN bit 2 is clear, else PSP), forwards the frame
+ * pointer (r0), the EXC_RETURN value (r1), and the fault kind (r2) to
+ * faultReport(), which returns the EXC_RETURN to use for a recoverable game
+ * crash (and never returns for a fatal kernel fault). The push keeps the stack
+ * 8-byte aligned across the call. */
+#define FAULT_TRAMPOLINE(kind)        \
+    __asm volatile(                   \
+        "tst lr, #4        \n"        \
+        "ite eq            \n"        \
+        "mrseq r0, msp     \n"        \
+        "mrsne r0, psp     \n"        \
+        "mov r1, lr        \n"        \
+        "movs r2, %0       \n"        \
+        "push {r0, r1}     \n"        \
+        "bl faultReport    \n"        \
+        "add sp, sp, #8    \n"        \
+        "bx r0             \n"        \
+        : : "i"(kind))
 
-__attribute__((naked)) void HardFault_Handler(void)
-{
-    __asm volatile (
-        "tst lr, #4      \n"
-        "ite eq          \n"
-        "mrseq r0, msp   \n"
-        "mrsne r0, psp   \n"
-        "b hard_fault_dump \n"
-    );
-}
+__attribute__((naked)) void HardFault_Handler(void) { FAULT_TRAMPOLINE(FAULT_HARD); }
+__attribute__((naked)) void MemManage_Handler(void) { FAULT_TRAMPOLINE(FAULT_MEMMANAGE); }
+__attribute__((naked)) void BusFault_Handler(void) { FAULT_TRAMPOLINE(FAULT_BUS); }
+__attribute__((naked)) void UsageFault_Handler(void) { FAULT_TRAMPOLINE(FAULT_USAGE); }
 
-void MemManage_Handler(void)
-{
-
-  while (1)
-  {
-  }
-}
-
-void BusFault_Handler(void)
-{
-
-  while (1)
-  {
-  }
-}
-
-void UsageFault_Handler(void)
-{
-
-  while (1)
-  {
-  }
-}
-
-void SVC_Handler(void)
-{
-}
+/* SVC_Handler lives in Console/Src/Kernel/syscall.c (the syscall trap). */
 
 void DebugMon_Handler(void)
 {
 }
 
-void PendSV_Handler(void)
-{
-}
+/* PendSV_Handler lives in Console/Src/Kernel/scheduler.c (switches game -> console). */
 
 /* USER CODE BEGIN 1 */
 

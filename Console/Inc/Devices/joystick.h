@@ -2,15 +2,9 @@
 #define __JOYSTICK_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "joystick_interface.h"
 void joystickInit(void);
 void joystickReadData(void);
-
-typedef enum JoystickAxisState
-{
-    JoystickAxisStateOff      = 0U,
-    JoystickAxisStateNegative = 1U,
-    JoystickAxisStatePositive = 2U,
-} JoystickAxisState;
 
 bool joystickGetRBtnUp(void);
 bool joystickGetRBtnRight(void);

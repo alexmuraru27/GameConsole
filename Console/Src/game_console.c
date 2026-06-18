@@ -1,5 +1,4 @@
 #include "game_console.h"
-#include "game_console_api.h"
 #include "sysclock.h"
 #include "usart.h"
 #include "joystick.h"
@@ -23,93 +22,10 @@
 #include "logger.h"
 #include "fonts.h"
 #include "font_utils.h"
+#include "faults.h"
+#include "syscall.h"
+#include "mpu.h"
 #include "stdio.h"
-
-extern uint32_t __game_console_api_start; // Linker symbol
-#define API_PTR ((ConsoleAPIHeader *)&__game_console_api_start)
-
-/* Game-facing settings shims: route the running game's read/write/clear to its
- * bound save slot and narrow the SettingsStorageStatus result to the uint8_t the
- * ConsoleAPI table exposes (0 == OK). */
-static uint8_t apiSettingsRead(uint16_t expected_version, uint8_t *buffer, uint16_t *size)
-{
-    return (uint8_t)settingsStorageCurrentGameRead(expected_version, buffer, size);
-}
-
-static uint8_t apiSettingsWrite(uint16_t version, const uint8_t *data, uint16_t size)
-{
-    return (uint8_t)settingsStorageCurrentGameWrite(version, data, size);
-}
-
-static uint8_t apiSettingsClear(void)
-{
-    return (uint8_t)settingsStorageCurrentGameDelete();
-}
-
-static void gameConsoleExposeApi()
-{
-    const ConsoleAPI api =
-        {
-            // SYSTIME
-            .getSysTime = &getSysTime,
-            .delay = &delay,
-
-            // SOUND
-            .buzzerGetMaxTracks = &buzzerGetMaxTracks,
-            .buzzerPlay = &buzzerPlay,
-            .buzzerPlayWithFlag = &buzzerPlayWithFlag,
-            .buzzerPause = &buzzerPause,
-            .buzzerResume = &buzzerResume,
-            .buzzerStop = &buzzerStop,
-            .buzzerStopAll = &buzzerStopAll,
-            // JOYSTICKS
-            .joystickGetRBtnUp = &joystickGetRBtnUp,
-            .joystickGetRBtnRight = &joystickGetRBtnRight,
-            .joystickGetRBtnDown = &joystickGetRBtnDown,
-            .joystickGetRBtnLeft = &joystickGetRBtnLeft,
-            .joystickGetLBtnUp = &joystickGetLBtnUp,
-            .joystickGetLBtnRight = &joystickGetLBtnRight,
-            .joystickGetLBtnDown = &joystickGetLBtnDown,
-            .joystickGetLBtnLeft = &joystickGetLBtnLeft,
-            .joystickGetSpecialBtn1 = &joystickGetSpecialBtn1,
-            .joystickGetSpecialBtn2 = &joystickGetSpecialBtn2,
-            .joystickGetRAnalogY = &joystickGetRAnalogY,
-            .joystickGetRAnalogX = &joystickGetRAnalogX,
-            .joystickGetLAnalogY = &joystickGetLAnalogY,
-            .joystickGetLAnalogX = &joystickGetLAnalogX,
-            .joystickIsAnyButtonPressed = &joystickIsAnyButtonPressed,
-            // RENDERING
-            .rendererInit = &rendererInit,
-            .rendererClear = &rendererClear,
-            .rendererSetBackground = &rendererSetBackground,
-            .rendererSubmitLayer = &rendererSubmitLayer,
-            .rendererRender = &rendererRender,
-            .rendererGetWidthPixels = &rendererGetWidthPixels,
-            .rendererGetHeightPixels = &rendererGetHeightPixels,
-            .rendererSystemColor = &rendererSystemColor,
-            // ASSETS
-            .assetLoaderGetAssetMetadata = &assetLoaderGetAssetMetadata,
-            .assetLoaderGetAssetData = &assetLoaderGetAssetData,
-            // SETTINGS
-            .settingsRead = &apiSettingsRead,
-            .settingsWrite = &apiSettingsWrite,
-            .settingsClear = &apiSettingsClear,
-            // FONTS
-            .fontGlyphW = &fontGlyphW,
-            .fontGlyphH = &fontGlyphH,
-            .fontGet = &fontGet,
-            .fontSize = &fontSize,
-            .fontScale = &fontScale,
-            // LOGGING
-            .log = &loggerGameLog};
-
-    const ConsoleAPIHeader api_header = {
-        .magic = API_MAGIC,
-        .version = 2U, /* v2: added the SETTINGS calls */
-        .api = api};
-
-    *API_PTR = api_header;
-}
 
 const uint16_t s_boot_notes[] = {
     NOTE_D4, 450, NOTE_FS4, 400, NOTE_A4, 350, NOTE_D5, 300, NOTE_FS5, 250, NOTE_A5, 200,
@@ -161,6 +77,8 @@ static void beep_step(uint8_t step)
 static void coreInit()
 {
     swoInit(2000000);
+    faultsInit();   /* enable + decode MemManage/Bus/Usage faults once SWO is up */
+    syscallInit();  /* set SVC/PendSV priorities for the game syscall trap */
     gpioInit();
     timerInit();
     buzzerInit();
@@ -218,7 +136,7 @@ void gameConsoleInit()
 
     peripheralsInit();
     devicesInit();
-    gameConsoleExposeApi();
+    mpuInit(); /* arm MPU confinement before any game can run */
     beep_step(8);
     playBootSong();
 }

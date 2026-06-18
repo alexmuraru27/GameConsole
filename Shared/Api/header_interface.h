@@ -1,48 +1,34 @@
 #ifndef __GAME_HEADER_API_H
 #define __GAME_HEADER_API_H
 
+#include "syscall_numbers.h" /* CONSOLE_ABI_VERSION (asm-safe) */
+
+/*
+ * Tiny prefix at offset 0 of every game .bin. Because a game is RAM-resident and
+ * reaches the console through SVC traps (not a function-pointer table), the loader
+ * does not need a section table: it validates this header, copies the whole flat
+ * image to GAME_RAM (.text/.rodata/.data are already linked at their final
+ * addresses), and jumps to entry_point. The game's _game_start zeroes its own
+ * .bss before calling main().
+ *
+ * The header is emitted by the game's startup.s, which includes this file and
+ * writes the three words into the `.game_header` section — see docu/game_creation.md.
+ * Both constants are plain integers (no suffix) so the assembler can use them.
+ */
+
+#define GAME_BINARY_MAGIC 0x47414D45 /* "GAME" */
+
+#ifndef __ASSEMBLER__
+
+#include <stdint.h>
+
 typedef struct
 {
-    uint32_t magic; // Just to identify it's a valid game file
-    uint32_t header_start;
-    uint32_t header_end;
-    uint32_t text_start;
-    uint32_t text_end;
-    uint32_t ro_data_start;
-    uint32_t ro_data_end;
-    uint32_t data_start;
-    uint32_t data_end;
-    uint32_t bss_start;
-    uint32_t bss_end;
-    uint32_t stack_top;
-    uint32_t entry_point;
-    uint32_t has_settings; // non-zero if the game persists settings (loader reserves a save slot)
+    uint32_t magic;       /* GAME_BINARY_MAGIC */
+    uint32_t abi_version; /* must equal CONSOLE_ABI_VERSION, or the loader refuses it */
+    uint32_t entry_point; /* address of _game_start in GAME_RAM */
 } GameBinaryHeader;
 
-// MAGIC = GAME in ASCII. `has_settings` is non-zero when the game uses the
-// settings API; the loader then binds a save slot keyed by the game's .bin name.
-#define DECLARE_GAME_BINARY_HEADER(entry_func, game_has_settings)       \
-    extern uint32_t __game_header_start, __game_header_end;             \
-    extern uint32_t __game_text_start, __game_text_end;                 \
-    extern uint32_t __game_ro_data_start, __game_ro_data_end;           \
-    extern uint32_t __game_data_init_start, __game_data_init_end;       \
-    extern uint32_t __game_data_no_init_start, __game_data_no_init_end; \
-    extern uint32_t _estack;                                            \
-    __attribute__((section(".game_header")))                            \
-    const GameBinaryHeader game_header_variable_47414D45 = {            \
-        .magic = 0x47414D45,                                            \
-        .header_start = (uint32_t)&__game_header_start,                 \
-        .header_end = (uint32_t)&__game_header_end,                     \
-        .text_start = (uint32_t)&__game_text_start,                     \
-        .text_end = (uint32_t)&__game_text_end,                         \
-        .ro_data_start = (uint32_t)&__game_ro_data_start,               \
-        .ro_data_end = (uint32_t)&__game_ro_data_end,                   \
-        .data_start = (uint32_t)&__game_data_init_start,                \
-        .data_end = (uint32_t)&__game_data_init_end,                    \
-        .bss_start = (uint32_t)&__game_data_no_init_start,              \
-        .bss_end = (uint32_t)&__game_data_no_init_end,                  \
-        .stack_top = (uint32_t)&_estack,                                \
-        .entry_point = (uint32_t)&entry_func,                           \
-        .has_settings = (game_has_settings)}
+#endif /* __ASSEMBLER__ */
 
-#endif
+#endif /* __GAME_HEADER_API_H */

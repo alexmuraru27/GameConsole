@@ -94,9 +94,11 @@ static void timer7Init(uint16_t time_ms)
     // enable counter
     TIM7->CR1 |= TIM_CR1_CEN;
 
-    // timer 7 lowest priority -> just updating user inputs
+    // Joystick polling is the least-urgent ISR, but it must still outrank SVC/PendSV
+    // (priority 15) so it can preempt a syscall running on the kernel stack — SVC and
+    // PendSV are kept strictly lowest. 14 = just above them.
     NVIC_EnableIRQ(TIM7_IRQn);
-    NVIC_SetPriority(TIM7_IRQn, 15);
+    NVIC_SetPriority(TIM7_IRQn, 14);
 }
 
 void timerInit(void)

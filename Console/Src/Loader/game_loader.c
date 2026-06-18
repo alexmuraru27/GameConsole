@@ -5,7 +5,13 @@
 #include "settings_storage.h"
 #include "logger.h"
 #include "sysclock.h"
+#include "scheduler.h"
 #include <string.h>
+
+/* GAME_RAM bounds (from common.ld) — the flat game image is copied here. */
+extern uint32_t __game_ram_start, __game_ram_size;
+#define GAME_RAM_BASE ((uint32_t)&__game_ram_start)
+#define GAME_RAM_LEN ((uint32_t)&__game_ram_size)
 
 GameBinaryHeader s_game_header;
 bool s_is_game_header_valid = false;
@@ -20,54 +26,31 @@ uint8_t gameLoaderGetHeader(GameBinaryHeader *const game_header)
     return GAME_LOADER_RET_OK;
 }
 
-static void clearBss(const uint32_t start_addr, const uint32_t size)
+/* Copy the whole .bin (header + .text + .rodata + .data — all linked at their
+ * final GAME_RAM addresses) to GAME_RAM_BASE. .bss and the CCM asset arena are
+ * NOLOAD (not in the file); the game zeroes its own .bss in _game_start. */
+static FRESULT loadImageToGameRam(FIL *file)
 {
-    memset((void *)start_addr, 0U, size);
-}
+    const uint32_t total = f_size(file);
+    if (total == 0U || total > GAME_RAM_LEN)
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "game image %lu B does not fit GAME_RAM (%lu B)",
+                         (unsigned long)total, (unsigned long)GAME_RAM_LEN);
+        return FR_INT_ERR;
+    }
 
-static uint8_t loadRegionToMemory(FIL *file, const uint32_t region_addr_start, const uint32_t header_addr_start, const uint32_t region_size)
-{
-    FRESULT res;
-    UINT bytes_read;
-    uint8_t buffer[128U];
-    uint32_t remaining_bytes = region_size;
-    uint32_t dest_addr = region_addr_start;
-
-    // file offset: region memory address - header start address
-    const uint32_t file_offset = region_addr_start - header_addr_start;
-
-    res = f_lseek(file, file_offset);
+    FRESULT res = f_lseek(file, 0U);
     if (res != FR_OK)
     {
         return res;
     }
 
-    while (remaining_bytes > 0)
+    UINT bytes_read = 0U;
+    res = f_read(file, (void *)GAME_RAM_BASE, total, &bytes_read);
+    if (res != FR_OK || bytes_read != total)
     {
-        uint32_t bytes_to_read = (remaining_bytes > sizeof(buffer)) ? sizeof(buffer) : remaining_bytes;
-        res = f_read(file, buffer, bytes_to_read, &bytes_read);
-        if (res != FR_OK || bytes_read == 0)
-        {
-            break;
-        }
-
-        memcpy((void *)dest_addr, buffer, bytes_read);
-
-        remaining_bytes -= bytes_read;
-        dest_addr += bytes_read;
-
-        // read less than requested, end of file
-        if (bytes_read < bytes_to_read)
-        {
-            break;
-        }
+        return (res != FR_OK) ? res : FR_INT_ERR;
     }
-
-    if (remaining_bytes > 0)
-    {
-        return FR_INT_ERR;
-    }
-
     return FR_OK;
 }
 
@@ -96,16 +79,11 @@ static void bindGamePak(void)
     assetLoaderOpenPak(pak_name);
 }
 
-/* If the game declares it persists settings, bind a save slot keyed by its .bin
- * name (created on first need). The game then reaches it via the settings
- * ConsoleAPI; the binding is dropped when the game returns. */
+/* Bind a save slot keyed by the game's .bin name. Binding is cheap — the actual
+ * 2 KB slot is only allocated on the game's first settingsWrite — so every game
+ * gets a slot lazily and no per-game opt-in flag is needed. Dropped on return. */
 static void bindGameSettings(void)
 {
-    if (!s_game_header.has_settings)
-    {
-        return;
-    }
-
     const FILINFO *finfo = loaderGetFileInfo();
     if (finfo == NULL)
     {
@@ -129,89 +107,61 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
         return res;
     }
 
-    uint8_t game_header_buffer[sizeof(GameBinaryHeader)];
-    UINT game_header_buffer_bytes_read;
-    res = f_read(loaderGetFile(), game_header_buffer, sizeof(GameBinaryHeader), &game_header_buffer_bytes_read);
-    if (res != FR_OK || game_header_buffer_bytes_read == 0)
+    UINT header_bytes_read = 0U;
+    res = f_read(loaderGetFile(), &s_game_header, sizeof(GameBinaryHeader), &header_bytes_read);
+    if (res != FR_OK || header_bytes_read != sizeof(GameBinaryHeader))
     {
+        loaderCloseFile();
+        return (res != FR_OK) ? res : (uint8_t)FR_INT_ERR;
+    }
+
+    if (s_game_header.magic != GAME_BINARY_MAGIC)
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "bad game magic 0x%08lX", (unsigned long)s_game_header.magic);
+        loaderCloseFile();
+        return GAME_LOADER_RET_ERR;
+    }
+    if (s_game_header.abi_version != CONSOLE_ABI_VERSION)
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "game ABI v%lu != console ABI v%u",
+                         (unsigned long)s_game_header.abi_version, (unsigned)CONSOLE_ABI_VERSION);
+        loaderCloseFile();
+        return GAME_LOADER_RET_ERR;
+    }
+    s_is_game_header_valid = true;
+
+    res = loadImageToGameRam(loaderGetFile());
+    if (res != FR_OK)
+    {
+        loaderCloseFile();
         return res;
+    }
+
+    /* Bind the game's asset pak and settings slot before handing over control. */
+    bindGamePak();
+    bindGameSettings();
+
+    LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
+
+    /* Hand over to the kernel: it builds the game's unprivileged context, enables
+     * the MPU confinement, and switches in. This returns only when the game exits
+     * cleanly or crashes — either way the console resumes privileged on the MSP. */
+    kernelRunGame(s_game_header.entry_point);
+
+    const bool crashed = kernelGameCrashed();
+    if (crashed)
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "game crashed; recovered to console");
     }
     else
     {
-        memcpy(&s_game_header, &game_header_buffer, sizeof(GameBinaryHeader));
-        s_is_game_header_valid = true;
-        uint32_t text_file_size = s_game_header.text_end - s_game_header.text_start;
-        uint32_t ro_data_file_size = s_game_header.ro_data_end - s_game_header.ro_data_start;
-        uint32_t data_file_size = s_game_header.data_end - s_game_header.data_start;
-        uint32_t bss_file_size = s_game_header.bss_end - s_game_header.bss_start;
-
-        clearBss(s_game_header.bss_start, bss_file_size);
-
-        if (text_file_size > 0U)
-        {
-            res = loadRegionToMemory(loaderGetFile(), s_game_header.text_start, s_game_header.header_start, text_file_size);
-            if (res != FR_OK)
-            {
-                return res;
-            }
-        }
-
-        if (ro_data_file_size > 0U)
-        {
-            res = loadRegionToMemory(loaderGetFile(), s_game_header.ro_data_start, s_game_header.header_start, ro_data_file_size);
-            if (res != FR_OK)
-            {
-                return res;
-            }
-        }
-
-        if (data_file_size > 0U)
-        {
-            res = loadRegionToMemory(loaderGetFile(), s_game_header.data_start, s_game_header.header_start, data_file_size);
-            if (res != FR_OK)
-            {
-                return res;
-            }
-        }
-
-        // Bind the game's asset pak before handing over control, so asset
-        // requests during gameplay resolve against this game's .pak.
-        bindGamePak();
-
-        // Bind this game's settings slot (no-op unless the header opts in).
-        bindGameSettings();
-
-        LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
-
-        // Set PSP to the game's stack and switch Thread mode to use PSP.
-        // This isolates the game's stack from the console: if the game faults,
-        // the CPU enters Handler mode on MSP (console stack), leaving the
-        // game's PSP stack intact for debugging.
-        __asm volatile("msr psp, %0" : : "r"(s_game_header.stack_top));
-
-        uint32_t control;
-        __asm volatile("mrs %0, control" : "=r"(control));
-        control |= 2U; // CONTROL[1] = SPSEL → use PSP in Thread mode
-        __asm volatile("msr control, %0" : : "r"(control));
-        __asm volatile("isb" : : : "memory");
-
-        void (*game_entry)(void) = (void (*)(void))s_game_header.entry_point;
-        game_entry();
-
-        // Switch Thread mode back to MSP before touching console state
-        __asm volatile("mrs %0, control" : "=r"(control));
-        control &= ~2U; // CONTROL[1] = 0 → back to MSP
-        __asm volatile("msr control, %0" : : "r"(control));
-        __asm volatile("isb" : : : "memory");
-
         LOGGER_LOG_INFO(LOGGER_LOADER, "game returned to console");
-
-        settingsStorageUnbindGame();
-        assetLoaderClosePak();
-        loaderCloseFile();
     }
 
-    return 0U;
+    settingsStorageUnbindGame();
+    assetLoaderClosePak();
+    loaderCloseFile();
+    return crashed ? GAME_LOADER_RET_CRASHED : GAME_LOADER_RET_OK;
 }
 
 uint8_t gameLoaderCloseGame()

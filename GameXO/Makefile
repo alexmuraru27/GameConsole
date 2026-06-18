@@ -22,7 +22,8 @@ Src/main.c \
 Src/game_state_manager.c \
 Src/tic_tac_toe_logic.c\
 Src/game_assets.c \
-Src/syscalls.c
+Src/syscalls.c \
+../Shared/Syscall/console_syscalls.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -42,6 +43,7 @@ C_INCLUDES =  \
 -IAssets/pak \
 -I../Shared \
 -I../Shared/Api \
+-I../Shared/Syscall \
 -I../tools/graphics \
 -I../tools/music_creator
 

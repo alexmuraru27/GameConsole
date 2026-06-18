@@ -8,6 +8,6 @@
 #include "renderer_interface.h"
 #include "font_interface.h"
 #include "header_interface.h"
-#include "function_interface.h"
+#include "console_syscalls.h" /* the strongly-typed SVC API a game calls */
 
 #endif /* __CONSOLE_API_H */

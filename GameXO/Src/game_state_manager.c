@@ -5,8 +5,6 @@
 #include "GameXOAssetEnum.h"
 #include <string.h>
 
-DECLARE_API_HEADER_PTR(s_api);
-#define API (s_api->api)
 
 #define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
 
@@ -66,7 +64,7 @@ static uint8_t s_text_pool[2048];
 
 static bool debounced(void)
 {
-    const uint32_t now = API.getSysTime();
+    const uint32_t now = getSysTime();
     if (now > s_last_input_ms + INPUT_DEBOUNCE_MS)
     {
         s_last_input_ms = now;
@@ -96,10 +94,10 @@ static void resetRound(void)
 
 void gameStateManagerInit(void)
 {
-    API.rendererInit();
-    API.rendererSetBackground(COL_BG);
+    rendererInit();
+    rendererSetBackground(COL_BG);
 
-    s_last_input_ms = API.getSysTime();
+    s_last_input_ms = getSysTime();
 
     gameAssetsInit();
     gameAssetsLoadSprite(GAMEXO_GFX_MARK_X, &s_spr_x, s_pal_x);
@@ -117,7 +115,7 @@ void gameStateManagerInit(void)
 
     gameAssetsPlaySound(GAMEXO_SFX_INTRO);
     resetRound();
-    API.log("GameXO ready");
+    gameLog("GameXO ready");
 }
 
 /* ---- per-mark helpers ------------------------------------------------ */
@@ -186,10 +184,10 @@ static void renderChoose(void)
                              (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 210, 0U,
                              s_pal_text, hint);
 
-    API.rendererClear();
-    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
-    API.rendererRender();
+    rendererClear();
+    rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    rendererRender();
 }
 
 static void renderPlaying(void)
@@ -210,10 +208,10 @@ static void renderPlaying(void)
                              (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
                              s_pal_text, hint);
 
-    API.rendererClear();
-    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
-    API.rendererRender();
+    rendererClear();
+    rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    rendererRender();
 }
 
 static void renderEnd(void)
@@ -251,22 +249,22 @@ static void renderEnd(void)
                              (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
                              s_pal_text, hint);
 
-    API.rendererClear();
-    API.rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    API.rendererSubmitLayer(LAYER_UI, s_ui, nu);
-    API.rendererRender();
+    rendererClear();
+    rendererSubmitLayer(LAYER_FG, s_fg, nf);
+    rendererSubmitLayer(LAYER_UI, s_ui, nu);
+    rendererRender();
 }
 
 /* ---- input + logic per phase ----------------------------------------- */
 
 static void updateChoose(void)
 {
-    if ((API.joystickGetRBtnLeft() || API.joystickGetRBtnRight()) && debounced())
+    if ((joystickGetRBtnLeft() || joystickGetRBtnRight()) && debounced())
     {
         s_player_is_x = !s_player_is_x;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    if (API.joystickGetSpecialBtn1() && debounced())
+    if (joystickGetSpecialBtn1() && debounced())
     {
         s_phase = PHASE_PLAYING;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
@@ -287,23 +285,23 @@ static void aiMove(void)
 
 static void updatePlaying(void)
 {
-    if (API.joystickGetRBtnLeft() && s_cursor_x > 0U && debounced())
+    if (joystickGetRBtnLeft() && s_cursor_x > 0U && debounced())
     {
         s_cursor_x--;
     }
-    else if (API.joystickGetRBtnRight() && s_cursor_x < 2U && debounced())
+    else if (joystickGetRBtnRight() && s_cursor_x < 2U && debounced())
     {
         s_cursor_x++;
     }
-    else if (API.joystickGetRBtnUp() && s_cursor_y > 0U && debounced())
+    else if (joystickGetRBtnUp() && s_cursor_y > 0U && debounced())
     {
         s_cursor_y--;
     }
-    else if (API.joystickGetRBtnDown() && s_cursor_y < 2U && debounced())
+    else if (joystickGetRBtnDown() && s_cursor_y < 2U && debounced())
     {
         s_cursor_y++;
     }
-    else if (API.joystickGetSpecialBtn1() && debounced())
+    else if (joystickGetSpecialBtn1() && debounced())
     {
         const uint8_t player = s_player_is_x ? TIC_TAC_TOE_BOARD_PLAYER_X : TIC_TAC_TOE_BOARD_PLAYER_O;
         if (ticTacToeMakeMove(s_board, s_cursor_y, s_cursor_x, player))
@@ -328,7 +326,7 @@ static void updateEnd(void)
     if (!s_result_handled)
     {
         s_result_handled = true;
-        s_last_input_ms = API.getSysTime(); /* hold off the restart press briefly */
+        s_last_input_ms = getSysTime(); /* hold off the restart press briefly */
         if (s_result == TIC_TAC_TOE_GAME_STATE_DRAW)
         {
             gameAssetsPlaySound(GAMEXO_SFX_DRAW);
@@ -339,7 +337,7 @@ static void updateEnd(void)
             gameAssetsPlaySound(player_won ? GAMEXO_SFX_WIN : GAMEXO_SFX_LOSE);
         }
     }
-    if (API.joystickGetSpecialBtn1() && debounced())
+    if (joystickGetSpecialBtn1() && debounced())
     {
         resetRound();
     }

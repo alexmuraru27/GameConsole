@@ -56,7 +56,11 @@ Src/Fonts/font5x5.c \
 Src/Fonts/font8x8.c \
 Src/Fonts/font_utils.c \
 Src/Renderer/renderer.c \
-Src/Renderer/renderer_testing.c
+Src/Renderer/renderer_testing.c \
+Src/Kernel/faults.c \
+Src/Kernel/syscall.c \
+Src/Kernel/mpu.c \
+Src/Kernel/scheduler.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -84,11 +88,13 @@ C_INCLUDES =  \
 -IInc/Swo \
 -IInc/Logger \
 -IInc/SettingsStorage \
+-IInc/Kernel \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
 -IInc/Fonts \
 -I../Shared \
 -I../Shared/Api \
+-I../Shared/Syscall \
 -I../Shared/Esp01s \
 -I../tools/packer
 

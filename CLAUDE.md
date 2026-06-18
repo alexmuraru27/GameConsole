@@ -29,48 +29,52 @@ Lives in `Console/`. Runs from flash at boot, initializes all hardware, shows th
 **Boot sequence** (`startup.s` → `main.c`):
 1. `Reset_Handler`: copies `.data` from flash to RAM, zeros `.bss` and `.ccmram`, calls `__libc_init_array`, then `main()`
 2. `SystemInit()` → `systemClockConfig()`: HSE 8MHz → PLL → 168MHz SYSCLK, SysTick at 1ms
-3. `gameConsoleInit()`: `coreInit()` (SWO, GPIO, timers, buzzer) → `storageInit()` (I2C, EEPROM, settings) → `applyConsoleSettings()` (read+apply the persisted mute *before* any boot sound) → `peripheralsInit()` (DMA, USART, ADC) → `devicesInit()` (ILI9341 display, renderer, joystick, FatFs mount) → `gameConsoleExposeApi()`. The `beep_step()` progress scale runs only across `peripheralsInit`/`devicesInit` (after the mute is applied), so a muted console boots silent.
+3. `gameConsoleInit()`: `coreInit()` (SWO, `faultsInit`, `syscallInit`, GPIO, timers, buzzer) → `storageInit()` (I2C, EEPROM, settings) → `applyConsoleSettings()` (read+apply the persisted mute *before* any boot sound) → `peripheralsInit()` (DMA, USART, ADC) → `devicesInit()` (ILI9341 display, renderer, joystick, FatFs mount) → `mpuInit()` (arm MPU confinement). The `beep_step()` progress scale runs only across `peripheralsInit`/`devicesInit` (after the mute is applied), so a muted console boots silent. There is no longer an API-exposure step — games reach the console through SVC syscalls, not a shared struct (see the Kernel subsystem).
 4. `main()` then runs `init()` → loop of `update()` → `render()`
 
 The production path is the main menu: `main()` calls `mainMenuInit()` then loops `mainMenuUpdate()` / `mainMenuRender()`. The `MainMenu/` module is a small **screen state machine** (`main_menu.c` is the orchestrator) over a shared theme/draw/input layer (`menu_common.c`): the **root** menu offers *Games* / *Settings* / *Poll Remote Games*. *Games* (`game_list.c`) is the centered-hero picker — lists the SD-card `.bin` games, browses with up/down, and launches the highlighted one with Special Button 1; `gameLoaderLoadGame()` blocks for the game's lifetime and the picker rebuilds its surface when it returns. *Settings* (`settings_menu.c`) is a tree of typed settings (currently one Buzzer Sound toggle, persisted via `ConsoleSettings.audio_enabled` and applied to `buzzerSetMute()`); the boot-time read-and-apply runs in `gameConsoleInit()` before the boot song so a muted console boots silent. *Poll Remote Games* is a stub. Controls everywhere: up/down move, Special Button 1 enters/confirms/toggles, Special Button 2 steps back a level. The `renderer_testing.c` perf harness is still in the tree (and its source still compiles) but is only wired in when `RENDERER_TESTING` is defined; it is off by default.
 
-**HardFault handler**: prints PC, LR, PSR, HFSR, CFSR, MMFAR, BFAR via `printf()`/SWO before halting — useful for debugging crashes.
+**Fault handlers** (`Console/Src/Kernel/faults.c`): MemManage/BusFault/UsageFault are enabled (not escalated to HardFault) and decoded — each prints its name, the faulting context (PSP=game / MSP=kernel), stacked PC/LR/PSR, the CFSR sub-flags by name, and MMFAR/BFAR via `printf()`/SWO. A fault in a running game is **recoverable** (the kernel switches back to the console and the menu shows a "crashed" banner); a fault in the kernel itself halts.
 
 ### Games (`.bin` files, loaded at runtime from SD card)
-`GameXO/` is the reference game. Game binaries are loaded into RAM and executed by the console OS. Each game:
+`GameXO/` is the reference game. Game binaries are loaded into RAM and run **unprivileged**, isolated from the console by the MPU. Each game:
 - Uses `../game.ld` as its linker script
-- Calls `DECLARE_API_HEADER_PTR(api_hdr_ptr)` to access all console functions via the shared RAM API struct
-- Calls `DECLARE_GAME_BINARY_HEADER(entry_func)` at file scope (places a `GameBinaryHeader` into `.game_header` section for the loader)
-- Returns to the console OS when Special Button 2 is pressed
+- Links `Shared/Syscall/console_syscalls.c` and calls the console through the strongly-typed SVC stubs in `console_syscalls.h` (e.g. `rendererSubmitLayer(...)`) — no shared struct, no direct linkage to console code
+- Calls `DECLARE_GAME_BINARY_HEADER(entry_func)` at file scope (places a 12-byte `GameBinaryHeader` — magic, ABI version, entry — into the `.game_header` section at offset 0 of the `.bin`)
+- Returns to the console by calling `gameExit()` (or letting `main()` return; `_game_start` calls `gameExit()` for it). Special Button 2 is the convention for "quit".
 
-**Game loading** (`game_loader.c`): reads the `GameBinaryHeader` from the `.bin` file, zeros the BSS region, copies text/rodata/data sections into their target RAM addresses using the offset `region_addr - header_start`, then jumps to `entry_point`.
+**Game loading** (`game_loader.c`): reads the 12-byte `GameBinaryHeader`, checks the magic and ABI version, copies the **whole flat image** to `GAME_RAM` (`.text`/`.rodata`/`.data` are linked at their final addresses, so no per-section table and no LMA copy), then hands off to `kernelRunGame()`. The game's `_game_start` zeroes its own `.bss` (the image is NOLOAD for `.bss`), runs ctors, and calls `main()`.
 
 **GameXO architecture**: a finite state machine (`CHOOSE → PLAYING → END`) in `game_state_manager.c` drives input, the AI opponent (minimax with alpha-beta pruning in `tic_tac_toe_logic.c`), and rendering. `game_assets.c` wraps the ConsoleAPI: it streams the packed graphics (X/O marks, cursor) from `GameXO.pak` into the CCM asset arena and builds `Sprite`s, plays packed buzzer tracks, and draws text with the console fonts. The board grid, marks, and cursor are drawn through the renderer's sprite API; all text uses the exposed console fonts (no glyphs are packed). Assets are authored with the in-repo tools under `GameXO/Assets/{Graphics,Music}` (per `GameXO/Assets/manifest.yaml`) and the GameXO Makefile runs the packer to emit `GameXO.pak` + `GameXOAssetEnum.h`.
 
 ### Shared (`Shared/`)
-Header-only. Contains `Shared/Api/` — the public game API (`function_interface.h`, `header_interface.h`, `asset_interface.h`). Both Console and games include these headers.
+`Shared/Api/` is header-only — the public data types both sides agree on (`renderer_interface.h`, `font_interface.h`, `asset_interface.h`, `settings_interface.h`, `joystick_interface.h`, `header_interface.h`, and the umbrella `game_console_api.h`). `Shared/Syscall/` holds the **syscall ABI**: `syscall_numbers.h` (ids + ABI version, the single source of truth for both sides), `console_syscalls.h` (the typed game-facing prototypes), and `console_syscalls.c` (the SVC stubs, compiled into each game).
 
 ### Memory Layout
 See `docu/memory.md` for the full map. Quick reference:
 
 | Region         | Origin      | Size | Purpose |
 | -------------- | ----------- | ---- | ------- |
-| SHARED_RAM     | 0x20000000  |   2K | ConsoleAPIHeader |
-| CONSOLE_RAM    | 0x20000800  |  82K | Console firmware `.data`/`.bss`/stack, DMA buffers, renderer (SRAM) |
-| GAME_RAM       | 0x20015000  |  44K | Game binary: code + rodata + data + bss + stack (SRAM, executable) |
+| CONSOLE_RAM    | 0x20000000  |  96K | Console firmware `.data`/`.bss`/MSP+PSP stacks, DMA buffers, renderer (SRAM) |
+| GAME_RAM       | 0x20018000  |  32K | Game binary: code + rodata + data + bss + stack (SRAM, executable). One MPU region. |
 | GAME_RAM_ASSET | 0x10000000  |  64K | Runtime asset arena for `.pak` loads — **CCM** (D-bus only, not executable) |
 | CONSOLE_FLASH  | 0x08000000  | 512K | Console firmware |
 
-CCM is D-bus only on the STM32F4, so **game code must run from SRAM (`GAME_RAM`), never CCM** — CCM holds the data-only asset arena. Games ship as two files on SD: `GameXO.bin` (header + code + rodata + data, all targeting SRAM) + `GameXO.pak` (assets, streamed lazily by ID into the CCM arena). The packer (`tools/packer/`) bundles assets and emits a C enum header. See `docu/memory.md` for the authoritative map.
+`GAME_RAM` is a power-of-two size aligned to its size (`0x20018000`) so a single ARMv7-M MPU region confines an unprivileged game to it; the old 2K `SHARED_RAM` was reclaimed when the function-pointer API became SVC syscalls. CCM is D-bus only on the STM32F4, so **game code must run from SRAM (`GAME_RAM`), never CCM** — CCM holds the data-only asset arena. Games ship as two files on SD: `GameXO.bin` (12-byte header + code + rodata + data, all targeting SRAM) + `GameXO.pak` (assets, streamed lazily by ID into the CCM arena). See `docu/memory.md` for the authoritative map.
 
 ### EEPROM
 AT24C512 (64KB) on I2C1. `settings_storage.c` splits it into a 16KB console partition (system header + 48-entry game directory + console settings blob) and a 48KB games partition (48 × 1KB save slots). Game saves are keyed by `.bin` name, CRC-16-CCITT protected, auto-cleaned on init. See `docu/memory.md`.
-The Console firmware writes a `ConsoleAPIHeader` struct (magic `0xDEADBEEF`, version 1) into `SHARED_RAM` at startup (`gameConsoleExposeApi()`). The struct contains a `ConsoleAPI` table of function pointers for: systime, buzzer, joystick, renderer, and asset loading. Games access it via the linker symbol `__game_console_api_start`. This is how games call renderer, joystick, buzzer, and asset functions — they never link against Console code directly.
+### Kernel / game isolation (`Console/Src/Kernel/`)
+Games run as untrusted, unprivileged code; the console is the kernel. A game **never** calls console code directly — it traps in via SVC.
+- **Syscall ABI** (`syscall.c`, `Shared/Syscall/`): each API call is a typed C stub that puts the syscall id in `r12`, args in `r0-r3`, and runs `svc #0`. `SVC_Handler` runs privileged on the **MSP (kernel stack)**, validates, dispatches to the real console function, and returns the result in the caller's `r0`. SVC is at the lowest priority so a long syscall (e.g. a full render) stays preemptible by the buzzer/joystick timer ISRs. Pointer arguments are range-checked (`gameCanRead`/`gameCanWrite`) so a game can't make the kernel touch console memory on its behalf; `gameLog` is formatted game-side and passed as raw bytes so no format string reaches the kernel.
+- **Context switch** (`scheduler.c`): the console runs privileged on the MSP. `kernelRunGame()` builds the game's initial unprivileged PSP frame and enters it via an **SVC** (`SYS_LAUNCH`), which parks the console's context on the MSP. Control returns to the exact launch point via **PendSV** — pended either by the game's `SYS_EXIT` (clean) or by the fault handler (crash). A crash is recoverable because the faulting unprivileged context can be abandoned: PendSV tail-chains before the faulting instruction is retried.
+- **MPU** (`mpu.c`): enabled with `PRIVDEFENA` (privileged console keeps the full map). A running game gets exactly two unprivileged regions: `GAME_RAM` (RWX) and the CCM asset arena (RW, execute-never). Anything else — console RAM, peripherals, flash — traps as a recoverable MemManage fault. Regions are released on exit/crash.
 
 ## Documentation
 
 Deep-dive docs live in `docu/`:
 - `docu/API_README.md` — ConsoleAPI surface and module internals
+- `docu/kernel.md` — game isolation, ground-up: privilege/stack model, the SVC syscall ABI, the SVC-in/PendSV-out context switch, MPU protection, pointer validation, fault recovery, interrupt priorities (with diagrams)
 - `docu/renderer.md` — the renderer, ground-up: frame pipeline, the hot loop, and the 24→76 FPS optimization journey
 - `docu/memory.md` — authoritative SRAM/CCM/flash map, game binary layout, EEPROM layout, linker scripts
 - `docu/HW.md` — Hardware schematics and full pinout

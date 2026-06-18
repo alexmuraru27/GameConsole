@@ -7,6 +7,7 @@
 #include "fonts.h"
 #include "logger.h"
 #include <string.h>
+#include <stdio.h>
 
 /* ------------------------------------------------------------------ *
  *  Centered-hero game picker. Behaviourally identical to the original
@@ -21,6 +22,13 @@
 static char s_names[GL_MAX_GAMES][GL_NAME_CHARS + 1U];
 static uint32_t s_num_games = 0U;
 static uint32_t s_selected = 0U;
+
+/* After a game crashes the console recovers and returns here; show a short banner
+ * so the player learns why they were dropped back to the menu. */
+static bool s_crash_banner = false;
+static uint32_t s_crash_banner_until = 0U;
+static char s_crash_name[GL_NAME_CHARS + 1U];
+#define GL_CRASH_BANNER_MS 4000U
 
 /* Short navigation blips (kept in flash so the buzzer's stored pointer stays valid). */
 static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
@@ -91,10 +99,17 @@ MenuTransition gameListUpdate(void)
     {
         buzzerPlay(0U, false, s_select_notes, 2U);
         LOGGER_LOG_INFO(LOGGER_MENU, "launching '%s'", s_names[s_selected]);
-        gameLoaderLoadGame((uint8_t)s_selected);
+        const uint8_t result = gameLoaderLoadGame((uint8_t)s_selected);
         /* Game returned: it owned the renderer, so rebuild the surface. */
         rendererInit();
         menuResetSurface();
+        if (result == GAME_LOADER_RET_CRASHED)
+        {
+            s_crash_banner = true;
+            s_crash_banner_until = getSysTime() + GL_CRASH_BANNER_MS;
+            strncpy(s_crash_name, s_names[s_selected], sizeof(s_crash_name) - 1U);
+            s_crash_name[sizeof(s_crash_name) - 1U] = '\0';
+        }
     }
 
     return MENU_STAY;
@@ -123,6 +138,21 @@ void gameListRender(void)
 
     rendererClear();
     n = menuDrawTitle(n, "GAMES");
+
+    if (s_crash_banner)
+    {
+        if (getSysTime() < s_crash_banner_until)
+        {
+            char banner[GL_NAME_CHARS + 24U];
+            snprintf(banner, sizeof(banner), "%s crashed - recovered", s_crash_name);
+            const int16_t x = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, banner)) / 2);
+            n = menuDrawText(n, &font5x5, x, 30, g_menu_pal_accent, banner);
+        }
+        else
+        {
+            s_crash_banner = false;
+        }
+    }
 
     if (s_num_games == 0U)
     {

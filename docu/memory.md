@@ -8,11 +8,13 @@ Defined in `common.ld`.
 
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
-| SHARED_RAM     | 0x20000000 | 2K   | rw    | `ConsoleAPIHeader` struct — games read it at runtime                              |
-| CONSOLE_RAM    | 0x20000800 | 82K  | rw    | Console firmware .data, .bss, stack, heap, DMA buffers, renderer, FatFs, SDIO, audio |
-| GAME_RAM       | 0x20015000 | 44K  | rwx   | Game .text, .rodata, .data, .bss, stack, heap — loaded from .bin at runtime       |
+| SHARED_RAM     | 0x20000000 | 2K   | rw    | Read-only console-info page (version, screen dims) games may map RO               |
+| CONSOLE_RAM    | 0x20000800 | 94K  | rw    | Console firmware .data, .bss, MSP (kernel) stack, PSP (console) stack, DMA buffers, renderer, FatFs, SDIO, audio |
+| GAME_RAM       | 0x20018000 | 32K  | rwx   | Game .text, .rodata, .data, .bss, stack — loaded from .bin at runtime             |
 
-Total: 2K + 82K + 44K = 128K ✓
+Total: 2K + 94K + 32K = 128K ✓
+
+`GAME_RAM` is deliberately a power-of-two size (32K) aligned to its size (`0x20018000`), so a single ARMv7-M MPU region confines an unprivileged game to it with no sub-region tricks. GameXO uses ~14K of it (≈5K code+data, 4K stack), leaving generous headroom.
 
 ## CCM (Core-Coupled Memory)
 
@@ -37,44 +39,33 @@ The `.bin` file on the SD card is a flat image of the game's `GAME_RAM` contents
 
 ```
 GAME_RAM  (in .bin)
-├── .game_header      ~52 B    GameBinaryHeader (magic, boundary symbols, entry point)
-├── .text                    game code
-├── .rodata                  constants and strings
-├── .data                    initialized globals
+├── .game_header      12 B     GameBinaryHeader (magic, ABI version, entry point)
+├── .text                      game code (_game_start first)
+├── .rodata                    constants and strings
+├── .data                      initialized globals
 ```
 
-`.bss` and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file.
+`.bss` and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file. Because the game is RAM-resident, every section is linked at its final `GAME_RAM` address, so copying the whole image to `GAME_RAM` lands each section in place: no per-section table and no separate LMA copy.
 
 ### GameBinaryHeader
 
-Placed in `.game_header` at the start of the binary. The loader reads it to know where to copy each section:
+A 12-byte prefix at offset 0 of the binary. The loader reads it, validates the game, and jumps to the entry — it needs nothing else (the game manages its own `.bss`):
 
-| Field                 | Meaning                      |
-| --------------------- | ---------------------------- |
-| `magic`               | `0x47414D45` ("GAME")        |
-| `header_start / end`  | Boundary of this struct      |
-| `text_start / end`    | Code region (SRAM)           |
-| `ro_data_start / end` | Read-only data (SRAM)        |
-| `data_start / end`    | Initialized data (SRAM)      |
-| `bss_start / end`     | Zero-fill region (SRAM)      |
-| `stack_top`           | Initial PSP stack pointer (top of GAME_RAM) |
-| `entry_point`         | Function pointer to `_game_start()` |
-
-The loader computes file offsets as `region_addr - header_start` — this works because the `.bin` starts at `header_start` and all regions are contiguous.
+| Field         | Meaning                                                |
+| ------------- | ------------------------------------------------------ |
+| `magic`       | `0x47414D45` ("GAME")                                  |
+| `abi_version` | must equal `CONSOLE_ABI_VERSION`, or the loader refuses it |
+| `entry_point` | address of `_game_start()` in GAME_RAM                 |
 
 ### Loading sequence
 
-1. Read header from the first `sizeof(GameBinaryHeader)` bytes of the `.bin`
-2. `memset(bss_start, 0, bss_end - bss_start)` — zero BSS in SRAM
-3. Copy `.text`, `.rodata`, `.data` from the `.bin` into their SRAM target addresses
-4. Set PSP to `stack_top` (top of GAME_RAM), set `CONTROL[1]` to use PSP in Thread mode
-5. `game_entry()` — jump to `entry_point` (`_game_start` in startup.s)
-6. `_game_start` pushes LR, calls `__libc_init_array`, calls `main()`, pops PC
-7. Game returns to the loader; loader clears `CONTROL[1]` (back to MSP) and closes file
+1. Read the 12-byte header; reject on bad magic or mismatched ABI version
+2. Copy the whole `.bin` to `GAME_RAM` base (`.text`/`.rodata`/`.data` land at their linked addresses)
+3. `kernelRunGame()` builds the game's initial **unprivileged** PSP exception frame at the top of `GAME_RAM`, programs the MPU regions, and enters the game via an SVC (`SYS_LAUNCH`), parking the console's context on the MSP
+4. `_game_start` zeroes its own `.bss`, runs `__libc_init_array`, and calls `main()`
+5. The game returns control by calling `gameExit()` (an `SVC` / `SYS_EXIT`), or crashes — either way **PendSV** switches back to the parked console context, which releases the MPU regions and resumes the loader
 
-The game runs on PSP (GAME_RAM) while the console and all exception handlers use MSP (CONSOLE_RAM).
-If the game faults, the CPU switches to MSP for the handler — the game's
-PSP stack is preserved untouched for post-mortem inspection.
+The game runs **unprivileged on PSP** (confined to `GAME_RAM` + the CCM asset arena by the MPU); the console and all exception handlers run privileged on MSP. A game fault is caught, decoded over SWO, and recovered from — control returns to the menu, which shows a "crashed" banner. See the Kernel subsystem in `CLAUDE.md` for the switch mechanics.
 
 ### Why game code is in SRAM, not CCM
 
@@ -123,8 +114,8 @@ Game saves are keyed by the game's `.bin` name (extension stripped, matched case
 
 | File         | Used by          | Purpose                                                                            |
 | ------------ | ---------------- | ---------------------------------------------------------------------------------- |
-| `common.ld`  | Both             | MEMORY region definitions, `.game_console_api` and `.game_header` output sections  |
+| `common.ld`  | Both             | MEMORY region definitions, the `.game_header` output section, region-bound symbols (`__game_ram_start/size`, …) the kernel uses for the MPU and pointer validation |
 | `console.ld` | Console firmware | `.isr_vector`, `.text`, `.rodata` → flash; `.data`, `.bss` → CONSOLE_RAM           |
 | `game.ld`    | Games            | `.text`, `.rodata`, `.data`, `.bss`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
 
-`common.ld` is included by both linker scripts via `INCLUDE "../common.ld"`. The ASSERTS validate that regions don't overlap and sizes sum to 128K.
+`common.ld` is included by both linker scripts via `INCLUDE "../common.ld"`. The ASSERTs validate that `GAME_RAM` stays 32K-aligned at `0x20018000` (so it is a single clean MPU region) and that the SRAM region sizes sum to 128K.
