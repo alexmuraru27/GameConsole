@@ -12,7 +12,7 @@
  * .bss before calling main().
  *
  * The header is emitted by the game's startup.s, which includes this file and
- * writes the three words into the `.game_header` section — see docu/game_creation.md.
+ * writes the three words into the `.game_header` section — see docu/game_template/.
  * Both constants are plain integers (no suffix) so the assembler can use them.
  */
 

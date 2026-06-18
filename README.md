@@ -23,10 +23,11 @@ make clean     # remove all build artifacts
 | Topic                    | Location                                                           |
 | ------------------------ | ------------------------------------------------------------------ |
 | API & renderer internals | [docu/API_README.md](docu/API_README.md)                           |
+| Kernel & game isolation  | [docu/kernel.md](docu/kernel.md)                                   |
 | Renderer deep-dive       | [docu/renderer.md](docu/renderer.md)                               |
 | Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                                   |
 | Hardware & pinout        | [docu/HW.md](docu/HW.md)                                           |
-| Game creation guide      | [docu/game_creation.md](docu/game_creation.md)                     |
+| Game creation & API      | [docu/game_template/README.md](docu/game_template/README.md)       |
 | Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md)               |
 | Music Creator tool       | [tools/music_creator/README.md](tools/music_creator/README.md)     |
 | Asset Packer tool        | [tools/packer/README.md](tools/packer/README.md)                   |

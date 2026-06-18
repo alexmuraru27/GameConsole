@@ -78,7 +78,7 @@ Deep-dive docs live in `docu/`:
 - `docu/renderer.md` — the renderer, ground-up: frame pipeline, the hot loop, and the 24→76 FPS optimization journey
 - `docu/memory.md` — authoritative SRAM/CCM/flash map, game binary layout, EEPROM layout, linker scripts
 - `docu/HW.md` — Hardware schematics and full pinout
-- `docu/game_creation.md` — Guide for creating new games for the platform
+- `docu/game_template/README.md` — guide for creating new games + the full game-facing API reference, with a copyable `startup.s` template
 
 ## Subsystems
 
