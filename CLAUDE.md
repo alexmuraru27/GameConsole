@@ -129,6 +129,13 @@ Enabled-path overhead is dominated by **bytes over SWO** — `ITM_SendChar` spin
 
 Loaded games can't link the logger, so they log via the ConsoleAPI: `api.log("score %d", score)` routes to `loggerGameLog()` on the `LOGGER_GAME` channel (printed as `[..][I][GAME] score 5`). Game-local `printf` is unreliable — the game's `_write` has no backing `__io_putchar` — so `api.log` is the correct path for games.
 
+**Convention — always log in the console OS.** When writing or modifying console firmware (anything under `Console/Src/`), add logging as part of the change; do not leave new code silent. The logger is compile-time gated per channel/level (a silenced site folds away to zero flash and zero cycles — verified), so logging is free in production builds and there is no cost argument for omitting it. Follow these rules:
+- **Map to the right channel** from `logger_config.h` (e.g. `LOGGER_CORE`, `LOGGER_KERNEL`, `LOGGER_SDIO`, `LOGGER_EEPROM`, …). Add a new channel there if a subsystem has none.
+- **Level discipline:** `INFO` for once-per-boot / lifecycle milestones (init done, game launched/exited); `DEBUG` for per-driver detail and frequent-but-cold events; `WARN` for recoverable anomalies (rejected input, validation failures); `ERROR` for hard failures. Aim for INFO to read as the session narrative on its own, with DEBUG as the layer beneath it.
+- **Log at boundaries, not internals:** public-API entry/exit, state transitions, and every error/early-return path — not every internal step.
+- **Never log on hot paths or in ISRs.** The renderer per-frame compositor, the 1 ms buzzer ISR (and `buzzerStop`, which it calls), the 50 ms joystick ISR, the per-syscall SVC dispatch, and PendSV teardown stay silent — a single SWO line (~5 µs/byte) there breaks audio/frame timing. Log their *init* and *lifecycle*, never their per-tick work.
+- **Don't instrument** third-party code (`ff.c`, `ffunicode.c`), pure data tables (fonts), the SWO sink itself (`logger.c`, `syscalls.c` — recursion risk), or `faults.c` (it uses raw `printf` by design).
+
 ## Pixel Forge (graphics creator)
 
 `tools/graphics/pixel_forge.py` — PyQt6 pixel-art editor for free-form pictures (any W×H, not tiles). Exports a `GfxAsset` `.bin` (header + palette + packed pixels) and a `.c` companion; format declared in `tools/graphics/gfx_asset.h` (magic "GFX1", 2bpp = 4 colors / 4bpp = 16 colors, slot 0 transparent, system palette indices 0–63). Qt-free core (`pixelforge/canvas.py`, `storage.py`, `history.py`) + GUI layer (`pixelforge/gui/`). Unlike `tools/music_creator/`, this tool is written to be maintainable — no "vibecoded" disclaimer headers. See `tools/graphics/README.md`.
