@@ -24,6 +24,7 @@
 #define MENU_COL_ITEM_SEL MENU_RGB(156, 232, 244)  /* selected row */
 #define MENU_COL_FOOTER MENU_RGB(84, 102, 124)
 #define MENU_COL_EMPTY MENU_RGB(150, 120, 120)
+#define MENU_COL_ALERT MENU_RGB(232, 72, 72) /* red: missing SD / error state */
 
 /* 2bpp font palettes (slot 0 transparent, 1-3 the ink). */
 extern const uint16_t g_menu_pal_title[4];
@@ -32,6 +33,7 @@ extern const uint16_t g_menu_pal_item[4];
 extern const uint16_t g_menu_pal_item_sel[4];
 extern const uint16_t g_menu_pal_footer[4];
 extern const uint16_t g_menu_pal_empty[4];
+extern const uint16_t g_menu_pal_alert[4];
 
 /* One UI layer holds the whole screen; sized well above the glyph count. */
 #define MENU_MAX_SPRITES 256U

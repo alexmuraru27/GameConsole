@@ -1,4 +1,8 @@
 #include "loader.h"
+#include "diskio_integration.h"
+#include "gpio.h"
+#include "sysclock.h"
+#include "logger.h"
 #include "stdbool.h"
 #include "stdlib.h"
 #include "string.h"
@@ -7,6 +11,62 @@ FIL s_active_file;
 FILINFO s_active_fileinfo;
 
 bool s_is_file_opened = false;
+
+/* Mounted FatFs work area for the SD volume, plus the debounced card-detect
+ * state. The card-detect line can bounce while a card is being seated, so a
+ * presence change must hold steady for MEDIA_DEBOUNCE_MS before we act on it. */
+static FATFS s_fatfs;
+static bool s_media_present;     /* committed (mounted) presence */
+static bool s_media_candidate;   /* raw reading awaiting debounce */
+static uint32_t s_media_since;   /* when the candidate first appeared */
+#define MEDIA_DEBOUNCE_MS 250U
+
+void loaderMediaInit(void)
+{
+    f_mount(&s_fatfs, "0:", 1U);
+    s_media_present = sdCardPresent();
+    s_media_candidate = s_media_present;
+    s_media_since = getSysTime();
+}
+
+bool loaderMediaSync(void)
+{
+    const bool raw = sdCardPresent();
+    const uint32_t now = getSysTime();
+
+    if (raw != s_media_candidate)
+    {
+        /* New raw reading: restart the debounce window. */
+        s_media_candidate = raw;
+        s_media_since = now;
+        return false;
+    }
+    if (raw == s_media_present || (now - s_media_since) < MEDIA_DEBOUNCE_MS)
+    {
+        return false; /* unchanged, or not yet stable long enough */
+    }
+
+    /* Committed change. */
+    s_media_present = raw;
+    if (raw)
+    {
+        diskMarkUninitialized();      /* re-run SDIO init for the new card */
+        f_mount(&s_fatfs, "0:", 1U);  /* remount and read its filesystem */
+        LOGGER_LOG_INFO(LOGGER_LOADER, "SD card inserted");
+    }
+    else
+    {
+        f_mount(NULL, "0:", 0U);      /* drop the stale mount */
+        diskMarkUninitialized();
+        LOGGER_LOG_INFO(LOGGER_LOADER, "SD card removed");
+    }
+    return true;
+}
+
+bool loaderMediaPresent(void)
+{
+    return s_media_present;
+}
 
 static bool isBinaryFile(const char *filename)
 {

@@ -9,6 +9,14 @@
 #define MAX_RETRIES 3
 static uint8_t s_card_initialized = 0;
 
+/* Force the card to be re-initialized on the next disk_initialize(). Called by
+ * the loader when the card is removed or (re)inserted, so a freshly inserted
+ * card runs the full SDIO init handshake again instead of reusing stale state. */
+void diskMarkUninitialized(void)
+{
+    s_card_initialized = 0U;
+}
+
 DSTATUS disk_status(BYTE pdrv)
 {
     if (pdrv != DRIVE_SD)

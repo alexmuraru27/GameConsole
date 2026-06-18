@@ -16,6 +16,7 @@ const uint16_t g_menu_pal_item[4] = {0, MENU_COL_ITEM, MENU_COL_ITEM, MENU_COL_I
 const uint16_t g_menu_pal_item_sel[4] = {0, MENU_COL_ITEM_SEL, MENU_COL_ITEM_SEL, MENU_COL_ITEM_SEL};
 const uint16_t g_menu_pal_footer[4] = {0, MENU_COL_FOOTER, MENU_COL_FOOTER, MENU_COL_FOOTER};
 const uint16_t g_menu_pal_empty[4] = {0, MENU_COL_EMPTY, MENU_COL_EMPTY, MENU_COL_EMPTY};
+const uint16_t g_menu_pal_alert[4] = {0, MENU_COL_ALERT, MENU_COL_ALERT, MENU_COL_ALERT};
 
 Sprite g_menu_ui[MENU_MAX_SPRITES];
 

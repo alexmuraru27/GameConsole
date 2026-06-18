@@ -18,4 +18,8 @@ uint8_t getSdType();
 uint32_t getSdSectorCount(void);
 void sdWaitCardReady(void);
 
+/* Reset the cached "card initialized" flag so the next mount/access re-runs the
+ * SDIO init handshake — used to recover after a card is swapped at runtime. */
+void diskMarkUninitialized(void);
+
 #endif

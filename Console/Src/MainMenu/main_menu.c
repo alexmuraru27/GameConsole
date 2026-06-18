@@ -2,6 +2,7 @@
 #include "menu_common.h"
 #include "game_list.h"
 #include "settings_menu.h"
+#include "loader.h"
 #include "renderer.h"
 #include "buzzer.h"
 #include "sysclock.h"
@@ -75,6 +76,7 @@ static void rootRender(void)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
     const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool sd_present = loaderMediaPresent();
     uint16_t n = 0U;
 
     rendererClear();
@@ -83,16 +85,21 @@ static void rootRender(void)
     for (uint32_t i = 0U; i < ROOT_ITEM_COUNT; i++)
     {
         const bool selected = (i == s_root_selected);
-        const char *label = s_root_items[i].label;
         const int16_t y = (int16_t)(MENU_LIST_TOP + (int)i * MENU_ROW_H);
+
+        /* The Games entry turns red and calls out a missing card. */
+        const bool no_sd = (s_root_items[i].target == MENU_GOTO_GAMES) && !sd_present;
+        const char *label = no_sd ? "Games (No SD detected)" : s_root_items[i].label;
+        const uint16_t *palette = no_sd ? g_menu_pal_alert
+                                        : (selected ? g_menu_pal_item_sel : g_menu_pal_item);
+
         const int16_t x = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, label)) / 2);
 
         if (selected && cursor_on)
         {
             n = menuDrawText(n, &font8x8, (int16_t)(x - 18), y, g_menu_pal_accent, ">");
         }
-        n = menuDrawText(n, &font8x8, x, y,
-                         selected ? g_menu_pal_item_sel : g_menu_pal_item, label);
+        n = menuDrawText(n, &font8x8, x, y, palette, label);
     }
 
     n = menuDrawFooter(n, "UP/DOWN browse   A select");
@@ -187,6 +194,12 @@ void mainMenuInit(void)
 void mainMenuUpdate(void)
 {
     MenuTransition transition = MENU_STAY;
+
+    /* Keep FatFs in sync with the card slot; reload the picker on a hot-swap. */
+    if (loaderMediaSync() && s_screen == SCREEN_GAMES)
+    {
+        gameListEnter();
+    }
 
     switch (s_screen)
     {

@@ -14,6 +14,7 @@
 #include "ff.h"
 #include "string.h"
 #include "asset_loader.h"
+#include "loader.h"
 #include "i2c.h"
 #include "external_eeprom.h"
 #include "settings_storage.h"
@@ -155,8 +156,6 @@ static void beep_step(uint8_t step)
     delay(150);
 }
 
-static FATFS s_fatfs;
-
 /* The minimal core every later phase (and the boot beeps) depends on: trace,
  * GPIO, timers, buzzer. Silent — runs before the mute flag is known. */
 static void coreInit()
@@ -207,7 +206,7 @@ static void devicesInit()
     beep_step(5);
     joystickInit();
     beep_step(6);
-    f_mount(&s_fatfs, "0:", 1U);
+    loaderMediaInit();
     beep_step(7);
 }
 
