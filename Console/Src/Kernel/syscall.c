@@ -27,11 +27,12 @@
  *                 is contiguous and side-effect-free, so a bounded over-read there
  *                 cannot fault the kernel or touch live state.
  */
+/* Region bounds come from the linker script (common.ld) as absolute symbols, so
+ * the trust boundary tracks the real memory map instead of hard-coded addresses.
+ * These are linker symbols — their *address* is the value, hence the &__sym casts. */
 extern uint32_t __game_ram_start, __game_ram_size;
 extern uint32_t __game_ram_asset_start, __game_ram_asset_size;
-
-#define CONSOLE_FLASH_BASE 0x08000000U
-#define CONSOLE_FLASH_SIZE (512U * 1024U)
+extern uint32_t __console_flash_start, __console_flash_size;
 
 static bool rangeWithin(uint32_t a, uint32_t len, uint32_t base, uint32_t size)
 {
@@ -62,7 +63,7 @@ static bool gameCanRead(const void *p, uint32_t len)
         return true;
     }
     return gameCanWrite(p, len) ||
-           rangeWithin(a, len, CONSOLE_FLASH_BASE, CONSOLE_FLASH_SIZE);
+           rangeWithin(a, len, (uint32_t)&__console_flash_start, (uint32_t)&__console_flash_size);
 }
 
 /* Packed pixel / palette extents the renderer will read for one sprite. */
@@ -125,6 +126,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_BUZZER_PLAY:
         if (!gameCanRead((const void *)a[2], a[3] * 2U * sizeof(uint16_t)))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return false;
         }
         return buzzerPlay((uint8_t)a[0], (bool)a[1], (const uint16_t *)a[2], (uint16_t)a[3]);
@@ -135,6 +137,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
             !gameCanRead(args->notes_data, args->notes_number * 2U * sizeof(uint16_t)) ||
             (args->on_done_flag != NULL && !gameCanWrite(args->on_done_flag, sizeof(bool))))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return false;
         }
         return buzzerPlayWithFlag(args->track, args->is_looped, args->notes_data, args->notes_number, args->on_done_flag);
@@ -201,7 +204,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         }
         else
         {
-            LOGGER_LOG_WARN(LOGGER_LOADER, "rejected layer submit: bad sprite pointer(s)");
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad sprite pointer(s)", (unsigned long)id);
         }
         return 0;
     }
@@ -219,12 +222,14 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_ASSET_METADATA:
         if (!gameCanWrite((void *)a[1], sizeof(AssetMetaData)))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return ASSET_LOADER_RET_ERR;
         }
         return assetLoaderGetAssetMetadata(a[0], (AssetMetaData *)a[1]);
     case SYS_ASSET_DATA:
         if (!gameCanWrite((void *)a[1], a[2]))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return ASSET_LOADER_RET_ERR;
         }
         return assetLoaderGetAssetData(a[0], (uint8_t *)a[1], a[2]);
@@ -235,6 +240,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         uint16_t *size = (uint16_t *)a[2];
         if (!gameCanWrite(size, sizeof(uint16_t)) || !gameCanWrite((void *)a[1], *size))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return (uint8_t)SETTINGS_STORAGE_STATUS_INVALID_ARG;
         }
         return (uint8_t)settingsStorageCurrentGameRead((uint16_t)a[0], (uint8_t *)a[1], size);
@@ -242,6 +248,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_SETTINGS_WRITE:
         if (!gameCanRead((const void *)a[1], (uint16_t)a[2]))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return (uint8_t)SETTINGS_STORAGE_STATUS_INVALID_ARG;
         }
         return (uint8_t)settingsStorageCurrentGameWrite((uint16_t)a[0], (const uint8_t *)a[1], (uint16_t)a[2]);
@@ -256,6 +263,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_FONT_GET:
         if (!gameCanWrite((void *)a[2], sizeof(const uint8_t *)))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return 0;
         }
         fontGet((uint8_t)a[0], (FontSize)a[1], (const uint8_t **)a[2]);
@@ -265,6 +273,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_FONT_SCALE:
         if (!gameCanWrite((void *)a[3], fontSize((FontSize)a[1], (uint8_t)a[2])))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return 0;
         }
         fontScale((uint8_t)a[0], (FontSize)a[1], (uint8_t)a[2], (uint8_t *)a[3]);
@@ -277,6 +286,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
          * ever interpreted, and the read is length-bounded. */
         if (!gameCanRead((const void *)a[0], a[1]))
         {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
             return 0;
         }
         loggerGameLog("%.*s", (int)a[1], (const char *)a[0]);
@@ -289,7 +299,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         return 0;
 
     default:
-        LOGGER_LOG_ERROR(LOGGER_LOADER, "bad syscall id %lu", (unsigned long)id);
+        LOGGER_LOG_ERROR(LOGGER_KERNEL, "bad syscall id %lu", (unsigned long)id);
         return 0;
     }
 }

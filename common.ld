@@ -35,6 +35,8 @@ __game_ram_start       = ORIGIN(GAME_RAM);
 __game_ram_size        = LENGTH(GAME_RAM);
 __game_ram_asset_start = ORIGIN(GAME_RAM_ASSET);
 __game_ram_asset_size  = LENGTH(GAME_RAM_ASSET);
+__console_flash_start  = ORIGIN(CONSOLE_FLASH);
+__console_flash_size   = LENGTH(CONSOLE_FLASH);
 
 SECTIONS
 {

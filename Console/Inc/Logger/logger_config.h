@@ -24,6 +24,7 @@
 #define LOGGER_EEPROM 1
 #define LOGGER_NETWORK 1
 #define LOGGER_MENU 1
-#define LOGGER_GAME 1 /* logs funnelled in from loaded games via api.log() */
+#define LOGGER_GAME 1   /* logs funnelled in from loaded games via api.log() */
+#define LOGGER_KERNEL 1 /* syscall trust-boundary events: rejected pointers, bad ids */
 
 #endif /* __LOGGER_CONFIG_H */
