@@ -39,6 +39,9 @@ Src/FatFs/diskio_integration.c \
 Src/FatFs/ff.c \
 Src/FatFs/ffunicode.c \
 Src/MainMenu/main_menu.c \
+Src/MainMenu/menu_common.c \
+Src/MainMenu/game_list.c \
+Src/MainMenu/settings_menu.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \

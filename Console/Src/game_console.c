@@ -17,6 +17,7 @@
 #include "i2c.h"
 #include "external_eeprom.h"
 #include "settings_storage.h"
+#include "console_settings_storage.h"
 #include "swo.h"
 #include "logger.h"
 #include "fonts.h"
@@ -155,43 +156,70 @@ static void beep_step(uint8_t step)
 }
 
 static FATFS s_fatfs;
-static void peripheralsInit()
+
+/* The minimal core every later phase (and the boot beeps) depends on: trace,
+ * GPIO, timers, buzzer. Silent — runs before the mute flag is known. */
+static void coreInit()
 {
     swoInit(2000000);
     gpioInit();
     timerInit();
     buzzerInit();
+}
+
+/* The I2C storage stack (EEPROM + settings). Brought up on its own, before any
+ * boot sound, so the persisted mute flag can be read and applied first; none of
+ * it depends on the display, DMA or SD card. Silent. */
+static void storageInit()
+{
+    i2cInit();
+    externalEepromInit(EXTERNAL_EEPROM_AT24C512_ADDRESS);
+    settingsStorageInit();
+}
+
+/* Apply the persisted console settings to the hardware. Runs before the boot
+ * scale and boot song so a console muted by the user boots silent. The settings
+ * menu owns the editable copy and the write-through path; this is the
+ * read-and-apply side. */
+static void applyConsoleSettings(void)
+{
+    ConsoleSettings cs;
+    consoleSettingsLoad(&cs); /* fills defaults on miss/corrupt */
+    buzzerSetMute(!cs.audio_enabled);
+}
+
+static void peripheralsInit()
+{
     beep_step(0);
     dmaInit((uint32_t)FSMC_DATA_ADDRESS);
     beep_step(1);
     usartInit();
     beep_step(2);
     adcInit();
-    beep_step(3);
-    i2cInit();
 }
 
 static void devicesInit()
 {
-    beep_step(4);
+    beep_step(3);
     ili9341Init(1U, ILI9341_WIDTH, ILI9341_HEIGHT);
-    beep_step(5);
+    beep_step(4);
     rendererInit();
-    beep_step(6);
+    beep_step(5);
     joystickInit();
-    beep_step(7);
-    externalEepromInit(EXTERNAL_EEPROM_AT24C512_ADDRESS);
-    beep_step(8);
+    beep_step(6);
     f_mount(&s_fatfs, "0:", 1U);
-    settingsStorageInit();
-    beep_step(9);
+    beep_step(7);
 }
 
 void gameConsoleInit()
 {
+    coreInit();
+    storageInit();
+    applyConsoleSettings(); /* honor the persisted mute before the first beep */
+
     peripheralsInit();
     devicesInit();
     gameConsoleExposeApi();
-    beep_step(10);
+    beep_step(8);
     playBootSong();
 }
