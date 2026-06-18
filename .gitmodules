@@ -1,0 +1,3 @@
+[submodule "tools/esp-serial-flasher"]
+	path = tools/esp-serial-flasher
+	url = https://github.com/espressif/esp-serial-flasher
