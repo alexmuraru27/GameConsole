@@ -87,7 +87,7 @@ Deep-dive docs live in `docu/`:
 ## Subsystems
 
 ### SD Card Stack
-Four layers: **FatFs** (`ff.c`) → **disk I/O** (`diskio.c`) → **low-level driver** (`diskio_integration.c`) → **SDIO peripheral** (`sdio.c`). `sdInit()` sends CMD0/CMD8/ACMD41/CMD2/CMD3/CMD7/CMD16, switches to 4-bit bus mode, and sets the clock to ~12MHz. `disk_write()` is a **stub** (returns `RES_PARERR`) — the SD card is read-only. Card detect is on GPIO PD3 (active-low, `sdCardPresent()` in `gpio.c`).
+Four layers: **FatFs** (`ff.c`) → **disk I/O** (`diskio.c`) → **low-level driver** (`diskio_integration.c`) → **SDIO peripheral** (`sdio.c`). `sdInit()` sends CMD0/CMD8/ACMD41/CMD2/CMD3/CMD7/CMD16, switches to 4-bit bus mode, and sets the clock to ~12MHz. `disk_write()` is implemented (`sdWriteSingleBlock`/`sdWriteMultipleBlocks`), and FatFs is built read-write (`FF_FS_READONLY 0`), so deletes/writes work — e.g. the WiFi upgrade removes `ESP01.bin` on success. Card detect is on GPIO PD3 (active-low, `sdCardPresent()` in `gpio.c`).
 
 ### Renderer
 Scanline **sprite compositor** (`Console/Src/Renderer/renderer.c`) — full deep-dive in `docu/renderer.md`.

@@ -16,8 +16,9 @@
 #include "network_protocol.h"
 #include "ff.h"
 
-/* The firmware image is looked up by this fixed name at the SD card root. */
-#define ESP_IMAGE_PATH "ESP01.bin"
+/* The firmware image is looked up by this fixed name at the SD card root
+ * (shared with the flasher and the game-list filter). */
+#define ESP_IMAGE_PATH ESP_FIRMWARE_FILENAME
 
 /* Progress-bar geometry. */
 #define BAR_X 40
@@ -114,6 +115,17 @@ void wifiUpdateRun(void)
 
     if (status == ESP_FLASH_OK)
     {
+        /* Remove the image on success so it isn't re-flashed on every visit and
+         * doesn't linger on the card. Best-effort — the upgrade already took. */
+        const FRESULT del = f_unlink(ESP_IMAGE_PATH);
+        if (del == FR_OK)
+        {
+            LOGGER_LOG_INFO(LOGGER_FLASHER, "removed '%s' after upgrade", ESP_IMAGE_PATH);
+        }
+        else
+        {
+            LOGGER_LOG_WARN(LOGGER_FLASHER, "could not remove '%s' (%d)", ESP_IMAGE_PATH, (int)del);
+        }
         buzzerPlay(0U, false, s_done_notes, 3U);
         waitForBack("Update complete!", g_menu_pal_accent);
     }

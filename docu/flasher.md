@@ -226,8 +226,15 @@ returns). `wifiUpdateRun()`:
 2. Draws *"Connecting to ESP…"*, then calls `espFlasherFlashFile()` with a
    progress callback that redraws a bar + percentage each block (it reuses the
    theme's `menuDrawBar()`, stacked into a thicker bar).
-3. On completion shows *"Update complete!"* (success chime) or *"Failed: …"* with
-   the status string (error chime), and waits for Special Button 2 to return.
+3. On success it deletes `ESP01.bin` from the card (best-effort `f_unlink` — the
+   SD stack is read-write), shows *"Update complete!"* (success chime), and waits
+   for Special Button 2. On failure it shows *"Failed: …"* (error chime) and
+   leaves the image in place so you can retry.
+
+The image file (`ESP_FIRMWARE_FILENAME` in `esp_flasher.h`) shares the `.bin`
+extension with games and isn't filtered out of the **Games** list, but it's
+harmless there: the game loader rejects it at launch via the `GAME_BINARY_MAGIC`
+/ ABI check before any code runs.
 
 It is wired into the settings tree via the `SETTING_ACTION` leaf kind in
 `settings_menu.c`:

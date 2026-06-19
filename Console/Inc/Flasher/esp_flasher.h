@@ -10,6 +10,12 @@
  * (see MainMenu/wifi_update.c). The SD card must already be mounted.
  */
 
+/* The ESP firmware image the console looks for at the SD-card root. It shares
+ * the .bin extension with games but is rejected at launch by the game loader's
+ * magic/ABI check, so it is harmless if it appears in the list; the upgrade flow
+ * removes it on success. */
+#define ESP_FIRMWARE_FILENAME "ESP01.bin"
+
 typedef enum
 {
     ESP_FLASH_OK = 0,       /* programmed and verified */
