@@ -74,6 +74,11 @@ uint16_t menuDrawTitle(uint16_t idx, const char *text);
 /* Centered footer hint at MENU_FOOTER_Y (font5x5). */
 uint16_t menuDrawFooter(uint16_t idx, const char *text);
 
+/* A horizontal solid bar `width` px wide at (x,y), in `palette`'s ink.
+ * One tile row tall (MENU_BAR_H px); stack rows for a thicker bar. */
+#define MENU_BAR_H 4
+uint16_t menuDrawBar(uint16_t idx, int16_t x, int16_t y, uint16_t width, const uint16_t *palette);
+
 /* ------------------------------------------------------------------ *
  *  Debounced navigation. menuPollNav() latches at most one edge per
  *  debounce window across all screens, so a held button (or a button

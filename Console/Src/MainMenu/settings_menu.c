@@ -5,6 +5,7 @@
 #include "sysclock.h"
 #include "fonts.h"
 #include "logger.h"
+#include "wifi_update.h"
 
 /* ------------------------------------------------------------------ *
  *  Tree-like settings. The screen renders one level of a static
@@ -18,7 +19,8 @@ typedef enum
 {
     SETTING_CATEGORY, /* a node with children; entering descends into it */
     SETTING_TOGGLE,   /* a bool leaf; entering flips it */
-    /* future: SETTING_TEXT, SETTING_NUMBER, SETTING_ACTION */
+    SETTING_ACTION,   /* a leaf that runs a blocking action when entered */
+    /* future: SETTING_TEXT, SETTING_NUMBER */
 } SettingKind;
 
 typedef struct SettingNode
@@ -27,6 +29,7 @@ typedef struct SettingNode
     SettingKind kind;
     bool (*get)(void);       /* TOGGLE: read the current value */
     void (*set)(bool value); /* TOGGLE: apply + persist the new value */
+    void (*action)(void);    /* ACTION: run when entered */
     const struct SettingNode *children;
     uint8_t child_count; /* CATEGORY: number of children */
 } SettingNode;
@@ -53,6 +56,7 @@ static void buzzerSoundSet(bool on)
 
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
+    {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
 };
 
 static const SettingNode s_root = {
@@ -132,6 +136,12 @@ MenuTransition settingsMenuUpdate(void)
             item->set(!item->get());
             buzzerPlay(0U, false, s_toggle_notes, 2U);
         }
+        else if (item->kind == SETTING_ACTION && item->action)
+        {
+            buzzerPlay(0U, false, s_toggle_notes, 2U);
+            item->action();      /* blocks for the action's lifetime */
+            menuResetSurface();  /* the action owned the screen; restore ours */
+        }
         else if (item->kind == SETTING_CATEGORY && (s_depth + 1U < SETTINGS_MAX_DEPTH))
         {
             s_depth++;
@@ -163,7 +173,7 @@ static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool sel
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, value));
         n = menuDrawText(n, &font8x8, vx, y, on ? g_menu_pal_accent : g_menu_pal_footer, value);
     }
-    else if (item->kind == SETTING_CATEGORY)
+    else if (item->kind == SETTING_CATEGORY || item->kind == SETTING_ACTION)
     {
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, ">"));
         n = menuDrawText(n, &font8x8, vx, y, label_pal, ">");

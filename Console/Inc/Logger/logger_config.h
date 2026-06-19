@@ -23,6 +23,7 @@
 #define LOGGER_SDIO 1
 #define LOGGER_EEPROM 1
 #define LOGGER_NETWORK 1
+#define LOGGER_FLASHER 1 /* ESP-01 firmware flashing over USART1 */
 #define LOGGER_MENU 1
 #define LOGGER_GAME 1   /* logs funnelled in from loaded games via api.log() */
 #define LOGGER_KERNEL 1 /* syscall trust-boundary events: rejected pointers, bad ids */

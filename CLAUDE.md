@@ -77,6 +77,7 @@ Deep-dive docs live in `docu/`:
 - `docu/kernel.md` — game isolation, ground-up: privilege/stack model, the SVC syscall ABI, the SVC-in/PendSV-out context switch, MPU protection, pointer validation, fault recovery, interrupt priorities (with diagrams)
 - `docu/renderer.md` — the renderer, ground-up: frame pipeline, the hot loop, and the 24→76 FPS optimization journey
 - `docu/memory.md` — authoritative SRAM/CCM/flash map, game binary layout, EEPROM layout, linker scripts
+- `docu/flasher.md` — ESP-01 flashing, ground-up: the esp-serial-flasher submodule + bare-metal vtable port, USART1 driver, bootstrap sequence, the flash flow, build integration, and troubleshooting
 - `docu/HW.md` — Hardware schematics and full pinout
 - `docu/game_template/README.md` — guide for creating new games + the full game-facing API reference, with a copyable `startup.s` template
 
@@ -113,7 +114,13 @@ Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). 
 Two uses: **ADC1 DMA** (DMA2 Stream0, circular, 16-bit) transfers 4 ADC channels continuously, and **FSMC DMA** (DMA2 Stream6, memory-to-memory) bursts pixel data to the ILI9341 display for opaque tile rendering.
 
 ### Network
-ESP-01 on USART1 (PA9/PA10, 921600 baud). **Not yet implemented** — `network.c` is a stub. The ESP-01 sketch in `Shared/Esp01s/Esp01s.ino` currently only blinks the LED and opens a serial connection.
+ESP-01 on USART1 (PA9/PA10, 921600 baud). The runtime network protocol is **not yet implemented** — `network.c` is a stub. The ESP-01 sketch in `Shared/Esp01s/Esp01s.ino` currently only blinks the LED and opens a serial connection. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher.
+
+### ESP Flasher
+Reflashes the ESP-01 firmware from the SD card (Settings → **Upgrade WiFi module**). Built on the vendored `tools/esp-serial-flasher` submodule (HAL-free core; the bundled HAL `port/stm32_port.c` is **not** compiled). Our glue lives in `Console/Src/Flasher/`:
+- `esp_flasher_port.c` — a bare-metal `esp_loader_port_ops_t` vtable over `usart.c` (polled byte I/O with timeouts) and the ESP-01 bootstrap pins exposed by `gpio.c` (`esp01SetEnable/Reset/Bootloader`: EN=PB10, RST=PB6, IO0=PC6, IO2=PC13). `enter_bootloader` drives IO0 low + pulses RST to enter the ROM download loader.
+- `esp_flasher.c` — `espFlasherFlashFile(path, cb, ctx)`: streams the image off FatFs in 1 KB blocks, connects at 115200 with the ESP8266 RAM stub, programs at flash offset 0, MD5-verifies, then resets the ESP to boot the new firmware. Reports progress through the callback.
+The UI (`MainMenu/wifi_update.c`) is a blocking modal (like launching a game): it looks for `ESP01.bin` at the card root, shows a progress bar, and waits for Special Button 2. Producing `ESP01.bin` (Arduino/PlatformIO) is out of scope for now. Logs on the `LOGGER_FLASHER` channel.
 
 ### Logging
 Severity-tagged logging over SWO/ITM (`Console/Src/Logger/logger.c`). Console code logs through macros:

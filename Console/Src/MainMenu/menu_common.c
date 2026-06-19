@@ -104,13 +104,13 @@ static uint16_t drawTextScaled(uint16_t idx, const Font *font, int16_t x, int16_
     return idx;
 }
 
-/* A horizontal accent bar of `width` px, starting at x, on row y. */
-static uint16_t drawBar(uint16_t idx, int16_t x, int16_t y, uint16_t width)
+/* A horizontal bar of `width` px, starting at x, on row y, in `palette`'s ink. */
+uint16_t menuDrawBar(uint16_t idx, int16_t x, int16_t y, uint16_t width, const uint16_t *palette)
 {
     for (int16_t sx = x; sx < (int16_t)(x + width) && idx < MENU_MAX_SPRITES; sx += BAR_SEG_W)
     {
         g_menu_ui[idx++] = (Sprite){.x = sx, .y = y, .w = BAR_SEG_W, .h = BAR_SEG_H, .z = 0U,
-                                    .flags = SPRITE_OPAQUE, .pixels = s_bar_tile, .palette = g_menu_pal_accent};
+                                    .flags = SPRITE_OPAQUE, .pixels = s_bar_tile, .palette = palette};
     }
     return idx;
 }
@@ -123,7 +123,7 @@ uint16_t menuDrawTitle(uint16_t idx, const char *text)
     const int16_t title_x = (int16_t)((screen_w - (int16_t)title_w) / 2);
 
     idx = drawTextScaled(idx, &font8x8, title_x, TITLE_Y, TITLE_SCALE, g_menu_pal_title, text);
-    idx = drawBar(idx, title_x, UNDERLINE_Y, title_w);
+    idx = menuDrawBar(idx, title_x, UNDERLINE_Y, title_w, g_menu_pal_accent);
     return idx;
 }
 

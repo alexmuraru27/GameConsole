@@ -16,6 +16,10 @@ OPT = -Og
 ######################################
 # source
 ######################################
+# Root of the vendored esp-serial-flasher submodule (HAL-free core only; the
+# bundled HAL port/stm32_port.c is deliberately NOT compiled — see Src/Flasher).
+ESP_FLASHER_DIR = ../tools/esp-serial-flasher
+
 # C sources
 C_SOURCES =  \
 Src/main.c \
@@ -42,6 +46,9 @@ Src/MainMenu/main_menu.c \
 Src/MainMenu/menu_common.c \
 Src/MainMenu/game_list.c \
 Src/MainMenu/settings_menu.c \
+Src/MainMenu/wifi_update.c \
+Src/Flasher/esp_flasher.c \
+Src/Flasher/esp_flasher_port.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
@@ -60,7 +67,14 @@ Src/Renderer/renderer_testing.c \
 Src/Kernel/faults.c \
 Src/Kernel/syscall.c \
 Src/Kernel/mpu.c \
-Src/Kernel/scheduler.c
+Src/Kernel/scheduler.c \
+$(ESP_FLASHER_DIR)/src/esp_loader.c \
+$(ESP_FLASHER_DIR)/src/esp_targets.c \
+$(ESP_FLASHER_DIR)/src/md5_hash.c \
+$(ESP_FLASHER_DIR)/src/protocol_serial.c \
+$(ESP_FLASHER_DIR)/src/protocol_uart.c \
+$(ESP_FLASHER_DIR)/src/slip.c \
+$(wildcard $(ESP_FLASHER_DIR)/src/stubs/*.c)
 
 # ASM sources
 ASM_SOURCES =  \
@@ -89,6 +103,9 @@ C_INCLUDES =  \
 -IInc/Logger \
 -IInc/SettingsStorage \
 -IInc/Kernel \
+-IInc/Flasher \
+-I$(ESP_FLASHER_DIR)/include \
+-I$(ESP_FLASHER_DIR)/private_include \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
 -IInc/Fonts \

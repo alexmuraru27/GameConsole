@@ -207,6 +207,8 @@ static void peripheralsClockEnable(void)
     RCC->APB2ENR |= RCC_APB2ENR_ADC1EN;
     // Pass clock to SDIO
     RCC->APB2ENR |= RCC_APB2ENR_SDIOEN;
+    // usart1 (ESP-01 link)
+    RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
 }
 
 void enableFPU(void)

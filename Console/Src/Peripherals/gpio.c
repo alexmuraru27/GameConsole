@@ -2,9 +2,38 @@
 #include <stm32f407xx.h>
 #include "logger.h"
 
-static void initGpioUsart3()
+static void initGpioEsp01()
 {
-    // TODO initGpioUsart3
+    // ESP-01 link on USART1 + bootstrap control pins (see docu/HW.md):
+    //   PA9  (USART1 TX, AF7)   PA10 (USART1 RX, AF7)
+    //   PB10 (EN/CH_PD, GPIO)   PB6  (RST, GPIO)
+    //   PC6  (IO0/GPIO0, GPIO)  PC13 (IO2/GPIO2, GPIO)
+    // Idle levels run the ESP normally: EN/RST/IO0/IO2 all high. The flasher
+    // drives IO0 low + pulses RST to enter the ROM bootloader.
+
+    // ---- PA9, PA10 -> AF7 (USART1) ----
+    GPIOA->MODER &= ~(GPIO_MODER_MODE9_Msk | GPIO_MODER_MODE10_Msk);
+    GPIOA->MODER |= (2U << GPIO_MODER_MODE9_Pos) | (2U << GPIO_MODER_MODE10_Pos);
+    GPIOA->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED9_Pos) | (3U << GPIO_OSPEEDR_OSPEED10_Pos);
+    // Pull-up on RX so the line idles high when the ESP is absent/quiet.
+    GPIOA->PUPDR &= ~(GPIO_PUPDR_PUPD9_Msk | GPIO_PUPDR_PUPD10_Msk);
+    GPIOA->PUPDR |= (1U << GPIO_PUPDR_PUPD10_Pos);
+    GPIOA->AFR[1] &= ~(GPIO_AFRH_AFSEL9_Msk | GPIO_AFRH_AFSEL10_Msk);
+    GPIOA->AFR[1] |= (7U << GPIO_AFRH_AFSEL9_Pos) | (7U << GPIO_AFRH_AFSEL10_Pos);
+
+    // ---- PB10 (EN), PB6 (RST) -> push-pull outputs, idle high ----
+    GPIOB->MODER &= ~(GPIO_MODER_MODE10_Msk | GPIO_MODER_MODE6_Msk);
+    GPIOB->MODER |= (1U << GPIO_MODER_MODE10_Pos) | (1U << GPIO_MODER_MODE6_Pos);
+    GPIOB->OTYPER &= ~(GPIO_OTYPER_OT10 | GPIO_OTYPER_OT6);
+    GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD10_Msk | GPIO_PUPDR_PUPD6_Msk);
+    GPIOB->BSRR = GPIO_BSRR_BS10 | GPIO_BSRR_BS6;
+
+    // ---- PC6 (IO0), PC13 (IO2) -> push-pull outputs, idle high ----
+    GPIOC->MODER &= ~(GPIO_MODER_MODE6_Msk | GPIO_MODER_MODE13_Msk);
+    GPIOC->MODER |= (1U << GPIO_MODER_MODE6_Pos) | (1U << GPIO_MODER_MODE13_Pos);
+    GPIOC->OTYPER &= ~(GPIO_OTYPER_OT6 | GPIO_OTYPER_OT13);
+    GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD6_Msk | GPIO_PUPDR_PUPD13_Msk);
+    GPIOC->BSRR = GPIO_BSRR_BS6 | GPIO_BSRR_BS13;
 }
 
 static void initGpioJoystick()
@@ -208,6 +237,23 @@ bool sdCardPresent(void)
     return (GPIOD->IDR & GPIO_IDR_ID3_Msk) == 0U;
 }
 
+/* ---- ESP-01 bootstrap pins (active-low logic, idle high) ---- */
+
+void esp01SetEnable(bool enabled)
+{
+    GPIOB->BSRR = enabled ? GPIO_BSRR_BS10 : GPIO_BSRR_BR10; // PB10 (EN)
+}
+
+void esp01SetReset(bool in_reset)
+{
+    GPIOB->BSRR = in_reset ? GPIO_BSRR_BR6 : GPIO_BSRR_BS6; // PB6 (RST), low = reset
+}
+
+void esp01SetBootloader(bool enter)
+{
+    GPIOC->BSRR = enter ? GPIO_BSRR_BR6 : GPIO_BSRR_BS6; // PC6 (IO0), low = bootloader
+}
+
 // Returns a 10-bit bitmask of active buttons (active-low pins, already inverted).
 // Bit layout matches JOYSTICK_DATA_*_BTN_* positions in joystick.c:
 //   0=R_Up 1=R_Right 2=R_Down 3=R_Left 4=L_Up 5=L_Right 6=L_Down 7=L_Left
@@ -232,7 +278,7 @@ uint16_t gpioReadButtons(void)
 
 void gpioInit(void)
 {
-    initGpioUsart3();
+    initGpioEsp01();
     initGpioJoystick();
     initGpioAdc1();
     initGpioBuzzer();
