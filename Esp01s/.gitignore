@@ -1,0 +1,2 @@
+# PlatformIO build tree (firmware.bin lives here; deploy copies it to the SD card)
+.pio/

@@ -12,6 +12,7 @@ all: $(BUILD_DIR)
 	$(MAKE) -C GameXO all
 	$(MAKE) -C Console all
 	$(MAKE) -C Shared all
+	$(MAKE) -C Esp01s build
 
 flash:  $(BUILD_DIR)
 	$(MAKE) -C Console flash
@@ -21,6 +22,13 @@ flashswo: flash
 
 deploy: $(BUILD_DIR)
 	$(MAKE) -C GameXO deploy
+
+# ESP-01S WiFi-module firmware (separate PlatformIO target, see Esp01s/).
+esp:
+	$(MAKE) -C Esp01s build
+
+deployesp:
+	$(MAKE) -C Esp01s deploy
 
 $(BUILD_DIR):
 	mkdir $@		

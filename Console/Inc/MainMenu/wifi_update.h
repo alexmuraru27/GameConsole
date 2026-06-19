@@ -9,4 +9,12 @@
  */
 void wifiUpdateRun(void);
 
+/*
+ * "Test WiFi module" flow. Resets the ESP, listens on USART1 at the runtime
+ * baud, and shows its UART heartbeat (received byte count + last line) on
+ * screen — a quick "is the ESP alive?" check, independent of the on-board LED.
+ * Blocking; returns on Special Button 2.
+ */
+void wifiTestRun(void);
+
 #endif /* __WIFI_UPDATE_H */

@@ -15,9 +15,12 @@ make clean          # Remove all build artifacts
 
 make -C Console all # Build only the console firmware
 make -C GameXO all  # Build only the GameXO game binary
+
+make esp            # Build the ESP-01S WiFi firmware (Esp01s/) via PlatformIO
+make deployesp      # Copy the built ESP firmware to SD as ESP01.bin (for "Upgrade WiFi module")
 ```
 
-`DEBUG=1` is on by default in `common.mk`. Add `GCC_PATH=<path>` if the ARM toolchain isn't on PATH.
+`DEBUG=1` is on by default in `common.mk`. Add `GCC_PATH=<path>` if the ARM toolchain isn't on PATH. `make esp` needs the PlatformIO CLI (`pio`); override with `PIO=<path>` if it isn't on PATH.
 
 ## Architecture
 
@@ -114,7 +117,7 @@ Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). 
 Two uses: **ADC1 DMA** (DMA2 Stream0, circular, 16-bit) transfers 4 ADC channels continuously, and **FSMC DMA** (DMA2 Stream6, memory-to-memory) bursts pixel data to the ILI9341 display for opaque tile rendering.
 
 ### Network
-ESP-01 on USART1 (PA9/PA10, 921600 baud). The runtime network protocol is **not yet implemented** — `network.c` is a stub. The ESP-01 sketch in `Shared/Esp01s/Esp01s.ino` currently only blinks the LED and opens a serial connection. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher.
+ESP-01S on USART1 (PA9/PA10, 921600 baud runtime). The runtime network protocol is **not yet implemented** — the console-side API (`Console/Src/Network/network.c`, `networkInit`/`networkIsConnected`) is a stub. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher. The console↔ESP wire contract (baud, protocol version, command IDs) is the header-only `Shared/Esp01s/network_protocol.h`, shared by both sides. The ESP-01S firmware itself is a separate PlatformIO target at **`Esp01s/`** (board `esp01_1m`, Arduino framework) — currently a blinky; build it with `make esp` and copy it to the SD card as `ESP01.bin` with `make deployesp` (for the flasher). See `Esp01s/README.md`.
 
 ### ESP Flasher
 Reflashes the ESP-01 firmware from the SD card (Settings → **Upgrade WiFi module**). Built on the vendored `tools/esp-serial-flasher` submodule (HAL-free core; the bundled HAL `port/stm32_port.c` is **not** compiled). Our glue lives in `Console/Src/Flasher/`:

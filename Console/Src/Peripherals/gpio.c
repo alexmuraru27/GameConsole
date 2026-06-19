@@ -8,8 +8,12 @@ static void initGpioEsp01()
     //   PA9  (USART1 TX, AF7)   PA10 (USART1 RX, AF7)
     //   PB10 (EN/CH_PD, GPIO)   PB6  (RST, GPIO)
     //   PC6  (IO0/GPIO0, GPIO)  PC13 (IO2/GPIO2, GPIO)
-    // Idle levels run the ESP normally: EN/RST/IO0/IO2 all high. The flasher
-    // drives IO0 low + pulses RST to enter the ROM bootloader.
+    // EN and RST are console-owned (driven high to enable/run). IO0 and IO2 are
+    // functional GPIOs of the *running* ESP firmware (the ESP-01S LED is on
+    // GPIO2), so the console must NOT hold them: they idle as inputs (Hi-Z) and
+    // the module's pull-ups keep them high for a normal boot. The flasher only
+    // drives IO0 low transiently to enter the ROM bootloader (esp01SetBootloader);
+    // IO2 is never driven, leaving GPIO2 free for the firmware.
 
     // ---- PA9, PA10 -> AF7 (USART1) ----
     GPIOA->MODER &= ~(GPIO_MODER_MODE9_Msk | GPIO_MODER_MODE10_Msk);
@@ -28,12 +32,16 @@ static void initGpioEsp01()
     GPIOB->PUPDR &= ~(GPIO_PUPDR_PUPD10_Msk | GPIO_PUPDR_PUPD6_Msk);
     GPIOB->BSRR = GPIO_BSRR_BS10 | GPIO_BSRR_BS6;
 
-    // ---- PC6 (IO0), PC13 (IO2) -> push-pull outputs, idle high ----
+    // ---- PC6 (IO0), PC13 (IO2) -> inputs with internal pull-up. The pull-up
+    // gently holds both straps high for a normal boot (GPIO0=1, GPIO2=1) without
+    // fighting the firmware: a running ESP drives them push-pull, easily
+    // overriding the ~40k pull-up. IO0 is switched to output-low only during the
+    // flash bootstrap (esp01SetBootloader); IO2 is never driven, so the firmware
+    // owns GPIO2 (the on-board LED).
     GPIOC->MODER &= ~(GPIO_MODER_MODE6_Msk | GPIO_MODER_MODE13_Msk);
-    GPIOC->MODER |= (1U << GPIO_MODER_MODE6_Pos) | (1U << GPIO_MODER_MODE13_Pos);
     GPIOC->OTYPER &= ~(GPIO_OTYPER_OT6 | GPIO_OTYPER_OT13);
     GPIOC->PUPDR &= ~(GPIO_PUPDR_PUPD6_Msk | GPIO_PUPDR_PUPD13_Msk);
-    GPIOC->BSRR = GPIO_BSRR_BS6 | GPIO_BSRR_BS13;
+    GPIOC->PUPDR |= (1U << GPIO_PUPDR_PUPD6_Pos) | (1U << GPIO_PUPDR_PUPD13_Pos);
 }
 
 static void initGpioJoystick()
@@ -251,7 +259,18 @@ void esp01SetReset(bool in_reset)
 
 void esp01SetBootloader(bool enter)
 {
-    GPIOC->BSRR = enter ? GPIO_BSRR_BR6 : GPIO_BSRR_BS6; // PC6 (IO0), low = bootloader
+    // PC6 (IO0): drive low to select the ROM bootloader; otherwise release to
+    // input (Hi-Z) so the module's pull-up restores high and the running ESP
+    // firmware owns GPIO0. Driving it high (push-pull) would fight the firmware.
+    if (enter)
+    {
+        GPIOC->BSRR = GPIO_BSRR_BR6; // preset low before enabling the output
+        GPIOC->MODER = (GPIOC->MODER & ~GPIO_MODER_MODE6_Msk) | (1U << GPIO_MODER_MODE6_Pos);
+    }
+    else
+    {
+        GPIOC->MODER &= ~GPIO_MODER_MODE6_Msk; // back to input (Hi-Z)
+    }
 }
 
 // Returns a 10-bit bitmask of active buttons (active-low pins, already inverted).

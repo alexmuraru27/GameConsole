@@ -57,6 +57,7 @@ static void buzzerSoundSet(bool on)
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
     {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
+    {.label = "Test WiFi module", .kind = SETTING_ACTION, .action = wifiTestRun},
 };
 
 static const SettingNode s_root = {

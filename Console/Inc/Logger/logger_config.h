@@ -9,7 +9,7 @@
  * ERROR(0) < WARN(1) < INFO(2) < DEBUG(3); a site prints only when its level is
  * <= LOGGER_MAX_LEVEL. Drop this to LOGGER_LEVEL_WARN for a quieter build.
  */
-#define LOGGER_MAX_LEVEL LOGGER_LEVEL_WARN
+#define LOGGER_MAX_LEVEL LOGGER_LEVEL_DEBUG
 
 /* Per-channel switches (1 = enabled, 0 = silenced). */
 #define LOGGER_CORE 1

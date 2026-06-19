@@ -112,8 +112,16 @@ The ESP-01 link and its strap pins (see [`docu/HW.md`](HW.md)):
 | USART1 RX  | PA10 (AF7)| ESP→host  | responses |
 | EN / CH_PD | PB10      | output    | held **high** = chip enabled |
 | RST        | PB6       | output    | pulsed **low** to reset |
-| IO0 / GPIO0| PC6       | output    | **low at reset** = ROM bootloader |
-| IO2 / GPIO2| PC13      | output    | held **high** at reset |
+| IO0 / GPIO0| PC6       | **Hi-Z**, driven low only during entry | **low at reset** = ROM bootloader |
+| IO2 / GPIO2| PC13      | **Hi-Z** (never driven) | module pull-up holds high at reset |
+
+> **IO0/IO2 are functional GPIOs of the *running* ESP firmware** (the ESP-01S
+> on-board LED is on GPIO2). The console must not hold them once flashing is
+> done — they idle as **inputs (Hi-Z)** and the module's pull-ups keep them high
+> for a normal boot. `esp01SetBootloader` drives IO0 low (output) only for the
+> bootloader-entry pulse, then releases it back to Hi-Z; IO2 is never driven, so
+> the firmware owns the LED. Holding either as a push-pull output would fight the
+> firmware (a freshly-flashed blinky wouldn't blink).
 
 Pin knowledge lives in `gpio.c`, which exposes three intention-named helpers so
 the flasher never pokes registers directly:
@@ -231,6 +239,12 @@ It is wired into the settings tree via the `SETTING_ACTION` leaf kind in
 When entered, the menu calls `item->action()` (which blocks for the flash's
 lifetime) and then `menuResetSurface()` to restore the settings screen.
 
+A sibling action, **Test WiFi module** (`wifiTestRun()` in the same module),
+resets the ESP, switches USART1 to the runtime baud (921600), and listens to the
+ESP's UART heartbeat — showing the received byte count and last line on screen.
+It's the quick "is the ESP actually running?" check, independent of the on-board
+LED (which on the ESP-01S is GPIO2; see `Esp01s/README.md`).
+
 > Rendering happens *between* `flash_write` calls, never during one, so it can't
 > disturb protocol timing. The buzzer/joystick ISRs keep running throughout; the
 > success/failure chimes play only after flashing finishes.
@@ -274,9 +288,10 @@ start/finish, and every error path — but **never** inside the read/write loops
 
 ## 10. Using it / verifying on hardware
 
-1. Build a `ESP01.bin` for the ESP-01 (Arduino/PlatformIO) — *out of scope here*;
-   it must be the full image flashed from address 0.
-2. Copy `ESP01.bin` to the **root** of the SD card.
+1. Build the [`Esp01s/`](../Esp01s) PlatformIO project (`pio run`) — the full
+   image, flashed from address 0.
+2. Copy it to the **root** of the SD card as `ESP01.bin` via `make -C Esp01s
+   deploy` (or top-level `make deploy`).
 3. `make flashswo` to flash the console and watch SWO.
 4. On the device: **Settings → Upgrade WiFi module**.
 5. The `[FLAS]` log should narrate connect → erase → per-block progress → MD5
