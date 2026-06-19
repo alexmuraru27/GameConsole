@@ -1,0 +1,9 @@
+# Served payloads are user-provided — keep the folder layout, not the binaries.
+content/**/*.bin
+content/**/*.pak
+content/**/*.hex
+# Generated manifest (the server serves a live one anyway).
+content/manifest.csv
+
+__pycache__/
+*.pyc

@@ -142,10 +142,9 @@ flash: $(BUILD_DIR)/$(TARGET).elf
 
 
 deploy: $(BUILD_DIR)/$(TARGET).bin $(PAK)
-	cp -f $(BUILD_DIR)/$(TARGET).bin $(SD_CARD_PATH)/
-	cp -f $(PAK) $(SD_CARD_PATH)/
-	sync
-	@echo "$(TARGET).bin + $(TARGET).pak copied to SD card $(SD_CARD_PATH)"
+	@mkdir -p $(UPDATE_SERVER_CONTENT)/games
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(PAK) $(UPDATE_SERVER_CONTENT)/games/
+	@echo "$(TARGET).bin + $(TARGET).pak -> update server $(UPDATE_SERVER_CONTENT)/games"
 #######################################
 # clean up
 #######################################

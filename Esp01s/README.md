@@ -36,11 +36,10 @@ make esp           # builds via PlatformIO -> .pio/build/esp01s/firmware.bin
 (Equivalent to `pio run` inside this directory, or the PlatformIO VS Code
 extension. If `pio` isn't on PATH, override it: `make esp PIO=/path/to/pio`.)
 
-## Deploy to the console
+## Deploy
 
-`make deployesp` copies the built firmware to the SD card as `ESP01.bin` (the
-name the flasher looks for). Set `SD_CARD_PATH` in
-[`../common.mk`](../common.mk), then from the repo root:
+`make deployesp` stages the built firmware into the update-server content tree as
+`tools/update_server/content/wifi/ESP01.bin` (the name the flasher looks for):
 
 ```bash
 make deployesp
@@ -48,9 +47,15 @@ make deployesp
 
 (It skips quietly if you haven't built the firmware yet, so it never errors out.)
 
-Then on the console: **Settings → Upgrade WiFi module**. The console drives the
-ESP into its ROM bootloader and flashes the image, showing a progress bar. See
-[`../docu/flasher.md`](../docu/flasher.md) for the flashing internals.
+From there the console gets it one of two ways:
+- **Now (manual):** copy `ESP01.bin` onto the SD-card root yourself, then on the
+  console: **Settings → Upgrade WiFi module**.
+- **Later (over WiFi):** the console pulls it from the update server (see
+  [`../tools/update_server`](../tools/update_server)).
+
+Either way the console drives the ESP into its ROM bootloader and flashes the
+image, showing a progress bar. See [`../docu/flasher.md`](../docu/flasher.md) for
+the flashing internals.
 
 > Deploy is manual today. The plan is a PC-side server holding these images,
 > which the console pulls over WiFi once the runtime link exists.

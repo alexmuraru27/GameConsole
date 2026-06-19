@@ -1,0 +1,8 @@
+# Optional advisory versions for the update manifest: "path,version".
+# Any file not listed here defaults to version 1. The console can use this to
+# decide whether an update is newer, but integrity is always confirmed by the
+# per-file CRC-32 in the manifest. Lines starting with '#' are ignored.
+#
+# path,version
+# games/GameXO.bin,2
+# wifi/ESP01.bin,3

@@ -1,7 +1,10 @@
 ######################################
-# GAME_DEPLOY_DIR
+# DEPLOY
 ######################################
-SD_CARD_PATH = /mnt/sd
+# Update-server content tree (the console will pull these over WiFi). Path is
+# relative to the deploying sub-makefile (GameXO/, Esp01s/), which sit one level
+# under the repo root, so ../tools/... resolves from either.
+UPDATE_SERVER_CONTENT = ../tools/update_server/content
 
 ######################################
 # OPENOCD

@@ -10,14 +10,14 @@ Requires `arm-none-eabi-gcc` toolchain and `openocd` on PATH.
 make all            # Build Console firmware + GameXO game + Shared (header check)
 make flash          # Flash Console firmware via OpenOCD/STLink
 make flashswo       # Flash and start SWO trace output via tools/scripts/swo.sh
-make deploy         # Copy GameXO.bin to SD card at /mnt/sd (set SD_CARD_PATH in common.mk)
+make deploy         # Copy GameXO.bin + .pak into the update-server tree (tools/update_server/content/games)
 make clean          # Remove all build artifacts
 
 make -C Console all # Build only the console firmware
 make -C GameXO all  # Build only the GameXO game binary
 
 make esp            # Build the ESP-01S WiFi firmware (Esp01s/) via PlatformIO
-make deployesp      # Copy the built ESP firmware to SD as ESP01.bin (for "Upgrade WiFi module")
+make deployesp      # Copy the built ESP firmware into the update-server tree (tools/update_server/content/wifi/ESP01.bin)
 ```
 
 `DEBUG=1` is on by default in `common.mk`. Add `GCC_PATH=<path>` if the ARM toolchain isn't on PATH. `make esp` needs the PlatformIO CLI (`pio`); override with `PIO=<path>` if it isn't on PATH.
@@ -117,7 +117,7 @@ Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). 
 Two uses: **ADC1 DMA** (DMA2 Stream0, circular, 16-bit) transfers 4 ADC channels continuously, and **FSMC DMA** (DMA2 Stream6, memory-to-memory) bursts pixel data to the ILI9341 display for opaque tile rendering.
 
 ### Network
-ESP-01S on USART1 (PA9/PA10, 921600 baud runtime). The runtime network protocol is **not yet implemented** — the console-side API (`Console/Src/Network/network.c`, `networkInit`/`networkIsConnected`) is a stub. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher. The console↔ESP wire contract (baud, protocol version, command IDs) is the header-only `Shared/Esp01s/network_protocol.h`, shared by both sides. The ESP-01S firmware itself is a separate PlatformIO target at **`Esp01s/`** (board `esp01_1m`, Arduino framework) — currently a blinky; build it with `make esp` and copy it to the SD card as `ESP01.bin` with `make deployesp` (for the flasher). See `Esp01s/README.md`.
+ESP-01S on USART1 (PA9/PA10, 921600 baud runtime). The runtime network protocol is **not yet implemented** — the console-side API (`Console/Src/Network/network.c`, `networkInit`/`networkIsConnected`) is a stub. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher. The console↔ESP wire contract (baud, protocol version, command IDs) is the header-only `Shared/Esp01s/network_protocol.h`, shared by both sides. The ESP-01S firmware itself is a separate PlatformIO target at **`Esp01s/`** (board `esp01_1m`, Arduino framework) — currently a blinky; build it with `make esp` and stage it into the update-server tree with `make deployesp` (which writes `tools/update_server/content/wifi/ESP01.bin`). See `Esp01s/README.md`.
 
 ### ESP Flasher
 Reflashes the ESP-01 firmware from the SD card (Settings → **Upgrade WiFi module**). Built on the vendored `tools/esp-serial-flasher` submodule (HAL-free core; the bundled HAL `port/stm32_port.c` is **not** compiled). Our glue lives in `Console/Src/Flasher/`:
@@ -162,6 +162,10 @@ Loaded games can't link the logger, so they log via the ConsoleAPI: `api.log("sc
 
 `tools/memory_analysis/memory_analysis.py` — CLI that parses GNU LD `.map` files (post-link section sizes) and/or `.ld` linker scripts (region capacities, no build required) into a per-region RAM/CCM/flash usage report: per-section breakdown, percentages, NOLOAD/LMA awareness, and free-space projections. With no args it auto-discovers the Console + GameXO maps under `build/` and compares them side by side; `--json` for machine output, `--no-color`/`--quiet` for plain or summary-only. Standard-library only (Python 3.10+). Modular package (`memoryanalysis/ld_parser.py`, `map_parser.py`, `model.py`, `report.py`, `cli.py`). This is the tool that answers "how much RAM is left?" — the renderer's static buffers dominate `CONSOLE_RAM`. See `tools/memory_analysis/README.md`.
 
+## Update Server
+
+`tools/update_server/update_server.py` — a stdlib-only HTTP server that hosts updatable content the console will pull over WiFi (once the runtime network link exists): games + their `.pak`s, the ESP-01 firmware (`ESP01.bin`), and — later — console OS images. The content root has one subfolder per **category** (`games/`, `wifi/`, `os/`); the category is the folder name. It serves `GET /manifest.csv` (generated live: `category,name,path,size,crc32,version`) and `GET /<path>` for the files. The manifest is **CSV on purpose** — trivial to parse on the STM32 with no JSON/YAML parser — and `crc32` is the zlib/IEEE CRC-32, bit-for-bit identical to the console's `crc32_calculate` and the packer, so the device recomputes it to confirm a clean download (and to detect changes). An optional `versions.csv` (`path,version`) supplies advisory versions (default 1). Modular package (`updateserver/catalog.py`, `manifest.py`, `crc.py`) + argparse/`http.server` frontend; `--generate` writes `manifest.csv` and exits. LAN/dev tool (no auth/TLS). See `tools/update_server/README.md`.
+
 ## Asset System
 
 The pipeline is **author → pack → load**:
@@ -173,15 +177,16 @@ The pipeline is **author → pack → load**:
 
 ## Tools Architecture
 
-The repo ships four Python tools that share one shape — a dependency-free **core** library holding the domain logic, wrapped by a thin frontend:
+The repo ships five Python tools that share one shape — a dependency-free **core** library holding the domain logic, wrapped by a thin frontend:
 - **Pixel Forge** and **Music Creator** are PyQt6 desktop GUIs (Qt-free core + Qt GUI layer).
 - **Asset Packer** and **Memory Analysis** are CLIs (core + argparse frontend).
+- **Update Server** is a CLI/HTTP server (core + argparse/`http.server` frontend).
 
 Shared conventions:
 - **Qt-free / UI-free core** library with the domain logic (no frontend dependency)
 - **Thin frontend** (Qt GUI or CLI) that imports the core
 - **VS Code launch configs** in `.vscode/launch.json` for each tool
-- **PyYAML** is the shared config/manifest format for the GUI tools and the packer (Memory Analysis is standard-library only)
+- **PyYAML** is the shared config/manifest format for the GUI tools and the packer (Memory Analysis and the Update Server are standard-library only)
 
 ## Naming Conventions
 

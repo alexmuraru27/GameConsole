@@ -11,13 +11,13 @@ FIRMWARE = .pio/build/esp01s/firmware.bin
 build:
 	$(PIO) run
 
-# Copy the built ESP firmware onto the SD card as ESP01.bin for the console's
-# "Upgrade WiFi module" flow. Skips quietly if the firmware hasn't been built,
-# so it never breaks the top-level `make deploy`.
+# Copy the built ESP firmware into the update server as wifi/ESP01.bin. Skips
+# quietly if the firmware hasn't been built, so it never breaks `make deployesp`.
 deploy:
 	@if [ -f $(FIRMWARE) ]; then \
-		cp -f $(FIRMWARE) $(SD_CARD_PATH)/ESP01.bin && sync && \
-		echo "ESP01.bin copied to SD card $(SD_CARD_PATH)"; \
+		mkdir -p $(UPDATE_SERVER_CONTENT)/wifi && \
+		cp -f $(FIRMWARE) $(UPDATE_SERVER_CONTENT)/wifi/ESP01.bin && \
+		echo "ESP01.bin -> update server $(UPDATE_SERVER_CONTENT)/wifi"; \
 	else \
 		echo "skip ESP01.bin: $(FIRMWARE) not built (run 'pio run' in Esp01s/ first)"; \
 	fi
