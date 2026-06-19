@@ -10,14 +10,13 @@ Requires `arm-none-eabi-gcc` toolchain and `openocd` on PATH.
 make all            # Build Console firmware + GameXO game + Shared (header check)
 make flash          # Flash Console firmware via OpenOCD/STLink
 make flashswo       # Flash and start SWO trace output via tools/scripts/swo.sh
-make deploy         # Copy GameXO.bin + .pak into the update-server tree (tools/update_server/content/games)
+make deploy         # Stage everything into the update-server tree: GameXO.bin + .pak (content/games) and, if built, ESP01.bin (content/wifi)
 make clean          # Remove all build artifacts
 
 make -C Console all # Build only the console firmware
 make -C GameXO all  # Build only the GameXO game binary
 
 make esp            # Build the ESP-01S WiFi firmware (Esp01s/) via PlatformIO
-make deployesp      # Copy the built ESP firmware into the update-server tree (tools/update_server/content/wifi/ESP01.bin)
 ```
 
 `DEBUG=1` is on by default in `common.mk`. Add `GCC_PATH=<path>` if the ARM toolchain isn't on PATH. `make esp` needs the PlatformIO CLI (`pio`); override with `PIO=<path>` if it isn't on PATH.
@@ -117,7 +116,13 @@ Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). 
 Two uses: **ADC1 DMA** (DMA2 Stream0, circular, 16-bit) transfers 4 ADC channels continuously, and **FSMC DMA** (DMA2 Stream6, memory-to-memory) bursts pixel data to the ILI9341 display for opaque tile rendering.
 
 ### Network
-ESP-01S on USART1 (PA9/PA10, 921600 baud runtime). The runtime network protocol is **not yet implemented** — the console-side API (`Console/Src/Network/network.c`, `networkInit`/`networkIsConnected`) is a stub. USART1 itself is brought up (`usart.c`: polled 8N1, PCLK2 84 MHz, default 115200) and is used today by the ESP Flasher. The console↔ESP wire contract (baud, protocol version, command IDs) is the header-only `Shared/Esp01s/network_protocol.h`, shared by both sides. The ESP-01S firmware itself is a separate PlatformIO target at **`Esp01s/`** (board `esp01_1m`, Arduino framework) — currently a blinky; build it with `make esp` and stage it into the update-server tree with `make deployesp` (which writes `tools/update_server/content/wifi/ESP01.bin`). See `Esp01s/README.md`.
+ESP-01S on USART1 (PA9/PA10), 115200 baud runtime (`usart.c`: polled 8N1; at 115200 there's ample per-byte slack so the polled reader doesn't overrun). The console talks to the ESP over a **framed request/response protocol** (`Shared/Esp01s/network_protocol.h`, shared by both sides): `0xA5 0x5A | type | len:u16 | payload | crc16`. The console is the master — it sends one command and reads exactly one response, so its polled USART receiver never overruns. Commands: PING, SCAN, CONNECT, STATUS, HTTP_OPEN/READ/CLOSE.
+- **Console driver** (`Console/Src/Network/network.c`): `networkScan/Connect/IsConnected` + `networkHttpOpen/Read/Close`. `networkInit()` (called in `peripheralsInit`) selects the runtime baud and power-cycles the ESP via EN so it boots fresh; connection is on demand using saved credentials. Per-frame CRC-16 is the inline `np_crc16` in the shared header.
+- **ESP diagnostics → SWO**: the ESP can emit `NP_RSP_LOG` frames (`{level, text}`) before its response; `npRecvFrame` buffers them and flushes to SWO on the **`LOGGER_ESP01`** channel only after the response is fully read (so the slow SWO `printf` never stalls the polled receiver mid-stream). The ESP calls `np::logf()` (`Esp01s/src/protocol.h`) inside its handlers — scan results with per-AP channel, connect status, HTTP status, etc.
+- **Download engine** (`Console/Src/Network/downloader.c`): server base address from `0:/server.txt` — auto-created with an example template (`host:port`, scheme optional) if missing, and editable in Settings; `downloaderFetchManifest()` parses the CSV manifest; `downloaderFetchFile()` streams a file to the SD card chunk-by-chunk, computing a streaming CRC-32 (`crc32_update/final` in `Console/Src/Crc`) and verifying it against the manifest (deletes the file on mismatch), reporting progress + speed.
+- **UI**: Settings → **WiFi** (`wifi_menu.c`) scans, picks an AP, takes the password on the on-screen keyboard (`keyboard.c`), connects, and persists creds to console settings (`ConsoleSettings.wifi_*`, settings v2); Settings → **Server address** edits `server.txt` via the same keyboard. Main menu → **Poll Remote Games** and Settings → **Download WiFi firmware** (`remote_update.c`) pull from the server with a shared progress UI (`download_ui.c`). WiFi credentials are stored in plaintext in EEPROM.
+
+The ESP-01S firmware is a separate PlatformIO target at **`Esp01s/`** (board `esp01_1m`, Arduino): it implements the protocol slave (`src/protocol.h` + `src/main.cpp`) over `ESP8266WiFi`/`ESP8266HTTPClient`, with the on-board LED as a WiFi-status light. Build with `make esp`, stage into the update-server tree with `make deploy`. USART1 is also driven at 115200 by the ESP Flasher (a separate path). See `Esp01s/README.md` and `tools/update_server/README.md`.
 
 ### ESP Flasher
 Reflashes the ESP-01 firmware from the SD card (Settings → **Upgrade WiFi module**). Built on the vendored `tools/esp-serial-flasher` submodule (HAL-free core; the bundled HAL `port/stm32_port.c` is **not** compiled). Our glue lives in `Console/Src/Flasher/`:
@@ -228,7 +233,7 @@ Shared conventions:
 - **Audio**: Passive buzzer on PB5 (TIM3_CH2)
 - **Storage**: Built-in SD card via SDIO (PC8–PC12, PD2), FAT32, mount point `"0:"`. Card detect on PD3 (active-low).
 - **EEPROM**: AT24C512 on I2C1 (PB8/PB9), address `0x50`, used for console settings
-- **Network**: ESP-01 on USART1 (PA9/PA10), 921600 baud, controlled via PB10/PB6/PC6/PC13
+- **Network**: ESP-01 on USART1 (PA9/PA10), 115200 baud (runtime + flashing), controlled via PB10/PB6/PC6/PC13
 - **Debug interface**: SWD (PA13/PA14) + SWO (PB3)
 
 EEPROM layout: console partition 0x0000–0x3FFF (system header 0x0000, game directory 0x0100, console settings 0x1000), games partition 0x4000–0xFFFF (48 × 1KB save slots).

@@ -47,6 +47,10 @@ Src/MainMenu/menu_common.c \
 Src/MainMenu/game_list.c \
 Src/MainMenu/settings_menu.c \
 Src/MainMenu/wifi_update.c \
+Src/MainMenu/keyboard.c \
+Src/MainMenu/download_ui.c \
+Src/MainMenu/wifi_menu.c \
+Src/MainMenu/remote_update.c \
 Src/Flasher/esp_flasher.c \
 Src/Flasher/esp_flasher_port.c \
 Src/Loader/loader.c \
@@ -54,6 +58,7 @@ Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
 Src/Crc/crc.c \
 Src/Network/network.c \
+Src/Network/downloader.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \

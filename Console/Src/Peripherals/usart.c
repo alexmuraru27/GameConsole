@@ -6,6 +6,13 @@
 /* USART1 lives on APB2; PCLK2 is SYSCLK/2 = 84 MHz (see systemClockConfig). */
 #define USART1_PCLK_HZ 84000000U
 
+/*
+ * Polled 8N1. At the runtime/flash baud of 115200 there is ~86 us of slack per
+ * byte — far longer than any ISR — so the polled reader keeps up without
+ * overrunning. (A DMA-RX ring was tried for higher baud; reverted in favour of
+ * the simpler, proven polled path since the link runs at 115200.)
+ */
+
 void usartSetBaud(uint32_t baud)
 {
     /* OVER8 = 0 (16x oversampling): the BRR register holds PCLK/baud directly,
@@ -57,6 +64,18 @@ bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
     }
 
     return true;
+}
+
+void usartFlushRx(void)
+{
+    /* Reading SR then DR clears RXNE and any overrun (ORE), discarding pending
+     * bytes — used after a baud change or a desync so a stale byte isn't misread.
+     * Drain the whole hardware buffer (DR + shift register), not just one byte. */
+    while ((USART1->SR & (USART_SR_RXNE | USART_SR_ORE)) != 0U)
+    {
+        (void)USART1->SR;
+        (void)USART1->DR;
+    }
 }
 
 int usartReadByte(uint32_t timeout_ms)

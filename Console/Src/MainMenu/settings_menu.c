@@ -6,6 +6,8 @@
 #include "fonts.h"
 #include "logger.h"
 #include "wifi_update.h"
+#include "wifi_menu.h"
+#include "remote_update.h"
 
 /* ------------------------------------------------------------------ *
  *  Tree-like settings. The screen renders one level of a static
@@ -56,6 +58,9 @@ static void buzzerSoundSet(bool on)
 
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
+    {.label = "WiFi", .kind = SETTING_ACTION, .action = wifiMenuRun},
+    {.label = "Server address", .kind = SETTING_ACTION, .action = remoteServerAddrRun},
+    {.label = "Download WiFi firmware", .kind = SETTING_ACTION, .action = remoteWifiFirmwareRun},
     {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
     {.label = "Test WiFi module", .kind = SETTING_ACTION, .action = wifiTestRun},
 };

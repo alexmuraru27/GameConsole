@@ -13,6 +13,7 @@
 #include "esp_flasher.h"
 #include "usart.h"
 #include "gpio.h"
+#include "network.h"
 #include "network_protocol.h"
 #include "ff.h"
 
@@ -126,6 +127,8 @@ void wifiUpdateRun(void)
         {
             LOGGER_LOG_WARN(LOGGER_FLASHER, "could not remove '%s' (%d)", ESP_IMAGE_PATH, (int)del);
         }
+        /* Reboot the ESP so it starts the freshly-flashed firmware cleanly. */
+        networkRebootEsp();
         buzzerPlay(0U, false, s_done_notes, 3U);
         waitForBack("Update complete!", g_menu_pal_accent);
     }

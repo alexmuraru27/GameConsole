@@ -32,6 +32,16 @@ static const uint8_t _font8x8_glyph_data_035[16U] = {
         0x04, 0x10,
         0x00, 0x00,
 };
+static const uint8_t _font8x8_glyph_data_036[16U] = {
+        0x01, 0x40,
+        0x15, 0x54,
+        0x51, 0x40,
+        0x15, 0x50,
+        0x01, 0x45,
+        0x15, 0x54,
+        0x01, 0x40,
+        0x00, 0x00,
+};
 static const uint8_t _font8x8_glyph_data_037[16U] = {
         0x14, 0x04,
         0x14, 0x10,
@@ -262,6 +272,16 @@ static const uint8_t _font8x8_glyph_data_059[16U] = {
         0x04, 0x00,
         0x00, 0x00,
 };
+static const uint8_t _font8x8_glyph_data_060[16U] = {
+        0x00, 0x00,
+        0x00, 0x04,
+        0x00, 0x40,
+        0x04, 0x00,
+        0x00, 0x40,
+        0x00, 0x04,
+        0x00, 0x00,
+        0x00, 0x00,
+};
 static const uint8_t _font8x8_glyph_data_061[16U] = {
         0x00, 0x00,
         0x00, 0x00,
@@ -269,6 +289,16 @@ static const uint8_t _font8x8_glyph_data_061[16U] = {
         0x00, 0x00,
         0x15, 0x50,
         0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_062[16U] = {
+        0x00, 0x00,
+        0x04, 0x00,
+        0x00, 0x40,
+        0x00, 0x04,
+        0x00, 0x40,
+        0x04, 0x00,
         0x00, 0x00,
         0x00, 0x00,
 };
@@ -552,6 +582,66 @@ static const uint8_t _font8x8_glyph_data_090[16U] = {
         0x15, 0x54,
         0x00, 0x00,
 };
+static const uint8_t _font8x8_glyph_data_091[16U] = {
+        0x05, 0x50,
+        0x04, 0x00,
+        0x04, 0x00,
+        0x04, 0x00,
+        0x04, 0x00,
+        0x04, 0x00,
+        0x05, 0x50,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_092[16U] = {
+        0x40, 0x00,
+        0x10, 0x00,
+        0x04, 0x00,
+        0x01, 0x00,
+        0x00, 0x40,
+        0x00, 0x10,
+        0x00, 0x04,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_093[16U] = {
+        0x05, 0x50,
+        0x00, 0x10,
+        0x00, 0x10,
+        0x00, 0x10,
+        0x00, 0x10,
+        0x00, 0x10,
+        0x05, 0x50,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_094[16U] = {
+        0x01, 0x00,
+        0x04, 0x40,
+        0x10, 0x10,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_095[16U] = {
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x15, 0x54,
+};
+static const uint8_t _font8x8_glyph_data_096[16U] = {
+        0x01, 0x00,
+        0x00, 0x40,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+};
 static const uint8_t _font8x8_glyph_data_097[16U] = {
         0x00, 0x00,
         0x00, 0x00,
@@ -812,6 +902,46 @@ static const uint8_t _font8x8_glyph_data_122[16U] = {
         0x15, 0x54,
         0x00, 0x00,
 };
+static const uint8_t _font8x8_glyph_data_123[16U] = {
+        0x00, 0x50,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x04, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x00, 0x50,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_124[16U] = {
+        0x01, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x01, 0x00,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_125[16U] = {
+        0x05, 0x00,
+        0x00, 0x40,
+        0x00, 0x40,
+        0x00, 0x10,
+        0x00, 0x40,
+        0x00, 0x40,
+        0x05, 0x00,
+        0x00, 0x00,
+};
+static const uint8_t _font8x8_glyph_data_126[16U] = {
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x15, 0x04,
+        0x40, 0x54,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x00, 0x00,
+};
 
 // shared blank glyph (16 zero bytes)
 static const uint8_t _font8x8_glyph_blank[16U] = {0};
@@ -822,7 +952,7 @@ const Font font8x8 = {
         [  1U] = {.pixels = _font8x8_glyph_data_033}, // 0x21 !
         [  2U] = {.pixels = _font8x8_glyph_data_034}, // 0x22
         [  3U] = {.pixels = _font8x8_glyph_data_035}, // 0x23 #
-        [  4U] = {.pixels = _font8x8_glyph_blank}, // 0x24 $
+        [  4U] = {.pixels = _font8x8_glyph_data_036}, // 0x24 $
         [  5U] = {.pixels = _font8x8_glyph_data_037}, // 0x25 %
         [  6U] = {.pixels = _font8x8_glyph_data_038}, // 0x26 &
         [  7U] = {.pixels = _font8x8_glyph_data_039}, // 0x27 '
@@ -846,9 +976,9 @@ const Font font8x8 = {
         [ 25U] = {.pixels = _font8x8_glyph_data_057}, // 0x39 9
         [ 26U] = {.pixels = _font8x8_glyph_data_058}, // 0x3A :
         [ 27U] = {.pixels = _font8x8_glyph_data_059}, // 0x3B ;
-        [ 28U] = {.pixels = _font8x8_glyph_blank}, // 0x3C <
+        [ 28U] = {.pixels = _font8x8_glyph_data_060}, // 0x3C <
         [ 29U] = {.pixels = _font8x8_glyph_data_061}, // 0x3D =
-        [ 30U] = {.pixels = _font8x8_glyph_blank}, // 0x3E >
+        [ 30U] = {.pixels = _font8x8_glyph_data_062}, // 0x3E >
         [ 31U] = {.pixels = _font8x8_glyph_data_063}, // 0x3F ?
         [ 32U] = {.pixels = _font8x8_glyph_data_064}, // 0x40 @
         [ 33U] = {.pixels = _font8x8_glyph_data_065}, // 0x41 A
@@ -877,12 +1007,12 @@ const Font font8x8 = {
         [ 56U] = {.pixels = _font8x8_glyph_data_088}, // 0x58 X
         [ 57U] = {.pixels = _font8x8_glyph_data_089}, // 0x59 Y
         [ 58U] = {.pixels = _font8x8_glyph_data_090}, // 0x5A Z
-        [ 59U] = {.pixels = _font8x8_glyph_blank}, // 0x5B [
-        [ 60U] = {.pixels = _font8x8_glyph_blank}, // 0x5C
-        [ 61U] = {.pixels = _font8x8_glyph_blank}, // 0x5D ]
-        [ 62U] = {.pixels = _font8x8_glyph_blank}, // 0x5E ^
-        [ 63U] = {.pixels = _font8x8_glyph_blank}, // 0x5F _
-        [ 64U] = {.pixels = _font8x8_glyph_blank}, // 0x60 `
+        [ 59U] = {.pixels = _font8x8_glyph_data_091}, // 0x5B [
+        [ 60U] = {.pixels = _font8x8_glyph_data_092}, // 0x5C
+        [ 61U] = {.pixels = _font8x8_glyph_data_093}, // 0x5D ]
+        [ 62U] = {.pixels = _font8x8_glyph_data_094}, // 0x5E ^
+        [ 63U] = {.pixels = _font8x8_glyph_data_095}, // 0x5F _
+        [ 64U] = {.pixels = _font8x8_glyph_data_096}, // 0x60 `
         [ 65U] = {.pixels = _font8x8_glyph_data_097}, // 0x61 a
         [ 66U] = {.pixels = _font8x8_glyph_data_098}, // 0x62 b
         [ 67U] = {.pixels = _font8x8_glyph_data_099}, // 0x63 c
@@ -909,10 +1039,10 @@ const Font font8x8 = {
         [ 88U] = {.pixels = _font8x8_glyph_data_120}, // 0x78 x
         [ 89U] = {.pixels = _font8x8_glyph_data_121}, // 0x79 y
         [ 90U] = {.pixels = _font8x8_glyph_data_122}, // 0x7A z
-        [ 91U] = {.pixels = _font8x8_glyph_blank}, // 0x7B {
-        [ 92U] = {.pixels = _font8x8_glyph_blank}, // 0x7C |
-        [ 93U] = {.pixels = _font8x8_glyph_blank}, // 0x7D }
-        [ 94U] = {.pixels = _font8x8_glyph_blank}, // 0x7E ~
+        [ 91U] = {.pixels = _font8x8_glyph_data_123}, // 0x7B {
+        [ 92U] = {.pixels = _font8x8_glyph_data_124}, // 0x7C |
+        [ 93U] = {.pixels = _font8x8_glyph_data_125}, // 0x7D }
+        [ 94U] = {.pixels = _font8x8_glyph_data_126}, // 0x7E ~
     },
     .palette = {
         0x0000U, 0xFFFFU, 0xFFFFU, 0xFFFFU,

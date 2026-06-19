@@ -1,6 +1,7 @@
 #include "game_console.h"
 #include "sysclock.h"
 #include "usart.h"
+#include "network.h"
 #include "joystick.h"
 #include "renderer.h"
 #include "buzzer.h"
@@ -114,6 +115,7 @@ static void peripheralsInit()
     dmaInit((uint32_t)FSMC_DATA_ADDRESS);
     beep_step(1);
     usartInit();
+    networkInit();
     beep_step(2);
     adcInit();
     LOGGER_LOG_INFO(LOGGER_CORE, "peripherals up: DMA/USART/ADC");

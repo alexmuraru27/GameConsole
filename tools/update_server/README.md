@@ -27,7 +27,7 @@ The console maps a category to an action: `games` → copy onto the SD card,
 self-update (future).
 
 The repo's build targets stage straight into this tree: `make deploy` writes
-`games/GameXO.bin` + `games/GameXO.pak`, and `make deployesp` writes
+`games/GameXO.bin` + `games/GameXO.pak` and (if it's been built with `make esp`)
 `wifi/ESP01.bin`. Drop other files in by hand as needed.
 
 ## Endpoints

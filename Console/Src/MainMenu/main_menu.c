@@ -8,6 +8,7 @@
 #include "sysclock.h"
 #include "fonts.h"
 #include "logger.h"
+#include "remote_update.h"
 #include <string.h>
 
 /* ------------------------------------------------------------------ *
@@ -15,16 +16,15 @@
  *  (Games / Settings / Poll Remote Games), dispatches input and
  *  drawing to the active screen, and applies the screen transitions
  *  each screen requests. The game picker and settings tree live in
- *  their own modules; the remote-games stub is small enough to live
- *  here until the network path is implemented.
+ *  their own modules; Poll Remote Games runs as a blocking flow
+ *  (remote_update.c) rather than a persistent screen.
  * ------------------------------------------------------------------ */
 
 typedef enum
 {
     SCREEN_ROOT,
     SCREEN_GAMES,
-    SCREEN_SETTINGS,
-    SCREEN_REMOTE
+    SCREEN_SETTINGS
 } MenuScreen;
 
 static MenuScreen s_screen;
@@ -108,44 +108,13 @@ static void rootRender(void)
     rendererRender();
 }
 
-/* ---- Poll Remote Games (stub) ---- */
-
-static void remoteEnter(void)
-{
-    menuResetSurface();
-}
-
-static MenuTransition remoteUpdate(void)
-{
-    const MenuNav nav = menuPollNav();
-    return nav.back ? MENU_GOTO_ROOT : MENU_STAY;
-}
-
-static void remoteRender(void)
-{
-    const int16_t screen_w = (int16_t)rendererGetWidthPixels();
-    uint16_t n = 0U;
-
-    rendererClear();
-    n = menuDrawTitle(n, "REMOTE GAMES");
-
-    const char *msg = "Coming soon";
-    const int16_t x = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, msg)) / 2);
-    n = menuDrawText(n, &font8x8, x, 120, g_menu_pal_item, msg);
-
-    n = menuDrawFooter(n, "remote game polling is not yet available    B back");
-
-    rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
-    rendererRender();
-}
-
 /* ---- Orchestration ---- */
 
 static void enterScreen(MenuScreen screen)
 {
     static const char *const k_screen_names[] = {
         [SCREEN_ROOT] = "root", [SCREEN_GAMES] = "games",
-        [SCREEN_SETTINGS] = "settings", [SCREEN_REMOTE] = "remote"};
+        [SCREEN_SETTINGS] = "settings"};
     LOGGER_LOG_DEBUG(LOGGER_MENU, "enter screen: %s", k_screen_names[screen]);
 
     s_screen = screen;
@@ -159,9 +128,6 @@ static void enterScreen(MenuScreen screen)
         break;
     case SCREEN_SETTINGS:
         settingsMenuEnter();
-        break;
-    case SCREEN_REMOTE:
-        remoteEnter();
         break;
     }
 }
@@ -182,7 +148,8 @@ static void applyTransition(MenuTransition transition)
         enterScreen(SCREEN_SETTINGS);
         break;
     case MENU_GOTO_REMOTE:
-        enterScreen(SCREEN_REMOTE);
+        remoteGamesRun(); /* blocking: download games from the update server */
+        enterScreen(SCREEN_ROOT);
         break;
     }
 }
@@ -217,9 +184,6 @@ void mainMenuUpdate(void)
     case SCREEN_SETTINGS:
         transition = settingsMenuUpdate();
         break;
-    case SCREEN_REMOTE:
-        transition = remoteUpdate();
-        break;
     }
 
     applyTransition(transition);
@@ -237,9 +201,6 @@ void mainMenuRender(void)
         break;
     case SCREEN_SETTINGS:
         settingsMenuRender();
-        break;
-    case SCREEN_REMOTE:
-        remoteRender();
         break;
     }
 }

@@ -10,14 +10,21 @@
  * so the rest of the firmware reads/writes settings by field, not by raw bytes.
  */
 
-#define CONSOLE_SETTINGS_VERSION 1U
+#define CONSOLE_SETTINGS_VERSION 2U
+
+/* WiFi credential field sizes (+1 for the NUL). Mirror NP_SSID_MAX/NP_PASS_MAX. */
+#define CONSOLE_WIFI_SSID_SIZE 33U
+#define CONSOLE_WIFI_PASS_SIZE 64U
 
 typedef struct
 {
     uint8_t audio_enabled;
+    uint8_t wifi_valid;                     /* 1 = the SSID/pass below are set */
+    char wifi_ssid[CONSOLE_WIFI_SSID_SIZE]; /* NUL-terminated */
+    char wifi_pass[CONSOLE_WIFI_PASS_SIZE]; /* NUL-terminated */
 } __attribute__((packed)) ConsoleSettings;
 
-/* Fill `settings` with the factory defaults (audio on). */
+/* Fill `settings` with the factory defaults (audio on, no WiFi creds). */
 void consoleSettingsResetDefaults(ConsoleSettings *settings);
 
 /*

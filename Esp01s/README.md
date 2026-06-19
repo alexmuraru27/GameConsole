@@ -38,14 +38,17 @@ extension. If `pio` isn't on PATH, override it: `make esp PIO=/path/to/pio`.)
 
 ## Deploy
 
-`make deployesp` stages the built firmware into the update-server content tree as
-`tools/update_server/content/wifi/ESP01.bin` (the name the flasher looks for):
+`make deploy` (from the repo root) stages the built firmware into the
+update-server content tree as `tools/update_server/content/wifi/ESP01.bin` (the
+name the flasher looks for), alongside the game files:
 
 ```bash
-make deployesp
+make esp      # build the firmware first
+make deploy   # stage it (+ the game) into the update server tree
 ```
 
-(It skips quietly if you haven't built the firmware yet, so it never errors out.)
+(The ESP step skips quietly if the firmware hasn't been built, so it never
+breaks the game deploy.)
 
 From there the console gets it one of two ways:
 - **Now (manual):** copy `ESP01.bin` onto the SD-card root yourself, then on the

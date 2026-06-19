@@ -12,7 +12,7 @@ build:
 	$(PIO) run
 
 # Copy the built ESP firmware into the update server as wifi/ESP01.bin. Skips
-# quietly if the firmware hasn't been built, so it never breaks `make deployesp`.
+# quietly if the firmware hasn't been built, so it never breaks `make deploy`.
 deploy:
 	@if [ -f $(FIRMWARE) ]; then \
 		mkdir -p $(UPDATE_SERVER_CONTENT)/wifi && \

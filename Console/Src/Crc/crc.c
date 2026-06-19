@@ -26,10 +26,8 @@ uint16_t crc16_calculate(const uint8_t *const data, const uint32_t length)
     return crc;
 }
 
-uint32_t crc32_calculate(const uint8_t *const data, const uint32_t length)
+uint32_t crc32_update(uint32_t crc, const uint8_t *const data, const uint32_t length)
 {
-    uint32_t crc = 0xFFFFFFFFU;
-
     for (uint32_t i = 0U; i < length; i++)
     {
         crc ^= (uint32_t)data[i];
@@ -46,5 +44,15 @@ uint32_t crc32_calculate(const uint8_t *const data, const uint32_t length)
         }
     }
 
+    return crc;
+}
+
+uint32_t crc32_final(const uint32_t crc)
+{
     return crc ^ 0xFFFFFFFFU;
+}
+
+uint32_t crc32_calculate(const uint8_t *const data, const uint32_t length)
+{
+    return crc32_final(crc32_update(CRC32_INIT, data, length));
 }

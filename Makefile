@@ -20,15 +20,15 @@ flash:  $(BUILD_DIR)
 flashswo: flash
 	./tools/scripts/swo.sh
 
+# Stage everything the console can pull into the update-server content tree:
+# the game (+ .pak) and the ESP-01S firmware (if it's been built).
 deploy: $(BUILD_DIR)
 	$(MAKE) -C GameXO deploy
+	$(MAKE) -C Esp01s deploy
 
-# ESP-01S WiFi-module firmware (separate PlatformIO target, see Esp01s/).
+# Build the ESP-01S WiFi-module firmware (separate PlatformIO target, see Esp01s/).
 esp:
 	$(MAKE) -C Esp01s build
-
-deployesp:
-	$(MAKE) -C Esp01s deploy
 
 $(BUILD_DIR):
 	mkdir $@		

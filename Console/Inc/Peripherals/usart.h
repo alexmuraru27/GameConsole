@@ -23,6 +23,9 @@ void usartSetBaud(uint32_t baud);
  * Returns true on success, false on timeout. */
 bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
 
+/* Discard any buffered (unread) received bytes — used when switching baud. */
+void usartFlushRx(void);
+
 /* Read one byte, blocking up to timeout_ms. Returns the byte (0..255) or -1 on timeout. */
 int usartReadByte(uint32_t timeout_ms);
 

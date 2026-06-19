@@ -9,7 +9,7 @@
   - [GPIO (Debug Pins)](#gpio-debug-pins)
   - [SD-CARD (Builtin)](#sd-card-builtin)
   - [I2C1 EEPROM Console Settings Storage](#i2c1-eeprom-console-settings-storage)
-  - [ESP01 - USART1 (Network Communication - Baud 921600)](#esp01---usart1-network-communication---baud-921600)
+  - [ESP01 - USART1 (Network Communication - Baud 115200)](#esp01---usart1-network-communication---baud-115200)
 - [EEPROM address](#eeprom-address)
 
 ## Hardware needed
@@ -94,7 +94,7 @@ Hardware design resources  `projectRoot/docu/HW/`
 1. PB8 (I2C1_SCL - AF4 PU)
 2. PB9 (I2C1_SDA - AF4 PU)
 
-### ESP01 - USART1 (Network Communication - Baud 921600)
+### ESP01 - USART1 (Network Communication - Baud 115200)
 1. PA9 (TX - AF7) - USART1
 2. PA10 (RX - AF7) - USART1
 3. PB10 (EN - normal GPIO)
