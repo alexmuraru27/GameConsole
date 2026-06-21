@@ -6,6 +6,8 @@
 #include "logger.h"
 #include "sysclock.h"
 #include "scheduler.h"
+#include "sd_layout.h"
+#include <stdio.h>
 #include <string.h>
 
 /* GAME_RAM bounds (from common.ld) — the flat game image is copied here. */
@@ -76,7 +78,10 @@ static void bindGamePak(void)
     }
     strcpy(ext, ".pak"); /* ".pak" is the same length as ".bin", so this fits in place */
 
-    assetLoaderOpenPak(pak_name);
+    /* The pak lives beside the .bin under Games/. */
+    char pak_path[FF_LFN_BUF + sizeof(SD_DIR_GAMES) + 1U];
+    snprintf(pak_path, sizeof(pak_path), "%s/%s", SD_DIR_GAMES, pak_name);
+    assetLoaderOpenPak(pak_path);
 }
 
 /* Bind a save slot keyed by the game's .bin name. Binding is cheap — the actual

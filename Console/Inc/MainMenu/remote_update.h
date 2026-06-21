@@ -2,17 +2,15 @@
 #define __REMOTE_UPDATE_H
 
 /*
- * Remote download flows over WiFi (blocking modals). Both fetch the update
- * server manifest, then download + CRC-verify files to the SD card with an
- * on-screen progress bar:
- *   - remoteGamesRun()        : Poll Remote Games (main menu) — pick a game to pull.
- *   - remoteWifiFirmwareRun() : Settings -> Download WiFi firmware (the ESP image).
- * Both ensure a WiFi connection first (using saved credentials).
+ * Remote flows over WiFi (blocking modals), each ensuring a WiFi connection
+ * first (using saved credentials):
+ *   - remoteGamesRun(): Poll Updates (main menu) — fetch the manifest, list every
+ *     item with a NEW/UPD/UpToDate diff vs the last download, and pull the
+ *     selected one (CRC-verified). The ESP firmware is just another row here.
  */
 void remoteGamesRun(void);
-void remoteWifiFirmwareRun(void);
 
-/* Settings -> Server address: edit 0:/server.txt via the on-screen keyboard. */
+/* Settings -> WiFi -> Server address: edit Settings/server.txt via the keyboard. */
 void remoteServerAddrRun(void);
 
 #endif /* __REMOTE_UPDATE_H */

@@ -14,14 +14,25 @@
 #include "download_ui.h"
 #include "keyboard.h"
 #include "console_settings_storage.h"
+#include "sd_layout.h"
 
 #define RU_MAX_ENTRIES 32
-#define RU_MAX_GAMES 16
 #define RU_VISIBLE_ROWS 8
 
 static RemoteEntry s_entries[RU_MAX_ENTRIES];
-static int s_game_rows[RU_MAX_GAMES]; /* indices into s_entries for game .bins */
-static char s_status[RU_MAX_GAMES][4]; /* "NEW" / "UPD" / "OK"                 */
+static char s_status[RU_MAX_ENTRIES][12];              /* "NEW" / "UPD" / "UpToDate" per display row */
+static DownloadedEntry s_downloaded[RU_MAX_ENTRIES];   /* last-downloaded CRCs (0:/downloaded.csv) */
+static int s_downloaded_count;
+
+/* A display row is one logical item: a standalone file, or a game (its .bin plus
+ * the paired .pak, shown and downloaded as a single unit). Indices into s_entries. */
+typedef struct
+{
+    int bin; /* primary entry: a game's .bin, or any standalone file */
+    int pak; /* the game's paired .pak, or -1                        */
+} DisplayRow;
+static DisplayRow s_rows[RU_MAX_ENTRIES];
+static int s_row_count;
 
 static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 
@@ -80,77 +91,146 @@ static bool nameEndsWith(const char *name, const char *suffix)
     return nl >= sl && strcasecmp(name + nl - sl, suffix) == 0;
 }
 
-/* Find the .pak entry that pairs with a .bin (same base name), or NULL. */
-static const RemoteEntry *findPak(int count, const char *bin_name)
+/* Local SD directory for a manifest category: Games/ for games, Firmware/ for
+ * wifi + os; unknown categories fall back to the card root. */
+static const char *destDir(const char *category)
 {
-    char pak[DOWNLOADER_NAME_MAX];
-    strncpy(pak, bin_name, sizeof(pak) - 1U);
-    pak[sizeof(pak) - 1U] = '\0';
-    char *dot = strrchr(pak, '.');
-    if (dot == NULL)
+    if (strcasecmp(category, "games") == 0)
     {
-        return NULL;
+        return SD_DIR_GAMES;
     }
-    strncpy(dot, ".pak", (size_t)(&pak[sizeof(pak) - 1U] - dot));
-
-    for (int i = 0; i < count; i++)
+    if (strcasecmp(category, "wifi") == 0 || strcasecmp(category, "os") == 0)
     {
-        if (strcasecmp(s_entries[i].name, pak) == 0)
-        {
-            return &s_entries[i];
-        }
+        return SD_DIR_FIRMWARE;
     }
-    return NULL;
+    return "";
 }
 
-/* Classify a local file vs the manifest CRC: NEW / UPD(ated) / OK. */
-static void computeStatus(const RemoteEntry *e, char out[4])
+/* On-card path a remote entry downloads to: "<dir>/<name>" (where the game
+ * loader / flasher look for it). */
+static void destPath(const RemoteEntry *e, char *out, size_t out_size)
 {
-    bool exists = false;
-    const uint32_t local = downloaderLocalCrc(e->name, &exists);
-    if (!exists)
+    const char *dir = destDir(e->category);
+    if (dir[0] == '\0')
     {
-        strcpy(out, "NEW");
-    }
-    else if (local == e->crc32)
-    {
-        strcpy(out, "OK");
+        snprintf(out, out_size, "%s", e->name);
     }
     else
     {
-        strcpy(out, "UPD");
+        snprintf(out, out_size, "%s/%s", dir, e->name);
     }
 }
 
-/* ---- Poll Remote Games ---- */
+/* CRC recorded for this remote path in the local downloaded-manifest, if any. */
+static uint32_t savedCrc(const char *path, bool *found)
+{
+    for (int i = 0; i < s_downloaded_count; i++)
+    {
+        if (strcmp(s_downloaded[i].path, path) == 0)
+        {
+            *found = true;
+            return s_downloaded[i].crc32;
+        }
+    }
+    *found = false;
+    return 0U;
+}
 
-static void renderGameList(int num, int selected, int top)
+/* Index of the manifest entry named `name` (case-insensitive), or -1. */
+static int findByName(int count, const char *name)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (strcasecmp(s_entries[i].name, name) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Index of the sibling entry that is `name` with its extension swapped to `ext`
+ * (e.g. the .pak that pairs with a .bin), or -1. */
+static int findSibling(int count, const char *name, const char *ext)
+{
+    char sib[DOWNLOADER_NAME_MAX];
+    strncpy(sib, name, sizeof(sib) - 1U);
+    sib[sizeof(sib) - 1U] = '\0';
+    char *dot = strrchr(sib, '.');
+    if (dot == NULL)
+    {
+        return -1;
+    }
+    strncpy(dot, ext, (size_t)(&sib[sizeof(sib) - 1U] - dot));
+    return findByName(count, sib);
+}
+
+/* True if `e` is missing from the saved manifest or its CRC differs from the
+ * server's; *exists reports whether it was recorded at all. */
+static bool entryMismatch(const RemoteEntry *e, bool *exists)
+{
+    bool found = false;
+    const uint32_t saved = savedCrc(e->path, &found);
+    *exists = found;
+    return !found || saved != e->crc32;
+}
+
+/* Diff a display row (a game's .bin + .pak, or a standalone file) against the
+ * last-downloaded manifest: NEW (never fetched) / UPD (changed) / OK. A game is
+ * "OK" only when both its .bin and .pak match. */
+static void rowStatus(const DisplayRow *r, char out[4])
+{
+    bool bin_exists = false;
+    bool mismatch = entryMismatch(&s_entries[r->bin], &bin_exists);
+    if (!bin_exists)
+    {
+        strcpy(out, "NEW");
+        return;
+    }
+    if (r->pak >= 0)
+    {
+        bool pak_exists = false;
+        if (entryMismatch(&s_entries[r->pak], &pak_exists))
+        {
+            mismatch = true;
+        }
+    }
+    strcpy(out, mismatch ? "UPD" : "UpToDate");
+}
+
+/* ---- Poll Updates ---- */
+
+static void renderList(int count, int selected, int top)
 {
     const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
     uint16_t n = 0U;
 
     rendererClear();
-    n = menuDrawTitle(n, "REMOTE GAMES");
+    n = menuDrawTitle(n, "UPDATES");
 
-    if (num == 0)
+    if (count == 0)
     {
-        n = menuDrawText(n, &font8x8, 60, 110, g_menu_pal_item, "No games on server");
+        n = menuDrawText(n, &font8x8, 60, 110, g_menu_pal_item, "Nothing on server");
     }
-    for (int i = 0; i < RU_VISIBLE_ROWS && (top + i) < num; i++)
+    for (int i = 0; i < RU_VISIBLE_ROWS && (top + i) < count; i++)
     {
         const int row = top + i;
-        const RemoteEntry *e = &s_entries[s_game_rows[row]];
+        const RemoteEntry *e = &s_entries[s_rows[row].bin];
         const bool sel = (row == selected);
+        const bool mismatch = (strcmp(s_status[row], "UpToDate") != 0); /* NEW or UPD */
         const int16_t y = (int16_t)(MENU_LIST_TOP + i * MENU_ROW_H);
 
         if (sel && cursor_on)
         {
             n = menuDrawText(n, &font8x8, 42, y, g_menu_pal_accent, ">");
         }
-        n = menuDrawText(n, &font8x8, 60, y, sel ? g_menu_pal_item_sel : g_menu_pal_item, e->name);
+        /* Highlight a CRC mismatch (vs the last download) in the accent colour. */
+        const uint16_t *label_pal = sel ? g_menu_pal_item_sel
+                                        : (mismatch ? g_menu_pal_accent : g_menu_pal_item);
+        n = menuDrawText(n, &font8x8, 60, y, label_pal, e->name);
 
         const char *tag = s_status[row];
-        const uint16_t *tag_pal = (strcmp(tag, "OK") == 0) ? g_menu_pal_footer : g_menu_pal_accent;
+        const uint16_t *tag_pal = mismatch ? g_menu_pal_accent : g_menu_pal_footer;
         const int16_t tx = (int16_t)(rendererGetWidthPixels() - 60 - (int16_t)menuTextWidth(font8x8.size, tag));
         n = menuDrawText(n, &font8x8, tx, y, tag_pal, tag);
     }
@@ -160,63 +240,119 @@ static void renderGameList(int num, int selected, int top)
     rendererRender();
 }
 
-static void downloadGame(int count, int game_row)
+/* Download one file, retrying once after recovering the link if the ESP's HTTP
+ * stack crashed (an intermittent lwIP fault over a flaky link reboots the ESP,
+ * dropping the connection). Only transport failures retry — a CRC/SD error is
+ * not a link crash. */
+static DownloadStatus fetchWithRetry(const RemoteEntry *e, const char *path, ProgressCtx *ctx)
 {
-    const RemoteEntry *bin = &s_entries[s_game_rows[game_row]];
-    ProgressCtx ctx = {"REMOTE GAMES", bin->name, 0U};
+    DownloadStatus st = downloaderFetchFile(e, path, progressCb, ctx);
+    if (st == DOWNLOAD_NO_SERVER || st == DOWNLOAD_HTTP_ERR)
+    {
+        downloadUiInfo("UPDATES", "Link reset, retrying...", g_menu_pal_item_sel);
+        networkRebootEsp();
+        if (ensureConnected("UPDATES"))
+        {
+            ctx->last_render = 0U;
+            st = downloaderFetchFile(e, path, progressCb, ctx);
+        }
+    }
+    return st;
+}
 
-    DownloadStatus st = downloaderFetchFile(bin, bin->name, progressCb, &ctx);
+static void downloadRow(int row)
+{
+    const DisplayRow *r = &s_rows[row];
+    const RemoteEntry *bin = &s_entries[r->bin];
+    ProgressCtx ctx = {"UPDATES", bin->name, 0U};
+    char path[DOWNLOADER_PATH_MAX];
+
+    /* Download the primary file into its category dir, then its paired .pak (a
+     * game is one unit). Each is recorded in the local manifest (keyed by remote
+     * path) so the diff shows "UpToDate" afterwards. */
+    destPath(bin, path, sizeof(path));
+    DownloadStatus st = fetchWithRetry(bin, path, &ctx);
     if (st == DOWNLOAD_OK)
     {
-        const RemoteEntry *pak = findPak(count, bin->name);
-        if (pak != NULL)
+        downloaderRecordDownload(bin->path, bin->crc32);
+        if (r->pak >= 0)
         {
+            const RemoteEntry *pak = &s_entries[r->pak];
             ctx.file = pak->name;
             ctx.last_render = 0U;
-            st = downloaderFetchFile(pak, pak->name, progressCb, &ctx);
+            destPath(pak, path, sizeof(path));
+            st = fetchWithRetry(pak, path, &ctx);
+            if (st == DOWNLOAD_OK)
+            {
+                downloaderRecordDownload(pak->path, pak->crc32);
+            }
         }
     }
 
     if (st == DOWNLOAD_OK)
     {
+        strcpy(s_status[row], "UpToDate");
         buzzerPlay(0U, false, s_move_notes, 1U);
-        computeStatus(bin, s_status[game_row]); /* now "OK" */
-        downloadUiWait("REMOTE GAMES", "Download complete!", g_menu_pal_accent);
+        downloadUiWait("UPDATES", "Download complete!", g_menu_pal_accent);
     }
     else
     {
         char m[48];
         snprintf(m, sizeof(m), "Failed: %s", downloaderStatusString(st));
-        downloadUiWait("REMOTE GAMES", m, g_menu_pal_alert);
+        downloadUiWait("UPDATES", m, g_menu_pal_alert);
     }
 }
 
 void remoteGamesRun(void)
 {
     menuResetSurface();
-    if (!ensureConnected("REMOTE GAMES"))
+    if (!ensureConnected("UPDATES"))
     {
         return;
     }
 
-    downloadUiInfo("REMOTE GAMES", "Fetching list...", g_menu_pal_item_sel);
-    const int count = downloaderFetchManifest(s_entries, RU_MAX_ENTRIES);
+    downloadUiInfo("UPDATES", "Fetching list...", g_menu_pal_item_sel);
+    int count = downloaderFetchManifest(s_entries, RU_MAX_ENTRIES);
     if (count <= 0)
     {
-        downloadUiWait("REMOTE GAMES", "No manifest / server error", g_menu_pal_alert);
+        /* The ESP can crash + reboot inside its HTTP/DNS stack on a flaky link
+         * (the GET fails silently and the module drops WiFi). Power-cycle it back
+         * to a clean state, reconnect, and try the fetch once more. */
+        downloadUiInfo("UPDATES", "Link reset, retrying...", g_menu_pal_item_sel);
+        networkRebootEsp();
+        if (ensureConnected("UPDATES"))
+        {
+            count = downloaderFetchManifest(s_entries, RU_MAX_ENTRIES);
+        }
+    }
+    if (count <= 0)
+    {
+        downloadUiWait("UPDATES", "No manifest / server error", g_menu_pal_alert);
         return;
     }
 
-    /* Collect the game .bin entries and classify each against the local copy. */
-    int num = 0;
-    for (int i = 0; i < count && num < RU_MAX_GAMES; i++)
+    /* Load the last-downloaded record, then collapse the manifest into display
+     * rows: a game's .bin absorbs its paired .pak (one row, downloaded together);
+     * every other file is its own row. Diff each row: NEW / UPD / OK. */
+    s_downloaded_count = downloaderLoadDownloaded(s_downloaded, RU_MAX_ENTRIES);
+    if (s_downloaded_count < 0)
     {
-        if (strcasecmp(s_entries[i].category, "games") == 0 && nameEndsWith(s_entries[i].name, ".bin"))
+        s_downloaded_count = 0;
+    }
+    s_row_count = 0;
+    for (int i = 0; i < count && s_row_count < RU_MAX_ENTRIES; i++)
+    {
+        /* A .pak that belongs to a .bin in the manifest rides with that game. */
+        if (nameEndsWith(s_entries[i].name, ".pak") && findSibling(count, s_entries[i].name, ".bin") >= 0)
         {
-            s_game_rows[num] = i;
-            computeStatus(&s_entries[i], s_status[num]);
-            num++;
+            continue;
         }
+        s_rows[s_row_count].bin = i;
+        s_rows[s_row_count].pak = nameEndsWith(s_entries[i].name, ".bin")
+                                      ? findSibling(count, s_entries[i].name, ".pak")
+                                      : -1;
+        rowStatus(&s_rows[s_row_count], s_status[s_row_count]);
+        s_row_count++;
     }
 
     int selected = 0;
@@ -233,7 +369,7 @@ void remoteGamesRun(void)
             selected--;
             buzzerPlay(0U, false, s_move_notes, 1U);
         }
-        else if (nav.down && selected < num - 1)
+        else if (nav.down && selected < s_row_count - 1)
         {
             selected++;
             buzzerPlay(0U, false, s_move_notes, 1U);
@@ -247,12 +383,12 @@ void remoteGamesRun(void)
             top = selected - RU_VISIBLE_ROWS + 1;
         }
 
-        if (nav.enter && num > 0)
+        if (nav.enter && s_row_count > 0)
         {
-            downloadGame(count, selected);
+            downloadRow(selected);
         }
 
-        renderGameList(num, selected, top);
+        renderList(s_row_count, selected, top);
     }
 }
 
@@ -276,52 +412,5 @@ void remoteServerAddrRun(void)
         {
             downloadUiWait("SERVER ADDRESS", "Save failed (no SD?)", g_menu_pal_alert);
         }
-    }
-}
-
-/* ---- Download WiFi firmware ---- */
-
-void remoteWifiFirmwareRun(void)
-{
-    menuResetSurface();
-    if (!ensureConnected("WIFI FIRMWARE"))
-    {
-        return;
-    }
-
-    downloadUiInfo("WIFI FIRMWARE", "Fetching list...", g_menu_pal_item_sel);
-    const int count = downloaderFetchManifest(s_entries, RU_MAX_ENTRIES);
-    if (count <= 0)
-    {
-        downloadUiWait("WIFI FIRMWARE", "No manifest / server error", g_menu_pal_alert);
-        return;
-    }
-
-    const RemoteEntry *fw = NULL;
-    for (int i = 0; i < count; i++)
-    {
-        if (strcasecmp(s_entries[i].category, "wifi") == 0 && nameEndsWith(s_entries[i].name, ".bin"))
-        {
-            fw = &s_entries[i];
-            break;
-        }
-    }
-    if (fw == NULL)
-    {
-        downloadUiWait("WIFI FIRMWARE", "No firmware on server", g_menu_pal_alert);
-        return;
-    }
-
-    ProgressCtx ctx = {"WIFI FIRMWARE", fw->name, 0U};
-    const DownloadStatus st = downloaderFetchFile(fw, fw->name, progressCb, &ctx);
-    if (st == DOWNLOAD_OK)
-    {
-        downloadUiWait("WIFI FIRMWARE", "Done - use Upgrade WiFi module", g_menu_pal_accent);
-    }
-    else
-    {
-        char m[48];
-        snprintf(m, sizeof(m), "Failed: %s", downloaderStatusString(st));
-        downloadUiWait("WIFI FIRMWARE", m, g_menu_pal_alert);
     }
 }

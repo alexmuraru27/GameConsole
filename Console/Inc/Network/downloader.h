@@ -51,6 +51,24 @@ uint32_t downloaderLocalCrc(const char *sd_path, bool *exists);
 
 const char *downloaderStatusString(DownloadStatus status);
 
+/* --- Local "downloaded" manifest (0:/downloaded.csv) -----------------------
+ * Records each file's remote path + the CRC-32 it had when it was last
+ * downloaded, so Poll Updates can diff the server manifest against what we
+ * already pulled (NEW / changed / current) without re-reading every file. */
+typedef struct
+{
+    char path[DOWNLOADER_PATH_MAX]; /* matches the remote entry's path */
+    uint32_t crc32;
+} DownloadedEntry;
+
+/* Load the local downloaded-manifest into `out` (up to `max`). Returns the entry
+ * count (0 if the file doesn't exist yet) or -1 on read error. */
+int downloaderLoadDownloaded(DownloadedEntry *out, int max);
+
+/* Record (insert or update by path) a downloaded file's CRC and persist
+ * 0:/downloaded.csv. Call after a successful download. Returns true on success. */
+bool downloaderRecordDownload(const char *path, uint32_t crc);
+
 /* Current server address (from 0:/server.txt, auto-creating a template if it's
  * missing) and a setter that rewrites server.txt. Used by the Settings editor. */
 void downloaderGetServerAddr(char *out, uint16_t out_size);

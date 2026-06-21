@@ -1,5 +1,6 @@
 #include "downloader.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -8,6 +9,7 @@
 #include "crc.h"
 #include "sysclock.h"
 #include "logger.h"
+#include "sd_layout.h"
 #include "ff.h"
 
 /* Example address used for the auto-created server.txt and as the fallback.
@@ -21,8 +23,11 @@
     "#   192.168.1.50:25568   |   myserver:25568   |   http://myserver.lan:25568\n" \
     "# A hostname is resolved by the ESP via DNS (must be resolvable on your network).\n"
 
-#define SERVER_CFG_PATH "server.txt"
-#define MANIFEST_PATH "manifest.csv"
+#define SERVER_CFG_PATH SD_DIR_SETTINGS "/server.txt"
+#define MANIFEST_PATH "manifest.csv"                         /* remote URL path (GET) */
+#define MANIFEST_SAVE_PATH SD_DIR_MANIFESTS "/manifest.csv"  /* saved copy of the fetched manifest */
+#define DOWNLOADED_PATH SD_DIR_MANIFESTS "/downloaded.csv"   /* local record of what we've fetched */
+#define DOWNLOADED_MAX 48                                    /* cap for the read-modify-write buffer */
 
 #define URL_MAX NP_URL_MAX
 #define MANIFEST_BUF_MAX 4096U      /* whole manifest text (~50 entries)        */
@@ -215,6 +220,15 @@ int downloaderFetchManifest(RemoteEntry *out, int max)
     networkHttpClose();
     s_manifest[total] = '\0';
 
+    /* Keep a local copy of the fetched manifest (before strtok rewrites it). */
+    FIL mf;
+    if (f_open(&mf, MANIFEST_SAVE_PATH, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK)
+    {
+        UINT mw = 0U;
+        f_write(&mf, s_manifest, (UINT)total, &mw);
+        f_close(&mf);
+    }
+
     /* Split into lines; skip the header row; parse the rest. */
     int count = 0;
     bool header = true;
@@ -348,4 +362,106 @@ uint32_t downloaderLocalCrc(const char *sd_path, bool *exists)
     }
     f_close(&f);
     return crc32_final(crc);
+}
+
+/* ---- Local downloaded-manifest (0:/downloaded.csv: "path,crc32hex") ---- */
+
+int downloaderLoadDownloaded(DownloadedEntry *out, int max)
+{
+    if (out == NULL || max <= 0)
+    {
+        return -1;
+    }
+
+    FIL f;
+    if (f_open(&f, DOWNLOADED_PATH, FA_READ) != FR_OK)
+    {
+        return 0; /* no file yet => nothing downloaded */
+    }
+    UINT n = 0U;
+    const FRESULT res = f_read(&f, s_manifest, MANIFEST_BUF_MAX, &n);
+    f_close(&f);
+    if (res != FR_OK)
+    {
+        return -1;
+    }
+    s_manifest[n] = '\0';
+
+    int count = 0;
+    char *save = NULL;
+    for (char *line = strtok_r(s_manifest, "\r\n", &save); line != NULL && count < max;
+         line = strtok_r(NULL, "\r\n", &save))
+    {
+        char *comma = strchr(line, ',');
+        if (comma == NULL)
+        {
+            continue;
+        }
+        *comma = '\0';
+        copyField(out[count].path, sizeof(out[count].path), line);
+        out[count].crc32 = (uint32_t)strtoul(comma + 1, NULL, 16);
+        count++;
+    }
+    return count;
+}
+
+bool downloaderRecordDownload(const char *path, uint32_t crc)
+{
+    if (path == NULL)
+    {
+        return false;
+    }
+
+    static DownloadedEntry entries[DOWNLOADED_MAX];
+    int count = downloaderLoadDownloaded(entries, DOWNLOADED_MAX);
+    if (count < 0)
+    {
+        count = 0;
+    }
+
+    /* Update in place if the path is already recorded, else append. */
+    int idx = -1;
+    for (int i = 0; i < count; i++)
+    {
+        if (strcmp(entries[i].path, path) == 0)
+        {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0)
+    {
+        if (count >= DOWNLOADED_MAX)
+        {
+            return false; /* table full; nothing auto-evicted */
+        }
+        idx = count++;
+        copyField(entries[idx].path, sizeof(entries[idx].path), path);
+    }
+    entries[idx].crc32 = crc;
+
+    FIL f;
+    if (f_open(&f, DOWNLOADED_PATH, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK)
+    {
+        return false;
+    }
+    char line[DOWNLOADER_PATH_MAX + 16];
+    bool ok = true;
+    for (int i = 0; i < count; i++)
+    {
+        const int len = snprintf(line, sizeof(line), "%s,%08lx\n",
+                                 entries[i].path, (unsigned long)entries[i].crc32);
+        UINT written = 0U;
+        if (len <= 0 || f_write(&f, line, (UINT)len, &written) != FR_OK || written != (UINT)len)
+        {
+            ok = false;
+            break;
+        }
+    }
+    f_close(&f);
+    if (ok)
+    {
+        LOGGER_LOG_INFO(LOGGER_NETWORK, "recorded download '%s' crc %08lx", path, (unsigned long)crc);
+    }
+    return ok;
 }

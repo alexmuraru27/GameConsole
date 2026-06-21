@@ -40,7 +40,7 @@ typedef struct
 static const RootItem s_root_items[] = {
     {"Games", MENU_GOTO_GAMES},
     {"Settings", MENU_GOTO_SETTINGS},
-    {"Poll Remote Games", MENU_GOTO_REMOTE},
+    {"Poll Updates", MENU_GOTO_REMOTE},
     {"Reboot Console", MENU_REBOOT},
 };
 #define ROOT_ITEM_COUNT (sizeof(s_root_items) / sizeof(s_root_items[0]))

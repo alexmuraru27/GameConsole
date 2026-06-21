@@ -56,12 +56,17 @@ static void buzzerSoundSet(bool on)
 
 /* ---- The tree ---- */
 
+/* All WiFi-related settings live under one "WiFi" category. */
+static const SettingNode s_wifi_children[] = {
+    {.label = "Networks", .kind = SETTING_ACTION, .action = wifiMenuRun},
+    {.label = "Server address", .kind = SETTING_ACTION, .action = remoteServerAddrRun},
+    {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
+};
+
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
-    {.label = "WiFi", .kind = SETTING_ACTION, .action = wifiMenuRun},
-    {.label = "Server address", .kind = SETTING_ACTION, .action = remoteServerAddrRun},
-    {.label = "Download WiFi firmware", .kind = SETTING_ACTION, .action = remoteWifiFirmwareRun},
-    {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
+    {.label = "WiFi", .kind = SETTING_CATEGORY, .children = s_wifi_children,
+     .child_count = (uint8_t)(sizeof(s_wifi_children) / sizeof(s_wifi_children[0]))},
 };
 
 static const SettingNode s_root = {

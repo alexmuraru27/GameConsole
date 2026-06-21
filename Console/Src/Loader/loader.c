@@ -3,7 +3,9 @@
 #include "gpio.h"
 #include "sysclock.h"
 #include "logger.h"
+#include "sd_layout.h"
 #include "stdbool.h"
+#include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
 
@@ -21,9 +23,21 @@ static bool s_media_candidate;   /* raw reading awaiting debounce */
 static uint32_t s_media_since;   /* when the candidate first appeared */
 #define MEDIA_DEBOUNCE_MS 250U
 
+/* Create the SD directory layout (idempotent: f_mkdir returns FR_EXIST if the
+ * folder is already there). Called after every successful mount so the tree is
+ * present for the game loader, downloader, and flasher to read/write. */
+static void ensureDirs(void)
+{
+    f_mkdir(SD_DIR_GAMES);
+    f_mkdir(SD_DIR_SETTINGS);
+    f_mkdir(SD_DIR_FIRMWARE);
+    f_mkdir(SD_DIR_MANIFESTS);
+}
+
 void loaderMediaInit(void)
 {
     f_mount(&s_fatfs, "0:", 1U);
+    ensureDirs();
     s_media_present = sdCardPresent();
     s_media_candidate = s_media_present;
     s_media_since = getSysTime();
@@ -52,6 +66,7 @@ bool loaderMediaSync(void)
     {
         diskMarkUninitialized();      /* re-run SDIO init for the new card */
         f_mount(&s_fatfs, "0:", 1U);  /* remount and read its filesystem */
+        ensureDirs();                 /* the new card may lack the layout */
         LOGGER_LOG_INFO(LOGGER_LOADER, "SD card inserted");
     }
     else
@@ -100,7 +115,7 @@ uint32_t loaderGetBinaryFilesNumberInDirectory(void)
     FILINFO finfo;
     uint32_t file_count = 0U;
 
-    res = f_opendir(&dir, "0:");
+    res = f_opendir(&dir, SD_DIR_GAMES);
     if (res != FR_OK)
     {
         return 0U;
@@ -161,7 +176,7 @@ FRESULT loaderOpenFile(const uint32_t binary_index)
     FILINFO finfo;
     uint32_t binary_file_index = 0U;
 
-    res = f_opendir(&dir, "0:");
+    res = f_opendir(&dir, SD_DIR_GAMES);
     if (res != FR_OK)
     {
         return res;
@@ -192,7 +207,10 @@ FRESULT loaderOpenFile(const uint32_t binary_index)
         {
             if (binary_file_index == binary_index)
             {
-                res = f_open(&s_active_file, finfo.fname, FA_READ);
+                /* f_readdir gives the bare name; open it under Games/. */
+                char path[FF_LFN_BUF + sizeof(SD_DIR_GAMES) + 1U];
+                snprintf(path, sizeof(path), "%s/%s", SD_DIR_GAMES, finfo.fname);
+                res = f_open(&s_active_file, path, FA_READ);
                 s_active_fileinfo = finfo;
                 if (res == FR_OK)
                 {
@@ -222,7 +240,7 @@ FRESULT loaderGetFilenameByIndex(const uint32_t binary_index, char *const filena
     filename_out[0] = '\0';
     *filename_length = 0U;
 
-    res = f_opendir(&dir, "0:");
+    res = f_opendir(&dir, SD_DIR_GAMES);
     if (res != FR_OK)
     {
         return res;

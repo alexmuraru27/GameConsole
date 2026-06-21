@@ -380,6 +380,12 @@ void setup()
      * crash reads as "Exception" — and there we dump the Xtensa exception cause +
      * faulting PC so the crash names itself (cause 28/29 = bad pointer / overflow,
      * 9 = unaligned, 0 = illegal instr) instead of just "Exception". */
+    /* Build stamp so the running firmware is identifiable in the SWO log (compare
+     * against when you last `make esp` + flashed). __DATE__/__TIME__ are filled by
+     * the compiler, so every build is uniquely tagged without manual version bumps. */
+    np::logf(NP_LOG_INFO, "ESP firmware: proto v%u, built " __DATE__ " " __TIME__,
+             (unsigned)NETWORK_PROTOCOL_VERSION);
+
     const struct rst_info *ri = ESP.getResetInfoPtr();
     if (ri != nullptr && ri->reason == REASON_EXCEPTION_RST)
     {

@@ -10,12 +10,13 @@
 #include "logger.h"
 #include "loader.h"
 #include "esp_flasher.h"
-#include "network.h"
+#include "game_console.h"
+#include "sd_layout.h"
 #include "ff.h"
 
-/* The firmware image is looked up by this fixed name at the SD card root
- * (shared with the flasher and the game-list filter). */
-#define ESP_IMAGE_PATH ESP_FIRMWARE_FILENAME
+/* The firmware image is looked up under Firmware/ on the SD card (where Download
+ * WiFi firmware / Poll Updates place it). */
+#define ESP_IMAGE_PATH SD_DIR_FIRMWARE "/" ESP_FIRMWARE_FILENAME
 
 /* Progress-bar geometry. */
 #define BAR_X 40
@@ -112,21 +113,16 @@ void wifiUpdateRun(void)
 
     if (status == ESP_FLASH_OK)
     {
-        /* Remove the image on success so it isn't re-flashed on every visit and
-         * doesn't linger on the card. Best-effort — the upgrade already took. */
-        const FRESULT del = f_unlink(ESP_IMAGE_PATH);
-        if (del == FR_OK)
-        {
-            LOGGER_LOG_INFO(LOGGER_FLASHER, "removed '%s' after upgrade", ESP_IMAGE_PATH);
-        }
-        else
-        {
-            LOGGER_LOG_WARN(LOGGER_FLASHER, "could not remove '%s' (%d)", ESP_IMAGE_PATH, (int)del);
-        }
-        /* Reboot the ESP so it starts the freshly-flashed firmware cleanly. */
-        networkRebootEsp();
+        /* Keep Firmware/ESP01.bin on the card so it can be re-flashed without
+         * re-downloading; it's in its own folder, so it never clutters the game
+         * list (which only reads Games/). */
+        LOGGER_LOG_INFO(LOGGER_FLASHER, "flash OK, keeping '%s' for re-flash", ESP_IMAGE_PATH);
         buzzerPlay(0U, false, s_done_notes, 3U);
-        waitForBack("Update complete!", g_menu_pal_accent);
+        /* Reboot the whole console so the freshly-flashed ESP starts clean; the
+         * reboot power-cycles the ESP as part of bringing the link back up. */
+        drawScreen("Update complete - rebooting", g_menu_pal_accent, false, 0U, 0U, NULL);
+        delay(1500U);
+        gameConsoleReboot(); /* does not return */
     }
     else
     {

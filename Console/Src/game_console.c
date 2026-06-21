@@ -153,5 +153,11 @@ void gameConsoleInit()
 void gameConsoleReboot(void)
 {
     LOGGER_LOG_INFO(LOGGER_CORE, "reboot requested");
+    /* Reboot the ESP-01 along with the console: hold its EN low so the module is
+     * disabled across the reset. peripheralsInit() -> networkInit() drives EN
+     * high again on the next boot, so the ESP comes up fresh (e.g. running
+     * firmware just flashed by the WiFi upgrade). */
+    esp01SetEnable(false);
+    delay(20U);
     NVIC_SystemReset(); /* full MCU reset; does not return */
 }
