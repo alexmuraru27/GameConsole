@@ -264,6 +264,10 @@ static void handleHttpOpen(uint16_t len)
         s_http.setReuse(false);
         s_http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
         s_http.setTimeout(8000);
+        /* Boundary marker: if this prints but "http N" / "GET error" never does,
+         * the crash is inside GET() (the TCP receive path), not begin()/connect.
+         * The heap here flags any allocation pressure right before the transfer. */
+        np::logf(NP_LOG_DEBUG, "begin ok, GET (heap %u)", (unsigned)ESP.getFreeHeap());
         const int code = s_http.GET();
         s_http_active = true;
         if (code > 0)

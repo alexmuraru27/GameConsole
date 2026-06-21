@@ -5,6 +5,7 @@
 #include "diskio.h"
 #include "diskio_integration.h"
 #include "sysclock.h"
+#include "logger.h"
 
 #define MAX_RETRIES 3
 static uint8_t s_card_initialized = 0;
@@ -89,6 +90,27 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
     return RES_ERROR;
 }
 
+/* Read each just-written block back and compare to the source. A flaky card can
+ * report a write OK yet store wrong/incomplete bytes; this catches that so the
+ * write can be retried. A single 512 B scratch handles any `count`. */
+static bool verifyWrite(const BYTE *buff, LBA_t sector, UINT count)
+{
+    static uint8_t s_verify[512];
+    sdWaitCardReady(); /* programming must finish before reading back */
+    for (UINT i = 0; i < count; i++)
+    {
+        if (sdReadSingleBlock((uint32_t)(sector + i), s_verify) != SD_OK)
+        {
+            return false;
+        }
+        if (memcmp(s_verify, buff + ((uint32_t)i * 512U), 512U) != 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {
     if (pdrv != DRIVE_SD)
@@ -104,31 +126,31 @@ DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
         return RES_PARERR;
     }
 
-    uint8_t ret;
     uint32_t retry_count = 0;
 
     do
     {
         sdWaitCardReady();
 
-        if (count == 1)
-        {
-            ret = sdWriteSingleBlock(sector, buff);
-        }
-        else
-        {
-            ret = sdWriteMultipleBlocks(sector, buff, count);
-        }
+        const uint8_t ret = (count == 1) ? sdWriteSingleBlock(sector, buff)
+                                         : sdWriteMultipleBlocks(sector, buff, count);
 
-        if (ret == SD_OK)
+        /* Accept the write only if it both reported OK and reads back identical. */
+        if (ret == SD_OK && verifyWrite(buff, sector, count))
         {
             return RES_OK;
         }
 
+        LOGGER_LOG_WARN(LOGGER_SDIO, "write sector %lu x%u: %s (retry %lu/%d)",
+                        (unsigned long)sector, (unsigned)count,
+                        (ret == SD_OK) ? "verify mismatch" : "write error",
+                        (unsigned long)(retry_count + 1U), MAX_RETRIES);
         retry_count++;
         sdWaitCardReady();
     } while (retry_count < MAX_RETRIES);
 
+    LOGGER_LOG_ERROR(LOGGER_SDIO, "write sector %lu x%u failed after %d retries",
+                     (unsigned long)sector, (unsigned)count, MAX_RETRIES);
     return RES_ERROR;
 }
 

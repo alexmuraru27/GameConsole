@@ -18,6 +18,7 @@
 
 #define RU_MAX_ENTRIES 32
 #define RU_VISIBLE_ROWS 8
+#define RU_DOWNLOAD_ATTEMPTS 3 /* re-download on ESP-link crash or corrupt write */
 
 static RemoteEntry s_entries[RU_MAX_ENTRIES];
 static char s_status[RU_MAX_ENTRIES][12];              /* "NEW" / "UPD" / "UpToDate" per display row */
@@ -246,15 +247,37 @@ static void renderList(int count, int selected, int top)
  * not a link crash. */
 static DownloadStatus fetchWithRetry(const RemoteEntry *e, const char *path, ProgressCtx *ctx)
 {
-    DownloadStatus st = downloaderFetchFile(e, path, progressCb, ctx);
-    if (st == DOWNLOAD_NO_SERVER || st == DOWNLOAD_HTTP_ERR)
+    DownloadStatus st = DOWNLOAD_HTTP_ERR;
+    for (int attempt = 1; attempt <= RU_DOWNLOAD_ATTEMPTS; attempt++)
     {
-        downloadUiInfo("UPDATES", "Link reset, retrying...", g_menu_pal_item_sel);
-        networkRebootEsp();
-        if (ensureConnected("UPDATES"))
+        st = downloaderFetchFile(e, path, progressCb, ctx);
+        if (st == DOWNLOAD_OK || attempt >= RU_DOWNLOAD_ATTEMPTS)
         {
-            ctx->last_render = 0U;
-            st = downloaderFetchFile(e, path, progressCb, ctx);
+            break;
+        }
+        ctx->last_render = 0U;
+        if (st == DOWNLOAD_NO_SERVER || st == DOWNLOAD_HTTP_ERR)
+        {
+            /* The ESP HTTP stack likely crashed + rebooted (dropping WiFi); bring
+             * the link back before retrying. */
+            downloadUiInfo("UPDATES", "Link reset, retrying...", g_menu_pal_item_sel);
+            networkRebootEsp();
+            if (!ensureConnected("UPDATES"))
+            {
+                break;
+            }
+        }
+        else if (st == DOWNLOAD_CRC_ERR)
+        {
+            /* Corrupt download — the read-back caught a flaky SD write (or rarely a
+             * bad transfer). The link is fine, so just re-fetch; a fresh write may
+             * land clean. (If the card keeps corrupting, this fails out and the
+             * card needs replacing.) */
+            downloadUiInfo("UPDATES", "Bad data, retrying...", g_menu_pal_item_sel);
+        }
+        else
+        {
+            break; /* DOWNLOAD_SD_ERR (hard write failure): don't spin on it */
         }
     }
     return st;

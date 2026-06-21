@@ -5,6 +5,7 @@
 
 typedef enum
 {
+    LOGGER_LEVEL_NONE = -1, /* channel fully silenced (below every severity) */
     LOGGER_LEVEL_ERROR = 0,
     LOGGER_LEVEL_WARN,
     LOGGER_LEVEL_INFO,
@@ -22,13 +23,17 @@ void loggerGameLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 #if LOGGER_ENABLED
 
-#define LOGGER_LOG_DISPATCH(enabled, tag, level, fmt, ...)   \
-    do                                                       \
-    {                                                        \
-        if ((enabled) && (level) <= LOGGER_MAX_LEVEL)        \
-        {                                                    \
-            loggerLog((level), (tag), (fmt), ##__VA_ARGS__); \
-        }                                                    \
+/* A site emits only when its severity passes BOTH the channel's own level
+ * (`chan_level`, the LOGGER_<NAME> value from logger_config.h) and the global
+ * LOGGER_MAX_LEVEL ceiling. Both are compile-time constants, so a site that can
+ * never pass folds away entirely — format string included, zero flash/cycles. */
+#define LOGGER_LOG_DISPATCH(chan_level, tag, level, fmt, ...)       \
+    do                                                              \
+    {                                                               \
+        if ((level) <= (chan_level) && (level) <= LOGGER_MAX_LEVEL) \
+        {                                                           \
+            loggerLog((level), (tag), (fmt), ##__VA_ARGS__);        \
+        }                                                           \
     } while (0)
 
 #define LOGGER_LOG_ERROR(channel, fmt, ...) LOGGER_LOG_DISPATCH(channel, #channel, LOGGER_LEVEL_ERROR, fmt, ##__VA_ARGS__)

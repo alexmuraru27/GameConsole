@@ -55,18 +55,27 @@ def _make_handler(root: Path, catalog: Catalog):
             return target == root or target.is_relative_to(root)
 
         def do_GET(self):
-            if self.path.split("?", 1)[0] in ("/", "/" + MANIFEST_NAME):
-                self._send_manifest()
-            elif not self._within_root():
-                self.send_error(403, "Forbidden")
-            else:
-                super().do_GET()  # static download from `directory`
+            try:
+                if self.path.split("?", 1)[0] in ("/", "/" + MANIFEST_NAME):
+                    self._send_manifest()
+                elif not self._within_root():
+                    self.send_error(403, "Forbidden")
+                else:
+                    super().do_GET()  # static download from `directory`
+            except (BrokenPipeError, ConnectionResetError):
+                # The client (the ESP) hung up mid-response — normal when it
+                # crashes or the console aborts/retries a download. One clean
+                # line, not a traceback.
+                self.log_message("client disconnected mid-response")
 
         def do_HEAD(self):
-            if not self._within_root():
-                self.send_error(403, "Forbidden")
-            else:
-                super().do_HEAD()
+            try:
+                if not self._within_root():
+                    self.send_error(403, "Forbidden")
+                else:
+                    super().do_HEAD()
+            except (BrokenPipeError, ConnectionResetError):
+                self.log_message("client disconnected mid-response")
 
         def _send_manifest(self):
             body = manifest.to_csv(catalog.scan()).encode("utf-8")

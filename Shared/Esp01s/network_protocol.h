@@ -23,11 +23,14 @@
 
 #include <stdint.h>
 
-/* Runtime UART baud for the console<->ESP link on USART1. 115200 — same rate as
- * firmware flashing (the ESP ROM bootloader rate), so the link runs at one
- * consistent speed. The console receives via circular DMA (usart.c), which would
- * allow far higher rates, but 115200 is the chosen reliable default. */
-#define NETWORK_UART_BAUD 115200u
+/* Runtime UART baud for the console<->ESP link on USART1. Firmware FLASHING is a
+ * separate path pinned to the ESP ROM bootloader's 115200 (USART1_DEFAULT_BAUD),
+ * so this only sets the *runtime protocol* speed. The console RX is fed by a
+ * continuously-running circular DMA (usart.c), so a byte is never dropped even
+ * when an ISR briefly delays the consumer — which makes this aggressive rate
+ * (923076 = the exact 84MHz/91 STM32 BRR, ~8x faster than 115200) safe. The
+ * per-frame CRC + retry is the backstop if a byte ever is corrupted. */
+#define NETWORK_UART_BAUD 923076u
 
 /* Bumped whenever the wire format below changes incompatibly. */
 #define NETWORK_PROTOCOL_VERSION 2u

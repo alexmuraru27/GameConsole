@@ -19,16 +19,16 @@ static char loggerLevelChar(LoggerLevel level)
 static void loggerEmit(LoggerLevel level, const char *channel, const char *fmt, va_list args)
 {
     /* Channel tags arrive as the macro's stringized switch name. Drop the
-     * shared "LOGGER_" prefix here, then the "%.4s" below caps the printed tag
-     * at four chars ("LOGGER_RENDERER" -> "REND") to bound the bytes pushed
-     * over SWO. Tags without the prefix (e.g. "GAME") pass straight through. */
+     * shared "LOGGER_" prefix here and print the remainder in full
+     * ("LOGGER_JOYSTICK" -> "JOYSTICK"). Tags without the prefix (e.g. "GAME")
+     * pass straight through. */
     static const char prefix[] = "LOGGER_";
     if (strncmp(channel, prefix, sizeof(prefix) - 1U) == 0)
     {
         channel += sizeof(prefix) - 1U;
     }
 
-    printf("[%c][%lu][%.4s] ", loggerLevelChar(level), (unsigned long)getSysTime(), channel);
+    printf("[%7lu][%c][%s] ", (unsigned long)getSysTime(), loggerLevelChar(level), channel);
     vprintf(fmt, args);
     printf("\r\n");
 }
@@ -44,9 +44,10 @@ void loggerLog(LoggerLevel level, const char *channel, const char *fmt, ...)
 void loggerGameLog(const char *fmt, ...)
 {
     /* Games share the console's logging config but cannot reference it; gate
-     * them here on the master switch and the LOGGER_GAME channel. Both are
-     * compile-time constants, so a disabled game channel folds this body away. */
-    if (LOGGER_ENABLED && LOGGER_GAME)
+     * them here exactly as the LOGGER_LOG_* macros would for an INFO-severity
+     * site on the GAME channel. All operands are compile-time constants, so a
+     * GAME level below INFO folds this whole body away. */
+    if (LOGGER_ENABLED && LOGGER_LEVEL_INFO <= LOGGER_GAME && LOGGER_LEVEL_INFO <= LOGGER_MAX_LEVEL)
     {
         va_list args;
         va_start(args, fmt);

@@ -4,9 +4,11 @@
 #include <stdbool.h>
 
 /*
- * USART1 (PA9 TX / PA10 RX) — the ESP-01 link. Brought up as a plain
- * polled 8N1 port; the only client today is the ESP flasher, which needs
- * blocking byte I/O with timeouts. PCLK2 is 84 MHz.
+ * USART1 (PA9 TX / PA10 RX) — the ESP-01 link, 8N1. RX is backed by a
+ * continuously-running circular DMA ring (DMA2 Stream 2) and TX by a per-transfer
+ * DMA (DMA2 Stream 7), so the byte API below never loses data even at high baud
+ * when an ISR briefly delays the consumer. Clients: the runtime network protocol
+ * (network.c) and the ESP flasher. PCLK2 is 84 MHz.
  */
 
 /* Default baud used by the ESP ROM bootloader for flashing. */

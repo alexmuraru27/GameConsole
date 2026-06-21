@@ -284,6 +284,7 @@ uint8_t sdWriteMultipleBlocks(uint32_t block_addr, const uint8_t *buffer, uint32
     uint32_t remaining = count * 512U;
     uint32_t deadline = getSysTime() + 5000U;
     uint32_t word;
+    uint8_t timed_out = 0U;
 
     while (!(SDIO->STA & (SDIO_STA_TXUNDERR | SDIO_STA_DCRCFAIL |
                           SDIO_STA_DTIMEOUT | SDIO_STA_DATAEND)))
@@ -302,20 +303,20 @@ uint8_t sdWriteMultipleBlocks(uint32_t block_addr, const uint8_t *buffer, uint32
 
         if (getSysTime() > deadline)
         {
-            SDIO->ICR = 0x5FF;
-            return SD_TIMEOUT;
+            timed_out = 1U;
+            break;
         }
     }
 
     status = SDIO->STA;
     SDIO->ICR = 0x5FF;
 
-    if (status & SDIO_STA_DATAEND)
-    {
-        sdioSendCommand(CMD12, 0U, SD_RESP_SHORT);
-    }
+    /* CMD25 is open-ended: ALWAYS terminate with CMD12, even on error/timeout.
+     * Skipping it on the error path leaves the card stuck in the receive state
+     * (CMD13 state=6) so every later read/write fails until re-init. */
+    sdioSendCommand(CMD12, 0U, SD_RESP_SHORT);
 
-    if (status & SDIO_STA_DTIMEOUT)
+    if (timed_out || (status & SDIO_STA_DTIMEOUT))
     {
         return SD_TIMEOUT;
     }
@@ -346,4 +347,12 @@ void sdWaitCardReady(void)
         delay(1);
     }
     LOGGER_LOG_WARN(LOGGER_SDIO, "sdWaitCardReady timeout, state=%lu", state);
+    /* Wedged mid-transfer (5=data, 6=rcv) — e.g. an aborted multi-block write.
+     * Issue CMD12 to abort it and return the card to the transfer state, so it
+     * recovers in place instead of staying locked until a board reboot. */
+    if (state == 5U || state == 6U)
+    {
+        sdioSendCommand(CMD12, 0U, SD_RESP_SHORT);
+        delay(1);
+    }
 }

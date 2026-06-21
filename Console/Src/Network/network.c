@@ -1,5 +1,6 @@
 #include "network.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "usart.h"
@@ -20,6 +21,7 @@
 #define NP_TIMEOUT_DEFAULT 2000U
 #define NP_TIMEOUT_SCAN 9000U
 #define NP_TIMEOUT_CONNECT 16000U /* must exceed the ESP's connect-wait (6 s) + boot/log slack so its result is received */
+#define NETWORK_CONNECT_ATTEMPTS 4U /* WiFi association retries before giving up (transient assoc failures are common) */
 #define NP_TIMEOUT_HTTP_OPEN 12000U
 #define NP_TIMEOUT_HTTP_READ 4000U
 #define NP_TX_TIMEOUT 1000U
@@ -334,12 +336,18 @@ static void npDiagnoseSilence(void)
     usartFlushRx();
     (void)npSendFrame(NP_CMD_PING, NULL, 0U);
 
+    uint8_t sample[24];
     uint32_t seen = 0U;
     const uint32_t until = getSysTime() + 300U;
     while (getSysTime() < until)
     {
-        if (usartReadByte(until - getSysTime()) >= 0)
+        const int b = usartReadByte(until - getSysTime());
+        if (b >= 0)
         {
+            if (seen < sizeof(sample))
+            {
+                sample[seen] = (uint8_t)b;
+            }
             seen++;
         }
     }
@@ -352,6 +360,17 @@ static void npDiagnoseSilence(void)
     {
         LOGGER_LOG_WARN(LOGGER_NETWORK, "diag: %lu byte(s) after PING -> ESP alive but link garbled (baud/wiring/crc)",
                         (unsigned long)seen);
+        /* Dump the head so the garble can be identified: readable ASCII => the
+         * ESP8266 postmortem text (a crash loop); scrambled bytes => ROM boot
+         * messages at 74880 baud (a reset loop) or a baud mismatch. */
+        char hex[3U * sizeof(sample) + 1U];
+        uint32_t pos = 0U;
+        const uint32_t dump = (seen < sizeof(sample)) ? seen : (uint32_t)sizeof(sample);
+        for (uint32_t i = 0U; i < dump; i++)
+        {
+            pos += (uint32_t)snprintf(&hex[pos], sizeof(hex) - pos, "%02X ", sample[i]);
+        }
+        LOGGER_LOG_WARN(LOGGER_NETWORK, "diag: head: %s", hex);
     }
 }
 
@@ -451,7 +470,6 @@ bool networkConnect(const char *ssid, const char *pass)
     {
         return false;
     }
-    npBegin();
 
     const uint8_t ssid_len = (uint8_t)strnlen(ssid, NP_SSID_MAX);
     const uint8_t pass_len = (pass != NULL) ? (uint8_t)strnlen(pass, NP_PASS_MAX) : 0U;
@@ -468,18 +486,30 @@ bool networkConnect(const char *ssid, const char *pass)
         n += pass_len;
     }
 
-    uint8_t type;
-    uint16_t len;
-    if (!npTransact(NP_CMD_CONNECT, payload, n, &type, &len, NP_TIMEOUT_CONNECT) ||
-        type != NP_RSP_STATUS || len < 1U)
+    /* Association can fail transiently (busy AP, weak signal, timing), so retry a
+     * few times before giving up. Each attempt is one CONNECT command (the ESP
+     * waits ~6 s for the result), so the total stays bounded. */
+    for (uint8_t attempt = 1U; attempt <= NETWORK_CONNECT_ATTEMPTS; attempt++)
     {
-        LOGGER_LOG_WARN(LOGGER_NETWORK, "connect '%s' failed", ssid);
-        return false;
+        npBegin();
+        uint8_t type = 0U;
+        uint16_t len = 0U;
+        if (npTransact(NP_CMD_CONNECT, payload, n, &type, &len, NP_TIMEOUT_CONNECT) &&
+            type == NP_RSP_STATUS && len >= 1U && s_rx[3] == NP_STATE_CONNECTED)
+        {
+            LOGGER_LOG_INFO(LOGGER_NETWORK, "connect '%s' -> ok (attempt %u/%u)",
+                            ssid, (unsigned)attempt, (unsigned)NETWORK_CONNECT_ATTEMPTS);
+            return true;
+        }
+        const unsigned wl_status = (len >= 6U) ? (unsigned)s_rx[3 + 5U] : 0xFFU;
+        LOGGER_LOG_WARN(LOGGER_NETWORK, "connect '%s' attempt %u/%u failed (wl_status %u)",
+                        ssid, (unsigned)attempt, (unsigned)NETWORK_CONNECT_ATTEMPTS, wl_status);
+        if (attempt < NETWORK_CONNECT_ATTEMPTS)
+        {
+            delay(500U); /* brief settle before re-associating */
+        }
     }
-    const bool connected = (s_rx[3] == NP_STATE_CONNECTED);
-    const unsigned wl_status = (len >= 6U) ? (unsigned)s_rx[3 + 5U] : 0xFFU;
-    LOGGER_LOG_INFO(LOGGER_NETWORK, "connect '%s' -> %s (wl_status %u)", ssid, connected ? "ok" : "fail", wl_status);
-    return connected;
+    return false;
 }
 
 void networkDisconnect(void)

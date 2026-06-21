@@ -324,8 +324,23 @@ DownloadStatus downloaderFetchFile(const RemoteEntry *entry, const char *sd_path
 
     if (result == DOWNLOAD_OK && crc32_final(crc) != entry->crc32)
     {
-        LOGGER_LOG_WARN(LOGGER_NETWORK, "crc mismatch on '%s'", sd_path);
+        LOGGER_LOG_WARN(LOGGER_NETWORK, "crc mismatch on '%s' (received bytes)", sd_path);
         result = DOWNLOAD_CRC_ERR;
+    }
+    /* Read the file back off the card and re-CRC it. The streaming CRC above only
+     * proves the *received* bytes were correct, not that the SD actually stored
+     * them — a flaky card can ACK a write yet hold wrong/incomplete data. This
+     * read-back closes that gap so a silently-corrupt file is never kept (and so
+     * never flashed to the ESP, whose MD5 only checks flash == SD-file). */
+    if (result == DOWNLOAD_OK)
+    {
+        bool exists = false;
+        const uint32_t disk_crc = downloaderLocalCrc(sd_path, &exists);
+        if (!exists || disk_crc != entry->crc32)
+        {
+            LOGGER_LOG_WARN(LOGGER_NETWORK, "sd verify failed on '%s' (card corrupted the write)", sd_path);
+            result = DOWNLOAD_CRC_ERR;
+        }
     }
     if (result != DOWNLOAD_OK)
     {
@@ -333,7 +348,7 @@ DownloadStatus downloaderFetchFile(const RemoteEntry *entry, const char *sd_path
     }
     else
     {
-        LOGGER_LOG_INFO(LOGGER_NETWORK, "downloaded '%s' (%lu bytes, crc ok)", sd_path, (unsigned long)done);
+        LOGGER_LOG_INFO(LOGGER_NETWORK, "downloaded '%s' (%lu bytes, crc + sd-readback ok)", sd_path, (unsigned long)done);
     }
     return result;
 }
