@@ -9,6 +9,7 @@
 #include "fonts.h"
 #include "logger.h"
 #include "remote_update.h"
+#include "game_console.h"
 #include <string.h>
 
 /* ------------------------------------------------------------------ *
@@ -40,6 +41,7 @@ static const RootItem s_root_items[] = {
     {"Games", MENU_GOTO_GAMES},
     {"Settings", MENU_GOTO_SETTINGS},
     {"Poll Remote Games", MENU_GOTO_REMOTE},
+    {"Reboot Console", MENU_REBOOT},
 };
 #define ROOT_ITEM_COUNT (sizeof(s_root_items) / sizeof(s_root_items[0]))
 
@@ -150,6 +152,9 @@ static void applyTransition(MenuTransition transition)
     case MENU_GOTO_REMOTE:
         remoteGamesRun(); /* blocking: download games from the update server */
         enterScreen(SCREEN_ROOT);
+        break;
+    case MENU_REBOOT:
+        gameConsoleReboot(); /* full MCU reset; does not return */
         break;
     }
 }

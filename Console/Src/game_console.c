@@ -1,4 +1,5 @@
 #include "game_console.h"
+#include <stm32f407xx.h> /* NVIC_SystemReset() */
 #include "sysclock.h"
 #include "usart.h"
 #include "network.h"
@@ -147,4 +148,10 @@ void gameConsoleInit()
     beep_step(8);
     playBootSong();
     LOGGER_LOG_INFO(LOGGER_CORE, "console ready");
+}
+
+void gameConsoleReboot(void)
+{
+    LOGGER_LOG_INFO(LOGGER_CORE, "reboot requested");
+    NVIC_SystemReset(); /* full MCU reset; does not return */
 }

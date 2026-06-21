@@ -53,9 +53,16 @@ class Catalog:
         """Return the current catalog, sorted by path for a stable manifest."""
         versions = self._load_versions()
         entries: list[ContentEntry] = []
+        root_real = self.root.resolve()
 
         for file in sorted(self.root.rglob("*")):
             if not file.is_file() or file.name.startswith("."):
+                continue
+            # Skip symlinks that escape the content root: the manifest must never
+            # list (nor leak the size/CRC of) files elsewhere on disk. The server
+            # also refuses to serve them, so this keeps listing and download in
+            # agreement.
+            if not file.resolve().is_relative_to(root_real):
                 continue
             rel = file.relative_to(self.root).as_posix()
             if rel in _RESERVED:

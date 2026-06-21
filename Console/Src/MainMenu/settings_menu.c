@@ -62,7 +62,6 @@ static const SettingNode s_root_children[] = {
     {.label = "Server address", .kind = SETTING_ACTION, .action = remoteServerAddrRun},
     {.label = "Download WiFi firmware", .kind = SETTING_ACTION, .action = remoteWifiFirmwareRun},
     {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
-    {.label = "Test WiFi module", .kind = SETTING_ACTION, .action = wifiTestRun},
 };
 
 static const SettingNode s_root = {

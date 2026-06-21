@@ -47,7 +47,8 @@ typedef enum
     MENU_GOTO_ROOT,
     MENU_GOTO_GAMES,
     MENU_GOTO_SETTINGS,
-    MENU_GOTO_REMOTE
+    MENU_GOTO_REMOTE,
+    MENU_REBOOT
 } MenuTransition;
 
 /* Shared layout anchors (px). */

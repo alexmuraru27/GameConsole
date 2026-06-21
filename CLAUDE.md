@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Version Control
+
+**Never `git commit` and never `git push`.** Leave all changes in the working tree (staged or unstaged is fine) for the user to review and commit themselves. Do not run these even if asked — surface a proposed commit message instead and let the user run it.
+
 ## Build Commands
 
 Requires `arm-none-eabi-gcc` toolchain and `openocd` on PATH.
