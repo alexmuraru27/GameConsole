@@ -104,7 +104,7 @@ Serves assets out of the `.pak` bound to the running game. The game loader opens
 - `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
 
 ### Settings
-Persistent per-game storage in the EEPROM, keyed by the running game's `.bin` name. A game opts in by setting `has_settings` in its `DECLARE_GAME_BINARY_HEADER`; the loader then binds a 1 KB save slot (created on first need), so the game never names a file. All three return a `SettingsStorageStatus` (`0` = `OK`; `NOT_FOUND` on first run, `STORAGE_FULL` when no slot is free, etc. — see `Shared/Api/settings_interface.h`).
+Persistent per-game storage in the EEPROM, keyed by the running game's `.bin` name. No opt-in is needed: the loader binds a save slot for every game (the 1 KB slot is allocated lazily on the first `settingsWrite`), so the game never names a file. All three return a `SettingsStorageStatus` (`0` = `OK`; `NOT_FOUND` on first run, `STORAGE_FULL` when no slot is free, etc. — see `Shared/Api/settings_interface.h`).
 - `settingsWrite(version, *data, size)`: Persist up to `SETTINGS_GAME_MAX_DATA` (1018) bytes tagged with a struct version.
 - `settingsRead(expected_version, *buffer, *size)`: Load the save; `*size` is in=capacity / out=actual, and a version bump yields `VERSION_MISMATCH`.
 - `settingsClear()`: Delete this game's save.

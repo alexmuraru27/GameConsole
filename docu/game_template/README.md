@@ -8,6 +8,12 @@ isolated from the console by the MPU. It reaches the console only through **SVC
 syscalls** — there is no shared struct and no direct linkage to console code. The
 isolation internals are in [`../kernel.md`](../kernel.md); this is the how-to.
 
+The **OS owns the game loop**. A game is not a `main()` that runs forever — it is
+three callbacks the console calls: `init` once, then `update` then `render` every
+frame. The console paces the frame and does its own work (the WiFi link, etc.)
+between frames, so a game must return promptly from each callback rather than spin.
+Game state lives in globals (it persists across calls); locals do not.
+
 ---
 
 ## Quick start
@@ -25,34 +31,45 @@ isolation internals are in [`../kernel.md`](../kernel.md); this is the how-to.
    C_INCLUDES  += -I../Shared/Api -I../Shared/Syscall
    ```
 
-3. **Add `startup.s`** — copy [`startup.s`](startup.s) from this folder verbatim.
-   It emits the binary header and defines `_game_start` (zero `.bss` → run ctors →
-   `main()` → `gameExit()`). It is identical for every game. Make sure the
-   assembler gets the same `-I` paths (it's built with `gcc -x assembler-with-cpp`).
+3. **No `startup.s`** — a game has no vector table and no hand-written entry. The
+   12→28-byte binary header is emitted by the `DECLARE_GAME_HEADER` macro (step 4),
+   and the C-runtime bootstrap (`_game_start`: zero `.bss` → run ctors) plus the
+   callback return trampoline (`_game_return`) come from the shared
+   `console_syscalls.c` linked in step 2. You write only your three callbacks.
 
-4. **Write `main()`** — include the umbrella header and call the API directly:
+4. **Write the callbacks + the header** — include the umbrella header, write
+   `init`/`update`/`render`, and declare the header at file scope:
 
    ```c
    #include "game_console_api.h"
 
-   int main(void)
+   static void gameInit(void)
    {
        gameLog("Hello from my game!");   // game-local printf() is unreliable; use gameLog
-
-       while (true)
-       {
-           // update + render here
-           if (joystickGetSpecialBtn2())
-           {
-               break;   // Special Button 2 returns to the console (by convention)
-           }
-       }
-       return 0;   // _game_start calls gameExit() for you
+       rendererInit();
+       // load assets, set up state (in globals — locals don't persist between calls)
    }
+
+   static void gameUpdate(void)
+   {
+       // read input, advance game logic
+       if (joystickGetSpecialBtn2())
+       {
+           gameExit();   // Special Button 2 returns to the console (by convention)
+       }
+   }
+
+   static void gameRender(void)
+   {
+       // submit sprites + rendererRender()
+   }
+
+   DECLARE_GAME_HEADER(gameInit, gameUpdate, gameRender);
    ```
 
    There is **no** runtime handshake — the loader already validated the binary's
-   magic and ABI version before running it.
+   magic and ABI version before running it. The OS calls `gameInit` once, then loops
+   `gameUpdate`/`gameRender`; `gameExit()` (or a crash) ends the session.
 
 5. **Build & deploy** — build with the Makefile, then copy `<game>.bin` and its
    matching `<game>.pak` (same base name) to the SD card root. `make deploy` copies
@@ -76,20 +93,26 @@ rather than holding them all resident. See [`../memory.md`](../memory.md).
 
 ---
 
-## The boot header (`startup.s`)
+## The binary header (`DECLARE_GAME_HEADER`)
 
-The header is the first 12 bytes of the `.bin`, emitted by `startup.s` straight
-from the shared ABI constants (so nothing is duplicated):
+The header is the first 28 bytes of the `.bin`, emitted by the macro straight from
+the shared ABI constants and your callback names (so nothing is duplicated):
 
 ```
-   offset 0:  magic        0x47414D45  "GAME"
-   offset 4:  abi_version  CONSOLE_ABI_VERSION   (loader refuses a mismatch)
-   offset 8:  entry_point  &_game_start          (Thumb bit set by the linker)
+   offset  0:  magic         0x47414D45  "GAME"
+   offset  4:  abi_version   CONSOLE_ABI_VERSION   (loader refuses a mismatch)
+   offset  8:  entry_point   &_game_start    one-time C-runtime bootstrap   ┐ filled by
+   offset 12:  frame_return  &_game_return   callback return trampoline      ┘ the macro
+   offset 16:  init          your gameInit                                   ┐ your three
+   offset 20:  update        your gameUpdate                                  │ callbacks
+   offset 24:  render        your gameRender                                 ┘
 ```
 
-`_game_start` is the entry trampoline. Because the game is unprivileged it cannot
-return into console code, so after `main()` returns it calls `gameExit()` (an SVC)
-to trap back to the console. Full file: [`startup.s`](startup.s).
+The macro fills `entry_point`/`frame_return` from the shared syscall library
+(you never name them). The OS invokes `entry_point` once to set up the C runtime,
+then `init`, then loops `update`/`render`. Each callback runs unprivileged and
+returns to the OS through `frame_return` (an SVC) — a game cannot return into
+console code directly. `gameExit()` ends the session early.
 
 ---
 
@@ -195,8 +218,8 @@ void gameLog(const char *fmt, ...);   // info log on the GAME channel over SWO (
 void gameExit(void);                  // return to the console (does not return)
 ```
 `gameLog` is formatted in your binary and handed over as bytes, so no format
-string reaches the console. `gameExit()` is called for you by `startup.s` after
-`main()` returns — call it directly only to quit early.
+string reaches the console. Call `gameExit()` from `update` (by convention on
+Special Button 2) to return to the console — there is no `main()` to fall out of.
 
 ---
 

@@ -15,6 +15,26 @@ extern uint32_t __game_ram_start, __game_ram_size;
 #define GAME_RAM_BASE ((uint32_t)&__game_ram_start)
 #define GAME_RAM_LEN ((uint32_t)&__game_ram_size)
 
+/* The OS now drives the game loop, so it also caps the frame rate (the game no
+ * longer paces itself). 60 Hz is the target; a frame that overruns just runs back
+ * to back. */
+#define GAME_FRAME_PERIOD_MS (1000U / 60U)
+static uint32_t s_next_frame_ms;
+
+/* Run between every frame, privileged, from inside kernelRunGame's loop. This is
+ * where the OS does its own work while a game is loaded: pace the frame, and (in
+ * the idle window) service console background tasks. The WiFi RX is a continuous
+ * DMA ring so nothing must be polled today, but this is the seam for inter-frame
+ * USART/network work as it lands. */
+static void gameRuntimeService(void)
+{
+    while ((int32_t)(getSysTime() - s_next_frame_ms) < 0)
+    {
+        /* idle until the next frame boundary; inter-frame console work goes here */
+    }
+    s_next_frame_ms = getSysTime() + GAME_FRAME_PERIOD_MS;
+}
+
 GameBinaryHeader s_game_header;
 bool s_is_game_header_valid = false;
 
@@ -148,10 +168,12 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 
     LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
 
-    /* Hand over to the kernel: it builds the game's unprivileged context, enables
-     * the MPU confinement, and switches in. This returns only when the game exits
-     * cleanly or crashes — either way the console resumes privileged on the MSP. */
-    kernelRunGame(s_game_header.entry_point);
+    /* Hand over to the kernel: it programs the MPU confinement, runs the game's
+     * bootstrap + init, then loops update/render (servicing the console between
+     * frames via gameRuntimeService). Returns only when the game exits cleanly or
+     * crashes — either way the console resumes privileged on the MSP. */
+    s_next_frame_ms = getSysTime();
+    kernelRunGame(&s_game_header, gameRuntimeService);
 
     const bool crashed = kernelGameCrashed();
     if (crashed)

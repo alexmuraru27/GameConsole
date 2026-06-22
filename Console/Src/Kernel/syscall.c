@@ -294,8 +294,8 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
 
     /* ---- lifecycle ---- */
     case SYS_EXIT:
-        /* Phase E hands control back to the console thread here; until then the
-         * game still returns from main() the old way and this is unreachable. */
+        /* Unreachable: SYS_EXIT/SYS_INVOKE/SYS_FRAME_DONE are the context switch and
+         * are handled in svcHandlerMain (scheduler.c) before svcDispatch is reached. */
         return 0;
 
     default:

@@ -14,11 +14,10 @@
  *
  * Bump CONSOLE_ABI_VERSION whenever the id assignments or argument marshalling
  * change; the loader refuses a game built against a different ABI. The value is a
- * plain integer (no suffix) so it is usable from both C and assembly — a game's
- * startup.s includes this header to emit its binary header.
+ * plain integer (no suffix) so it is usable from both C and assembly.
  */
 
-#define CONSOLE_ABI_VERSION 1
+#define CONSOLE_ABI_VERSION 2
 
 #ifndef __ASSEMBLER__
 
@@ -77,8 +76,14 @@ typedef enum
     SYS_FONT_SCALE,
 
     SYS_LOG,
-    SYS_EXIT,   /* game -> console: clean shutdown */
-    SYS_LAUNCH, /* console -> game: enter the game (kernel-internal, not a game stub) */
+
+    /* ---- lifecycle / context switch (kernel-internal, not game-facing stubs) ----
+     * The OS owns the game loop: it INVOKEs one callback (init/update/render) at a
+     * time, each running as a short unprivileged excursion that traps back with
+     * FRAME_DONE when it returns. EXIT ends the session for good. */
+    SYS_EXIT,       /* game -> console: clean shutdown, end the session */
+    SYS_INVOKE,     /* console -> game: run one callback unprivileged */
+    SYS_FRAME_DONE, /* game -> console: the invoked callback returned */
 
     SYS_COUNT
 } SyscallId;

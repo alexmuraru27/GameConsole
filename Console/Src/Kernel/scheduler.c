@@ -4,6 +4,7 @@
 #include "mpu.h"
 #include "logger.h"
 
+#include <stddef.h>
 #include <stm32f407xx.h>
 
 /* GAME_RAM bounds (common.ld) — the game's PSP starts at the top of this region. */
@@ -18,7 +19,10 @@ static volatile bool s_game_active = false;
 static volatile bool s_game_crashed = false;
 static volatile bool s_leave_crashed = false;
 static uint32_t s_game_psp = 0U;
-/* The EXC_RETURN captured when the console launched the game. Reused to resume the
+/* Return address (LR) installed in every invoked callback's frame — the game-side
+ * _game_return trampoline that traps back here when a callback returns. */
+static uint32_t s_game_frame_return = 0U;
+/* The EXC_RETURN captured when the console invoked the game. Reused to resume the
  * console so the stacked-frame type (basic vs. FP-extended) matches exactly. */
 static uint32_t s_console_exc_return = RETURN_TO_CONSOLE;
 
@@ -28,53 +32,76 @@ bool kernelGameCrashed(void) { return s_game_crashed; }
 void kernelRequestLeave(bool crashed)
 {
     s_leave_crashed = crashed;
-    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk; /* PendSV switches us back to the console */
+    SCB->ICSR = SCB_ICSR_PENDSVSET_Msk; /* PendSV ends the session and switches back */
 }
 
-/* Safety net: if a game's entry function ever returns instead of calling
- * gameExit(), fall through to a clean exit. */
-static void gameEntryReturned(void)
-{
-    __asm volatile("mov r12, %0 \n svc #0 \n" : : "i"(SYS_EXIT) : "r12");
-    for (;;)
-    {
-    }
-}
-
-/* Console -> game launch trampoline. Runs privileged on the MSP. The push parks
+/* Console -> game invoke trampoline. Runs privileged on the MSP. The push parks
  * the console's callee-saved registers below the SVC-stacked frame; the matching
- * pop runs only after the game has left and PendSV has returned us here. */
-__attribute__((naked)) static void kernelTriggerLaunch(void)
+ * pop runs only after the callback has returned (SYS_FRAME_DONE) or the game has
+ * left (SYS_EXIT / crash, via PendSV) and control has come back here. */
+__attribute__((naked)) static void kernelTriggerInvoke(void)
 {
     __asm volatile(
         "push {r4-r11, lr}   \n"
         "mov r12, %0         \n"
-        "svc #0              \n" /* SYS_LAUNCH: enter the game; returns here on leave */
+        "svc #0              \n" /* SYS_INVOKE: run one callback; returns here on leave */
         "pop {r4-r11, pc}    \n"
-        : : "i"(SYS_LAUNCH) : "r12", "memory");
+        : : "i"(SYS_INVOKE) : "r12", "memory");
 }
 
-void kernelRunGame(uint32_t entry_point)
+/* Run one game callback (init/update/render or the bootstrap) unprivileged on a
+ * fresh PSP frame, returning when it returns. A no-op once the session has ended,
+ * so a crash/exit mid-loop cleanly skips the remaining callbacks. */
+static void kernelInvokeGame(uint32_t callback)
 {
-    /* Build the initial exception frame the launch unstacks into the game. */
+    if (!s_game_active)
+    {
+        return;
+    }
+
+    /* Build the initial exception frame the invoke unstacks into the callback. */
     uint32_t *frame = (uint32_t *)(GAME_STACK_TOP - 32U);
-    frame[0] = 0U; /* r0  */
-    frame[1] = 0U; /* r1  */
-    frame[2] = 0U; /* r2  */
-    frame[3] = 0U; /* r3  */
-    frame[4] = 0U; /* r12 */
-    frame[5] = (uint32_t)gameEntryReturned;  /* LR  */
-    frame[6] = entry_point & ~0x1U;          /* PC  (Thumb state is in xPSR) */
-    frame[7] = 0x01000000U;                  /* xPSR: T-bit set */
+    frame[0] = 0U;                  /* r0  */
+    frame[1] = 0U;                  /* r1  */
+    frame[2] = 0U;                  /* r2  */
+    frame[3] = 0U;                  /* r3  */
+    frame[4] = 0U;                  /* r12 */
+    frame[5] = s_game_frame_return; /* LR: the game-side return trampoline (Thumb bit kept) */
+    frame[6] = callback & ~0x1U;    /* PC  (Thumb state is in xPSR) */
+    frame[7] = 0x01000000U;         /* xPSR: T-bit set */
 
     s_game_psp = (uint32_t)frame;
+    kernelTriggerInvoke();
+    /* --- resumes here once the callback returns or the game leaves --- */
+}
+
+void kernelRunGame(const GameBinaryHeader *header, void (*service)(void))
+{
+    s_game_frame_return = header->frame_return; /* keep Thumb bit: it is used as LR */
     s_game_crashed = false;
     s_game_active = true;
 
-    LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game @ 0x%08lX, psp=0x%08lX", (unsigned long)(entry_point & ~0x1U), (unsigned long)s_game_psp);
+    LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game: init=0x%08lX update=0x%08lX render=0x%08lX",
+                    (unsigned long)(header->init & ~0x1U), (unsigned long)(header->update & ~0x1U),
+                    (unsigned long)(header->render & ~0x1U));
     mpuConfigureForGame();
-    kernelTriggerLaunch();
-    /* --- resumes here once the game has exited or crashed (via PendSV) --- */
+
+    /* One-time C-runtime bootstrap (zero .bss, run ctors), then the game's init. */
+    kernelInvokeGame(header->entry_point);
+    kernelInvokeGame(header->init);
+
+    /* The OS owns the loop: service console background work + pace the frame, then
+     * step the game. A clean gameExit() or a crash inside update clears s_game_active
+     * (via PendSV) so we stop before rendering a game that is no longer there. */
+    while (s_game_active)
+    {
+        if (service != NULL)
+        {
+            service();
+        }
+        kernelInvokeGame(header->update);
+        kernelInvokeGame(header->render);
+    }
 
     /* Back in privileged thread context. Safe to log: the per-game lifecycle ends
      * here, not on a hot path. (The leave itself happens in PendSV, which stays
@@ -89,8 +116,9 @@ void kernelRunGame(uint32_t entry_point)
     }
 }
 
-/* Teardown shared by the clean-exit and crash paths. Runs in PendSV (privileged).
- * Returns the EXC_RETURN that resumes the parked console context on the MSP. */
+/* Session teardown shared by the clean-exit and crash paths. Runs in PendSV
+ * (privileged). Returns the EXC_RETURN that resumes the parked console context on
+ * the MSP. */
 static uint32_t kernelLeaveGame(void)
 {
     s_game_crashed = s_leave_crashed;
@@ -108,18 +136,26 @@ uint32_t svcHandlerMain(uint32_t *frame, uint32_t exc_return)
 
     switch (id)
     {
-    case SYS_LAUNCH:
-        /* Console -> game: switch the PSP to the game's frame and drop the thread
-         * to unprivileged. The console frame the hardware just stacked on the MSP
-         * stays parked until we leave the game; remember how to resume it. */
+    case SYS_INVOKE:
+        /* Console -> game: switch the PSP to the callback's frame and drop the
+         * thread to unprivileged. The console frame the hardware just stacked on
+         * the MSP stays parked until the callback leaves; remember how to resume it. */
         s_console_exc_return = exc_return;
         __set_PSP(s_game_psp);
         __set_CONTROL(__get_CONTROL() | 0x1U); /* nPRIV = 1 (unprivileged thread) */
         __ISB();
         return RETURN_TO_GAME;
 
+    case SYS_FRAME_DONE:
+        /* Game -> console: a callback returned. Re-privilege the thread and resume
+         * the parked console frame on the MSP directly — the MPU/session stay up so
+         * the OS can invoke the next callback. */
+        __set_CONTROL(__get_CONTROL() & ~0x1U);
+        __ISB();
+        return s_console_exc_return;
+
     case SYS_EXIT:
-        /* Clean shutdown: defer the switch to PendSV (tail-chains immediately). */
+        /* Clean shutdown: end the session via PendSV (tail-chains immediately). */
         kernelRequestLeave(false);
         return exc_return;
 
@@ -134,7 +170,7 @@ __attribute__((naked)) void SVC_Handler(void)
     __asm volatile(
         "tst lr, #4          \n" /* EXC_RETURN bit 2: which stack was in use */
         "ite eq              \n"
-        "mrseq r0, msp       \n" /* launch SVC comes from the console (MSP) */
+        "mrseq r0, msp       \n" /* invoke SVC comes from the console (MSP) */
         "mrsne r0, psp       \n" /* game syscalls come from the game (PSP) */
         "mov r1, lr          \n"
         "push {r0, r1}       \n" /* keep 8-byte alignment across the call */
@@ -144,7 +180,7 @@ __attribute__((naked)) void SVC_Handler(void)
 }
 
 /* PendSV performs the actual switch back to the console for both clean exit and
- * crash recovery. */
+ * crash recovery — it ends the session (releases the MPU). */
 uint32_t pendSvLeave(void) { return kernelLeaveGame(); }
 
 __attribute__((naked)) void PendSV_Handler(void)

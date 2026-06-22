@@ -26,8 +26,10 @@ Src/syscalls.c \
 ../Shared/Syscall/console_syscalls.c
 
 # ASM sources
-ASM_SOURCES =  \
-startup.s
+# None: a game has no vector table and no startup.s. The binary header is emitted
+# by DECLARE_GAME_HEADER (main.c) and the C-runtime bootstrap lives in the shared
+# console_syscalls.c, linked above.
+ASM_SOURCES =
 
 #######################################
 # CFLAGS

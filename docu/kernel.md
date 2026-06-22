@@ -87,7 +87,7 @@ Calls with more than four register arguments (`buzzerPlayWithFlag`) bundle them 
    …game continues…
 ```
 
-`SVC_Handler` is a naked trampoline: it figures out which stack holds the caller's exception frame (PSP for a game syscall, MSP for the launch trap — see §4), then calls `svcHandlerMain`, which either does the context-switch lifecycle calls (`SYS_LAUNCH`/`SYS_EXIT`) or forwards everything else to `svcDispatch`. The dispatcher is a deliberately **explicit `switch`**, not a generated table — it is the trust boundary, so every argument cast and every pointer check is meant to be read in one place.
+`SVC_Handler` is a naked trampoline: it figures out which stack holds the caller's exception frame (PSP for a game syscall or a callback's `SYS_FRAME_DONE`, MSP for the `SYS_INVOKE` trap — see §4), then calls `svcHandlerMain`, which either does the context-switch lifecycle calls (`SYS_INVOKE`/`SYS_FRAME_DONE`/`SYS_EXIT`) or forwards everything else to `svcDispatch`. The dispatcher is a deliberately **explicit `switch`**, not a generated table — it is the trust boundary, so every argument cast and every pointer check is meant to be read in one place.
 
 Because the SVC handler runs at the **lowest** exception priority (§7), a long syscall such as a full-frame render stays preemptible by the audio and tick interrupts while it runs on the kernel stack.
 
@@ -133,59 +133,76 @@ The renderer, the buzzer ISR, and the asset loader all read game RAM **from the 
 
 ---
 
-## 4. The context switch — SVC in, PendSV out
+## 4. The context switch — the OS-driven loop
 
-The console runs as a normal C call chain on the MSP: `main → … → gameListUpdate → gameLoaderLoadGame → kernelRunGame`. To run a game, `kernelRunGame()` (scheduler.c) must *become* the game and later come back to this exact spot. It does so by turning the launch into an exception.
+The **OS owns the game loop**. A game is not a `main()` that runs forever — the console calls it as three callbacks (`init` once, then `update`/`render` each frame) and does its own work (pacing the frame, servicing the WiFi link) in between. `kernelRunGame()` (scheduler.c) runs as a normal C call chain on the MSP and, for each callback, must *become* the game briefly and come right back. It does that by turning each call into an exception.
 
-**Narrative:** SVC takes us **into** the game and parks the console; PendSV brings us **back out** to the console. A crash routes through the same PendSV exit.
+**Narrative:** `SYS_INVOKE` takes us **into** one callback and parks the console; `SYS_FRAME_DONE` brings us **back out** when the callback returns — leaving the MPU and the game session up so the next callback can run. Only `gameExit()` or a crash ends the session, and those route through PendSV (which tears the session down). So per frame there are two cheap excursions (update, render); the MPU is programmed once per session, not once per call.
 
-### Launch (`SYS_LAUNCH`)
+```
+  kernelRunGame(header, service):
+    mpuConfigureForGame()                 ← wall goes up once
+    invoke(entry_point)   ── bootstrap: zero .bss, run ctors
+    invoke(init)          ── game one-time setup
+    while (game active):
+        service()         ── console: pace frame + background work (privileged)
+        invoke(update)    ── game logic        ┐ two excursions
+        invoke(render)    ── game draw          ┘ per frame
+    (session ended by gameExit/crash → PendSV released the wall)
+```
 
-`kernelRunGame()`:
+### Invoke one callback (`SYS_INVOKE`)
 
-1. Builds the game's **initial exception frame** by hand at the top of `GAME_RAM` — 8 words `{r0–r3=0, r12=0, LR=safety-exit, PC=entry, xPSR=0x01000000}`.
-2. Programs the MPU regions.
-3. Calls `kernelTriggerLaunch()`, which preserves the console's callee-saved registers and traps:
+`kernelInvokeGame(fn)`:
+
+1. Builds a fresh **exception frame** by hand at the top of `GAME_RAM` — 8 words `{r0–r3=0, r12=0, LR=_game_return, PC=fn, xPSR=0x01000000}`. The LR is the game-side return trampoline (see below); the PSP is reset to the top of `GAME_RAM` every invoke, so each callback starts on a clean stack (state lives in the game's globals, which persist).
+2. Calls `kernelTriggerInvoke()`, which preserves the console's callee-saved registers and traps:
 
 ```asm
    push {r4-r11, lr}     ; park the console's callee regs below the SVC frame
-   mov  r12, #SYS_LAUNCH
-   svc  #0               ; ── enter the game; we resume *here* when it leaves ──
-   pop  {r4-r11, pc}     ; …returns to kernelRunGame's caller
+   mov  r12, #SYS_INVOKE
+   svc  #0               ; ── run the callback; we resume *here* when it returns ──
+   pop  {r4-r11, pc}     ; …returns to kernelInvokeGame's caller (the loop)
 ```
 
-The `svc` stacks the console's exception frame onto the **MSP** and enters the handler. `svcHandlerMain` sees `SYS_LAUNCH`, points the PSP at the game's hand-built frame, sets `CONTROL.nPRIV` (drop to unprivileged), and returns with `EXC_RETURN = 0xFFFFFFFD` (Thread mode, **PSP**). The hardware unstacks the *game* frame from the PSP — so the game starts running — and the console's frame just sits **parked on the MSP**, untouched.
+The `svc` stacks the console's exception frame onto the **MSP** and enters the handler. `svcHandlerMain` sees `SYS_INVOKE`, points the PSP at the hand-built frame, sets `CONTROL.nPRIV` (drop to unprivileged), and returns with `EXC_RETURN = 0xFFFFFFFD` (Thread mode, **PSP**). The hardware unstacks the *callback* frame from the PSP — so the callback runs — and the console's frame sits **parked on the MSP**, untouched.
 
 ```
         MSP  (kernel stack)                       PSP  (game stack)
    higher ┌───────────────────────┐         0x20020000 ┌──────────────┐
-   addr   │ …main → kernelRunGame │                    │ (game stack  │
-          │   call chain…         │                    │  grows down) │
+   addr   │ …kernelRunGame loop   │                    │ (callback    │
+          │ → kernelInvokeGame    │                    │  stack, down)│
           │ {r4-r11, lr}  ◀── push│                    ├──────────────┤
-          │ ┌───────────────────┐ │         0x2001FFE0 │ initial 8-wd │ ◀ PSP
-   MSP ──▶│ │ parked console    │ │                    │ frame: pc=   │
-          │ │ exception frame   │ │                    │  _game_start │
+          │ ┌───────────────────┐ │         0x2001FFE0 │ fresh 8-wd   │ ◀ PSP
+   MSP ──▶│ │ parked console    │ │                    │ frame: pc=fn │
+          │ │ exception frame   │ │                    │ lr=_game_ret │
    lower  │ └───────────────────┘ │                    └──────────────┘
    addr   └───────────────────────┘
-            (sits here, frozen,                  the game runs from here,
-             for the game's lifetime)            unprivileged, MPU-confined
+            (frozen for this one                 the callback runs here,
+             callback's duration)                unprivileged, MPU-confined
 ```
 
-The `EXC_RETURN` value the console was entered with is saved (`s_console_exc_return`) so the eventual return matches the exact stacked-frame layout — important if the console ever has live FPU state, because that changes the frame size.
+The `EXC_RETURN` the console was entered with is saved (`s_console_exc_return`) so the eventual return matches the exact stacked-frame layout — important if the console ever has live FPU state, because that changes the frame size.
+
+### Callback returns (`SYS_FRAME_DONE`)
+
+A callback is plain C — it just `return`s. The kernel set its LR to `_game_return`, a tiny game-side trampoline (in `console_syscalls.c`, so it runs unprivileged from `GAME_RAM`) that does `svc #0` with `SYS_FRAME_DONE`. The handler **re-privileges the thread** and returns with `s_console_exc_return` (Thread mode, **MSP**) — directly, no PendSV. That unstacks the **parked console frame** from the MSP → execution resumes at `pop {r4-r11, pc}` inside `kernelTriggerInvoke` → back in the loop. The MPU regions and `s_game_active` stay up, so the next `invoke()` runs against the same live session.
+
+This is the symmetric counterpart of `SYS_INVOKE`: invoke unstacks the *game* frame from the PSP; frame-done unstacks the *parked console* frame from the MSP. Both are handled inline in the SVC handler — no PendSV on the hot per-frame path.
 
 ### Clean exit (`SYS_EXIT`)
 
-When the game's `main()` returns, `_game_start` calls `gameExit()` (it can't simply return — it's unprivileged and can't re-enter console code). `gameExit()` is `svc #0` with `SYS_EXIT`. The handler does **not** switch directly; it **pends PendSV** and returns toward the game. Because PendSV outranks Thread mode, the processor never executes another game instruction — it tail-chains straight into PendSV, which:
+To quit, a callback (by convention on Special Button 2) calls `gameExit()` — `svc #0` with `SYS_EXIT`. Unlike frame-done, this must end the **whole session**, so the handler does **not** switch directly; it **pends PendSV** and returns toward the game. Because PendSV outranks Thread mode, the processor never executes another game instruction — it tail-chains straight into PendSV, which:
 
 1. releases the MPU regions,
 2. re-privileges the thread (`CONTROL.nPRIV = 0`),
 3. returns with `EXC_RETURN = 0xFFFFFFF9` (Thread mode, **MSP**).
 
-That unstacks the **parked console frame** from the MSP → execution resumes at `pop {r4-r11, pc}` inside `kernelTriggerLaunch` → `kernelRunGame()` returns → the menu redraws.
+That unstacks the parked console frame (the current invoke's) from the MSP → resumes in `kernelInvokeGame` → the loop sees `kernelGameActive()` is now false and stops → `kernelRunGame()` returns → the menu redraws.
 
 ### Crash (any fault from the game)
 
-Identical exit path, reached from the fault handler instead of `SYS_EXIT` — see §6.
+Identical session-ending exit path, reached from the fault handler instead of `SYS_EXIT` — see §6.
 
 ---
 
@@ -285,31 +302,33 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
     │
     ▼
   gameLoaderLoadGame(idx)                       (privileged, MSP, Thread)
-    │  read 12-byte header → check magic + ABI version
+    │  read 28-byte header → check magic + ABI version
     │  copy the whole .bin to GAME_RAM (flat image, sections land in place)
     │  bind .pak + settings slot
     ▼
-  kernelRunGame(entry)
-    │  build initial PSP frame at top of GAME_RAM
-    │  mpuConfigureForGame()                     ← wall goes up
-    │  kernelTriggerLaunch():  svc SYS_LAUNCH
-    ▼ ───────────────────────────────────────── drop to unprivileged, switch to PSP
-  _game_start  (unprivileged, PSP, Thread)
-    │  zero .bss · run ctors · main()
-    │  …gameplay: every console call is an svc #0 → SVC_Handler → svcDispatch…
-    │     getSysTime · rendererSubmitLayer · assetLoaderGetAssetData · settingsWrite …
+  kernelRunGame(header, service)
+    │  mpuConfigureForGame()                     ← wall goes up (once)
+    │  ┌─ for each callback: kernelInvokeGame(fn) ─────────────────────────┐
+    │  │   build fresh PSP frame at top of GAME_RAM (PC=fn, LR=_game_return)│
+    │  │   kernelTriggerInvoke():  svc SYS_INVOKE                           │
+    │  │ ▼ ──────────────────────── drop to unprivileged, switch to PSP     │
+    │  │  callback  (unprivileged, PSP, Thread)                             │
+    │  │   …console calls are svc #0 → SVC_Handler → svcDispatch…           │
+    │  │   return → _game_return → svc SYS_FRAME_DONE                       │
+    │  │ ▲ ── re-privilege, EXC_RETURN s_console_exc_return → MSP (no PendSV)│
+    │  └────────────────────────────────────────────────────────────────────┘
+    │  sequence:  entry_point (bss+ctors) · init · loop{ service · update · render }
     │
-    ├─ clean: main() returns → _game_start calls gameExit() → svc SYS_EXIT
-    │            └─ pend PendSV
+    ├─ clean: update calls gameExit() → svc SYS_EXIT → pend PendSV
     └─ crash: illegal access → MemManage/Bus/Usage fault → decode → pend PendSV
               │
-              ▼  PendSV tail-chains
+              ▼  PendSV tail-chains   (session end only — not per frame)
   PendSV_Handler                                (privileged, MSP, Handler)
     │  mpuReleaseGame()                          ← wall comes down
-    │  re-privilege thread
+    │  re-privilege thread, clear s_game_active
     │  EXC_RETURN 0xFFFFFFF9 → unstack parked console frame
     ▼ ─────────────────────────────────────────
-  kernelRunGame() returns to gameLoaderLoadGame()
+  kernelRunGame() loop sees !active, returns to gameLoaderLoadGame()
     │  unbind settings · close .pak
     │  return OK or GAME_LOADER_RET_CRASHED
     ▼
@@ -326,7 +345,7 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
 | `Shared/Syscall/console_syscalls.h` | typed game-facing prototypes |
 | `Shared/Syscall/console_syscalls.c` | the SVC stubs, compiled into every game |
 | `Console/Src/Kernel/syscall.c` | `svcDispatch` (the switch), pointer validators, `syscallInit` (priorities) |
-| `Console/Src/Kernel/scheduler.c` | `SVC_Handler`, `PendSV_Handler`, `kernelRunGame`, the launch/leave context switch |
+| `Console/Src/Kernel/scheduler.c` | `SVC_Handler`, `PendSV_Handler`, `kernelRunGame` (the OS-driven loop), the invoke/frame-done/leave context switch |
 | `Console/Src/Kernel/mpu.c` | enable + per-game region setup/teardown |
 | `Console/Src/Kernel/faults.c` | enable + decode the configurable faults; route game crashes to recovery |
 | `Console/Src/Loader/game_loader.c` | validate header, copy the flat image, hand off to `kernelRunGame` |
@@ -335,7 +354,7 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
 
 ## 10. Known limits & sharp edges
 
-- **FPU callee registers (s16–s31) are not preserved across a game run.** Only s0–s15 ride the exception frame. The console holds no live FP state across a launch today, so it's fine; if that changes, add `vpush/vpop {s16-s31}` in `kernelTriggerLaunch`.
+- **FPU callee registers (s16–s31) are not preserved across a callback invoke.** Only s0–s15 ride the exception frame. The console holds no live FP state across an invoke today, so it's fine; if that changes, add `vpush/vpop {s16-s31}` in `kernelTriggerInvoke`.
 - **Sprite pixel pointers may aim into flash.** `gameCanRead` allows it (font glyphs live there). A game could therefore render arbitrary flash bytes — a *bounded* information leak, with no corruption and no kernel fault. Accepted by design.
 - **`GAME_RAM` is one RWX region** — W^X is not enforced. Hardening would split game `.text` into its own read-only, executable sub-region.
 - **ABI versioning:** any change to syscall ids or argument marshalling must bump `CONSOLE_ABI_VERSION`; the loader refuses a `.bin` built against a different version.

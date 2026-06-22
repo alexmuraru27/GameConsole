@@ -39,8 +39,8 @@ The `.bin` file on the SD card is a flat image of the game's `GAME_RAM` contents
 
 ```
 GAME_RAM  (in .bin)
-├── .game_header      12 B     GameBinaryHeader (magic, ABI version, entry point)
-├── .text                      game code (_game_start first)
+├── .game_header      28 B     GameBinaryHeader (magic, ABI version, callbacks)
+├── .text                      game code
 ├── .rodata                    constants and strings
 ├── .data                      initialized globals
 ```
@@ -49,21 +49,27 @@ GAME_RAM  (in .bin)
 
 ### GameBinaryHeader
 
-A 12-byte prefix at offset 0 of the binary. The loader reads it, validates the game, and jumps to the entry — it needs nothing else (the game manages its own `.bss`):
+A 28-byte prefix at offset 0 of the binary. The loader reads it, validates the game, and the kernel drives the named callbacks — it needs nothing else (the game manages its own `.bss` in the bootstrap):
 
-| Field         | Meaning                                                |
-| ------------- | ------------------------------------------------------ |
-| `magic`       | `0x47414D45` ("GAME")                                  |
-| `abi_version` | must equal `CONSOLE_ABI_VERSION`, or the loader refuses it |
-| `entry_point` | address of `_game_start()` in GAME_RAM                 |
+| Field          | Meaning                                                       |
+| -------------- | ------------------------------------------------------------ |
+| `magic`        | `0x47414D45` ("GAME")                                         |
+| `abi_version`  | must equal `CONSOLE_ABI_VERSION`, or the loader refuses it    |
+| `entry_point`  | `_game_start()` — one-time C-runtime bootstrap (zero `.bss`, run ctors) |
+| `frame_return` | `_game_return()` — return trampoline the kernel installs as each callback's LR |
+| `init`         | game init — the OS calls it once after the bootstrap         |
+| `update`       | game update — the OS calls it every frame                    |
+| `render`       | game render — the OS calls it every frame                    |
+
+`entry_point`/`frame_return` are filled by `DECLARE_GAME_HEADER` from the shared syscall library; the game only names `init`/`update`/`render`.
 
 ### Loading sequence
 
-1. Read the 12-byte header; reject on bad magic or mismatched ABI version
+1. Read the 28-byte header; reject on bad magic or mismatched ABI version
 2. Copy the whole `.bin` to `GAME_RAM` base (`.text`/`.rodata`/`.data` land at their linked addresses)
-3. `kernelRunGame()` builds the game's initial **unprivileged** PSP exception frame at the top of `GAME_RAM`, programs the MPU regions, and enters the game via an SVC (`SYS_LAUNCH`), parking the console's context on the MSP
-4. `_game_start` zeroes its own `.bss`, runs `__libc_init_array`, and calls `main()`
-5. The game returns control by calling `gameExit()` (an `SVC` / `SYS_EXIT`), or crashes — either way **PendSV** switches back to the parked console context, which releases the MPU regions and resumes the loader
+3. `kernelRunGame()` programs the MPU regions, then drives the game **OS-first**: it invokes each callback by building a fresh **unprivileged** PSP exception frame at the top of `GAME_RAM` and entering via an SVC (`SYS_INVOKE`), parking the console's context on the MSP
+4. The first invoke runs `_game_start` (zero `.bss`, `__libc_init_array`), the second runs `init`; each returns to the OS via the `_game_return` trampoline (`SYS_FRAME_DONE`), leaving the MPU/session up
+5. The OS then loops `update`/`render` (servicing the console + pacing the frame in between). The game ends the session with `gameExit()` (an `SVC` / `SYS_EXIT`), or crashes — either way **PendSV** switches back to the parked console context, releases the MPU regions, and resumes the loader
 
 The game runs **unprivileged on PSP** (confined to `GAME_RAM` + the CCM asset arena by the MPU); the console and all exception handlers run privileged on MSP. A game fault is caught, decoded over SWO, and recovered from — control returns to the menu, which shows a "crashed" banner. See the Kernel subsystem in `CLAUDE.md` for the switch mechanics.
 

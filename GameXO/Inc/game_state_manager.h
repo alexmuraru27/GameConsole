@@ -5,4 +5,5 @@
 
 void gameStateManagerInit(void);
 void gameStateManagerUpdate(void);
+void gameStateManagerRender(void);
 #endif /* __GAME_STATE_MANAGER_H */

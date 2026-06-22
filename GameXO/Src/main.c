@@ -2,9 +2,6 @@
 #include "game_state_manager.h"
 
 
-#define FPS 30U
-#define FRAME_PERIOD (1000U / FPS)
-
 /* Persisted across runs through the console settings store, keyed by the .bin
  * name. Bump the version if this struct ever changes. */
 #define GAMEXO_SETTINGS_VERSION 1U
@@ -12,8 +9,6 @@ typedef struct
 {
     uint32_t launch_count;
 } __attribute__((packed)) GameXoSettings;
-
-static uint32_t s_last_frame_time;
 
 /* Load the launch counter, bump it, and persist it — proves the settings round
  * trip end to end (slot auto-created by the loader on first launch). */
@@ -38,38 +33,36 @@ static void bumpLaunchCount(void)
     gameLog("settings: launch #%lu saved (%u)", (unsigned long)settings.launch_count, (unsigned)write_status);
 }
 
-static void syncFrame(void)
-{
-    while ((getSysTime() - s_last_frame_time) < FRAME_PERIOD)
-    {
-        /* busy-wait to the next frame boundary */
-    }
-    s_last_frame_time = getSysTime();
-}
+/*
+ * The OS owns the loop. It runs the C-runtime bootstrap, then calls gameInit()
+ * once, then gameUpdate()/gameRender() every frame (pacing the frame and servicing
+ * the console in between). There is no handshake: the loader validated this
+ * binary's magic + ABI version before loading it, and the API is reached through
+ * SVC traps.
+ */
 
-int main(void)
+static void gameInit(void)
 {
-    /* No handshake needed: the console validated this binary's magic + ABI version
-     * before loading it, and the API is reached through SVC traps, not a table. */
     gameLog("GameXO started");
-
     bumpLaunchCount();
-
     gameStateManagerInit();
-    s_last_frame_time = getSysTime();
-
-    while (true)
-    {
-        gameStateManagerUpdate();
-        if (joystickGetSpecialBtn2())
-        {
-            break; /* Special Button 2 returns to the console OS */
-        }
-        syncFrame();
-    }
-
-    buzzerStopAll(); /* don't leave the buzzer reading game RAM after we return */
-    return 0;
 }
 
-/* The game binary header (magic / ABI version / entry) is emitted by startup.s. */
+static void gameUpdate(void)
+{
+    gameStateManagerUpdate();
+    if (joystickGetSpecialBtn2())
+    {
+        buzzerStopAll(); /* don't leave the buzzer reading game RAM after we return */
+        gameExit();      /* Special Button 2 returns to the console OS (does not return) */
+    }
+}
+
+static void gameRender(void)
+{
+    gameStateManagerRender();
+}
+
+/* Emit the binary header: magic + ABI version + the runtime stubs are filled in
+ * for us; we just name our three callbacks. */
+DECLARE_GAME_HEADER(gameInit, gameUpdate, gameRender);

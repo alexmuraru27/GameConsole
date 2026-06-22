@@ -343,20 +343,35 @@ static void updateEnd(void)
     }
 }
 
+/* The OS drives update and render as separate steps each frame. Logic runs first
+ * (it may advance the phase); the matching draw then reflects the new phase. */
 void gameStateManagerUpdate(void)
 {
     switch (s_phase)
     {
     case PHASE_CHOOSE:
         updateChoose();
-        renderChoose();
         break;
     case PHASE_PLAYING:
         updatePlaying();
-        renderPlaying();
         break;
     case PHASE_END:
         updateEnd();
+        break;
+    }
+}
+
+void gameStateManagerRender(void)
+{
+    switch (s_phase)
+    {
+    case PHASE_CHOOSE:
+        renderChoose();
+        break;
+    case PHASE_PLAYING:
+        renderPlaying();
+        break;
+    case PHASE_END:
         renderEnd();
         break;
     }

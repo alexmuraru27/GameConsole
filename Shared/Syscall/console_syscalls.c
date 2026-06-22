@@ -1,5 +1,6 @@
 #include "console_syscalls.h"
 #include "syscall_numbers.h"
+#include "header_interface.h"
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -158,4 +159,39 @@ void gameExit(void)
     for (;;)
     {
     }
+}
+
+/*
+ * Runtime glue the OS drives. The game image carries no startup.s and no vector
+ * table; the kernel reaches these two stubs through the binary header (filled by
+ * DECLARE_GAME_HEADER) and uses them to run the game as a set of OS-called
+ * callbacks rather than a self-contained main().
+ */
+
+/* C-runtime bootstrap. The OS invokes this once (unprivileged, on a fresh PSP)
+ * before the game's init: it zeroes .bss — NOLOAD in the .bin, so the game clears
+ * it itself, exactly as a reset handler would — and runs static constructors,
+ * then returns to the OS via _game_return. */
+extern uint32_t _sbss, _ebss;
+extern void __libc_init_array(void);
+
+void _game_start(void)
+{
+    for (uint32_t *p = &_sbss; p < &_ebss; ++p)
+    {
+        *p = 0U;
+    }
+    __libc_init_array();
+}
+
+/* Callback return trampoline. The kernel installs this as the return address (LR)
+ * of every callback it invokes, so when a callback returns, control lands here
+ * and traps back to the OS — which then runs the next step of its loop. The
+ * frame is abandoned by the switch, so this never actually returns. */
+__attribute__((naked)) void _game_return(void)
+{
+    __asm volatile(
+        "mov r12, %0 \n"
+        "svc #0      \n"
+        : : "i"(SYS_FRAME_DONE) : "r12");
 }
