@@ -133,7 +133,16 @@ static void applyStaging(const OsStagingHeader *hdr)
     }
 
     /* On success the pending flag is now clear, so the reset boots the new app. On
-     * failure it is still set, so the reset re-applies from the intact staging. */
+     * failure it is still set, so the reset re-applies from the intact staging.
+     *
+     * KNOWN LIMIT (docu/bootloader.md §9): no retry cap. Once the app region is
+     * erased there is no old app to fall back to, so a genuinely failing flash chip
+     * reset-loops, re-applying from the (good) staging copy. Accepted — a stable
+     * supply completes the apply; a dead flash needs servicing regardless.
+     *
+     * NOTE (pending, cosmetic): the reset can cut off the last SWO log line
+     * mid-byte — the serializer may still be draining and there is no SysTick delay
+     * here to cover it. A short drain before the reset would fix it. */
     NVIC_SystemReset();
     for (;;)
     {

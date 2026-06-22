@@ -41,6 +41,22 @@ Lives in `Console/`. Runs from flash at boot, initializes all hardware, shows th
 
 The production path is the main menu: `main()` calls `mainMenuInit()` then loops `mainMenuUpdate()` / `mainMenuRender()`. The `MainMenu/` module is a small **screen state machine** (`main_menu.c` is the orchestrator) over a shared theme/draw/input layer (`menu_common.c`): the **root** menu offers *Games* / *Settings* / *Poll Updates* / *Reboot Console*. *Games* (`game_list.c`) is the centered-hero picker — lists the `.bin` games under `Games/`, browses with up/down, and launches the highlighted one with Special Button 1; `gameLoaderLoadGame()` blocks for the game's lifetime and the picker rebuilds its surface when it returns. *Settings* (`settings_menu.c`) is a tree of typed settings — a Buzzer Sound toggle (persisted via `ConsoleSettings.audio_enabled`, applied to `buzzerSetMute()`), a **WiFi** sub-category grouping *Networks* (scan/connect) and *Server address*, and a **Firmware** sub-category grouping *Upgrade OS* (`os_update.c`, self-flash the console firmware from `Firmware/Console.bin`) and *Upgrade WiFi module* (`wifi_update.c`); the boot-time mute read-and-apply runs in `gameConsoleInit()` before the boot song so a muted console boots silent. *Poll Updates* (`remote_update.c`) fetches the server manifest and lists each item — a game's `.bin` and its paired `.pak` collapse into one row (downloaded together), other files stand alone — diffing each against a local `Manifests/downloaded.csv` record of the last download (NEW / UPD / UpToDate) and highlighting CRC mismatches; Special Button 1 downloads the selected item (CRC-verified) and records its new CRC. *Reboot Console* calls `gameConsoleReboot()` (`NVIC_SystemReset`) for a full restart. Controls everywhere: up/down move, Special Button 1 enters/confirms/toggles, Special Button 2 steps back a level. The `renderer_testing.c` perf harness is still in the tree (and its source still compiles) but is only wired in when `RENDERER_TESTING` is defined; it is off by default.
 
+```
+Main menu (main_menu.c)
+├── Games            game_list.c   — pick Games/*.bin, A launches (gameLoaderLoadGame blocks)
+├── Settings         settings_menu.c (typed-node tree)
+│   ├── Buzzer Sound      [ON/OFF] toggle  → ConsoleSettings.audio_enabled / buzzerSetMute
+│   ├── WiFi
+│   │   ├── Networks         wifi_menu.c   — scan / connect / save creds
+│   │   └── Server address   keyboard.c    — edit Settings/server.txt
+│   └── Firmware
+│       ├── Upgrade OS           os_update.c   — self-flash Firmware/Console.bin (bootloader applies)
+│       └── Upgrade WiFi module  wifi_update.c — flash Firmware/ESP01.bin to the ESP-01
+├── Poll Updates     remote_update.c — fetch manifest, diff vs downloaded.csv, download to SD
+└── Reboot Console   gameConsoleReboot() (NVIC_SystemReset)
+```
+
+
 **Fault handlers** (`Console/Src/Kernel/faults.c`): MemManage/BusFault/UsageFault are enabled (not escalated to HardFault) and decoded — each prints its name, the faulting context (PSP=game / MSP=kernel), stacked PC/LR/PSR, the CFSR sub-flags by name, and MMFAR/BFAR via `printf()`/SWO. A fault in a running game is **recoverable** (the kernel switches back to the console and the menu shows a "crashed" banner); a fault in the kernel itself halts.
 
 ### Games (`.bin` files, loaded at runtime from SD card)

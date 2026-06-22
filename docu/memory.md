@@ -4,17 +4,25 @@ The STM32F407VET6 provides **128 KB SRAM** at `0x20000000`, **64 KB CCM** at `0x
 
 ## SRAM regions
 
-Defined in `common.ld`.
+Defined in `common.ld`. There is no shared-RAM window: a game reaches the console only through SVC syscalls, so the old 2 KB `SHARED_RAM` was reclaimed into `CONSOLE_RAM`.
 
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
-| SHARED_RAM     | 0x20000000 | 2K   | rw    | Read-only console-info page (version, screen dims) games may map RO               |
-| CONSOLE_RAM    | 0x20000800 | 94K  | rw    | Console firmware .data, .bss, MSP (kernel) stack, PSP (console) stack, DMA buffers, renderer, FatFs, SDIO, audio |
+| CONSOLE_RAM    | 0x20000000 | 96K  | rw    | Console firmware .data, .bss, MSP (kernel) stack, PSP (console) stack, DMA buffers, renderer, FatFs, SDIO, audio |
 | GAME_RAM       | 0x20018000 | 32K  | rwx   | Game .text, .rodata, .data, .bss, stack — loaded from .bin at runtime             |
 
-Total: 2K + 94K + 32K = 128K ✓
+Total: 96K + 32K = 128K ✓
 
-`GAME_RAM` is deliberately a power-of-two size (32K) aligned to its size (`0x20018000`), so a single ARMv7-M MPU region confines an unprivileged game to it with no sub-region tricks. GameXO uses ~14K of it (≈5K code+data, 4K stack), leaving generous headroom.
+```
+ 0x20000000 ┌────────────────────────┐ ─┐
+            │ CONSOLE_RAM   96K       │  │ kernel .data/.bss, MSP + PSP stacks,
+            │  (console only)         │  │ renderer buffers, DMA, FatFs, SDIO, audio
+ 0x20018000 ├────────────────────────┤ ─┤ ◀ 32K-aligned: one clean MPU region
+            │ GAME_RAM      32K  rwx  │  │ loaded game: code + rodata + data + bss + stack
+ 0x20020000 └────────────────────────┘ ─┘ top of SRAM (game stack grows down from here)
+```
+
+`GAME_RAM` is deliberately a power-of-two size (32K) aligned to its size (`0x20018000`), so a single ARMv7-M MPU region confines an unprivileged game to it with no sub-region tricks. GameXO uses ~8K of it (≈4K code+data, 4K stack), leaving generous headroom.
 
 ## CCM (Core-Coupled Memory)
 
@@ -35,6 +43,21 @@ The 512 KB flash is partitioned for power-fail-safe OS self-flashing (see the OS
 | OS_STAGING    | 0x08040000 | 6-7     | 256K | rx    | OS-update staging scratch: `OsStagingHeader` + the new image, written before a verified, committed swap. |
 
 STM32F407 sector geometry: sectors 0-3 = 16K, sector 4 = 64K, sectors 5-7 = 128K (single bank — any flash access stalls while a program/erase is in flight, so the erase/program primitives run from SRAM via `.RamFunc`).
+
+```
+            sector  size   region
+ 0x08000000 ┌─0────┬─16K─┐ BOOTLOADER  reset vector + apply/verify  (SWD only, never self-updated)
+ 0x08004000 ├─1────┼─16K─┤ ┐
+ 0x08008000 │ 2    │ 16K │ │
+ 0x0800C000 │ 3    │ 16K │ │ APPLICATION (console OS, 240K)  ── app links here; VTOR → 0x08004000
+ 0x08010000 │ 4    │ 64K │ │
+ 0x08020000 │ 5    │128K │ ┘
+ 0x08040000 ├─6────┼128K─┤ ┐ STAGING (256K)  ── new image staged + verified here before the swap
+ 0x08060000 │ 7    │128K │ ┘    [OsStagingHeader @ 0x08040000 | image @ +0x200]
+ 0x08080000 └──────┴─────┘ end of flash
+```
+
+The bootloader copies a committed staging image into the APPLICATION region and re-verifies it by readback before booting it. See `docu/bootloader.md` for the full self-flash flow and recovery guarantees.
 
 The bootloader runs first on reset and either applies a committed staging image (erase app → copy → **readback-CRC verify** → clear pending → reset) or jumps to the validated app. The console firmware runs directly from flash at `0x08004000`; its `.data` section LMA is in flash (copied to CONSOLE_RAM by startup code), and `.bss` is zeroed at boot.
 

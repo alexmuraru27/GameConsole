@@ -20,8 +20,9 @@ bottom.
 
 The ESP-01 ships with its own flashable firmware (the WiFi co-processor sketch).
 Rather than pulling the module and wiring up a USB-serial adapter, the console
-reflashes it **in place**: a user drops `ESP01.bin` on the SD card, opens
-**Settings → Upgrade WiFi module**, and the STM32 plays the role of the host
+reflashes it **in place**: a user gets `ESP01.bin` onto the SD card (under
+`Firmware/`), opens **Settings → Firmware → Upgrade WiFi module**, and the STM32
+plays the role of the host
 flasher — driving the ESP into its ROM download mode and streaming the new image
 over USART1, with a progress bar on screen.
 
@@ -219,25 +220,31 @@ strictly sequential).
 
 `wifi_update.c` is a **blocking modal** — the same pattern as launching a game
 (`game_list.c` hands the renderer to the game, then rebuilds its surface when it
-returns). `wifiUpdateRun()`:
+returns). Its screen helpers (status line + progress bar, CRC-mismatch confirm,
+wait-for-back, recorded-CRC lookup) live in the shared `MainMenu/flash_ui.c`, used
+by both this flow and the console **OS** self-flasher (Settings → Firmware →
+Upgrade OS; see `docu/bootloader.md`). `wifiUpdateRun()`:
 
-1. Checks `loaderMediaPresent()` and `f_stat("ESP01.bin")`; if missing, shows
-   *"ESP01.bin not found on SD"* and waits for **Special Button 2**.
-2. Draws *"Connecting to ESP…"*, then calls `espFlasherFlashFile()` with a
-   progress callback that redraws a bar + percentage each block (it reuses the
-   theme's `menuDrawBar()`, stacked into a thicker bar).
-3. On success it deletes `ESP01.bin` from the card (best-effort `f_unlink` — the
-   SD stack is read-write), shows *"Update complete!"* (success chime), and waits
-   for Special Button 2. On failure it shows *"Failed: …"* (error chime) and
-   leaves the image in place so you can retry.
+1. Checks `loaderMediaPresent()` and `f_stat("Firmware/ESP01.bin")`; if missing,
+   shows *"ESP01.bin not found on SD"* and waits for **Special Button 2**.
+2. **Pre-verifies the image**: recomputes the file's CRC-32 and compares it to the
+   value recorded when it was downloaded (`downloaded.csv`, matched by basename). On
+   a mismatch it shows both CRCs and lets the user flash anyway (A) or cancel (B) — a
+   flaky SD read would otherwise flash a broken image that the post-flash MD5 still
+   "passes". With no download record (hand-copied image) it proceeds with a warning.
+3. Draws *"Connecting to ESP…"*, then calls `espFlasherFlashFile()` with a progress
+   callback that redraws a bar + percentage each block (`flashUiScreen`, which stacks
+   the theme's `menuDrawBar()` into a thicker bar).
+4. On success it **keeps** the image on the card (for re-flash without re-download)
+   and **reboots the whole console** (`gameConsoleReboot()`), so the freshly-flashed
+   ESP comes up clean via the normal boot bring-up. On failure it shows *"Failed: …"*
+   (error chime) and waits for Special Button 2.
 
-The image file (`ESP_FIRMWARE_FILENAME` in `esp_flasher.h`) shares the `.bin`
-extension with games and isn't filtered out of the **Games** list, but it's
-harmless there: the game loader rejects it at launch via the `GAME_BINARY_MAGIC`
-/ ABI check before any code runs.
+The image file (`ESP_FIRMWARE_FILENAME` in `esp_flasher.h`) lives under `Firmware/`,
+its own folder, so it never appears in the **Games** list (which only reads `Games/`).
 
-It is wired into the settings tree via the `SETTING_ACTION` leaf kind in
-`settings_menu.c`:
+It is wired into the settings tree under **Firmware** via the `SETTING_ACTION` leaf
+kind in `settings_menu.c`:
 
 ```c
 { .label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun },
@@ -285,7 +292,7 @@ HAL port we don't compile.
 
 ## 9. Logging
 
-The subsystem logs on the **`LOGGER_FLASHER`** channel (printed `[FLAS]`):
+The subsystem logs on the **`LOGGER_FLASHER`** channel (printed `[FLASHER]`):
 USART bring-up, the requested update, connect + detected target, flash
 start/finish, and every error path — but **never** inside the read/write loops
 (one SWO line is ~5 µs/byte and would perturb the link). The library's own
@@ -297,12 +304,14 @@ start/finish, and every error path — but **never** inside the read/write loops
 
 1. Build the [`Esp01s/`](../Esp01s) PlatformIO project (`pio run`) — the full
    image, flashed from address 0.
-2. Copy it to the **root** of the SD card as `ESP01.bin` via `make -C Esp01s
-   deploy` (or top-level `make deploy`).
+2. Stage it into the update-server tree as `content/wifi/ESP01.bin` via `make -C
+   Esp01s deploy` (or top-level `make deploy`); get it onto the card under
+   `Firmware/` via **Poll Updates** (or hand-copy it there).
 3. `make flashswo` to flash the console and watch SWO.
-4. On the device: **Settings → Upgrade WiFi module**.
-5. The `[FLAS]` log should narrate connect → erase → per-block progress → MD5
-   verified, and the on-screen bar should reach 100% then *"Update complete!"*.
+4. On the device: **Settings → Firmware → Upgrade WiFi module**.
+5. The `[FLASHER]` log should narrate connect → erase → per-block progress → MD5
+   verified; the on-screen bar reaches 100%, then the console **reboots** so the
+   ESP comes up on the new firmware.
 
 ### Troubleshooting
 

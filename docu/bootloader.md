@@ -40,6 +40,43 @@ typedef struct {
 } OsStagingHeader;
 ```
 
+Staging is laid out header-first, image after a fixed gap (so the header can grow):
+
+```
+ 0x08040000 ┌──────────────────────────────┐ OsStagingHeader (16 B): magic·size·img_crc·hdr_crc
+            │ ····· (reserved, 0x200) ····· │
+ 0x08040200 ├──────────────────────────────┤ STAGING_IMAGE_ADDR ── the new OS image bytes
+            │  image (== app .bin, ≤240K)  │
+            └──────────────────────────────┘
+```
+
+### The two vector tables (boot handoff)
+
+There are **two** vector tables; `VTOR` selects which is live. The hardware's reset
+fetch (SP @ `0x08000000`, PC @ `0x08000004`) is fixed and ignores `VTOR`, so the
+bootloader's table must sit at `0x08000000` and is always what runs first.
+
+```
+        reset / power-on
+              │   HW reads SP @ 0x08000000, PC @ 0x08000004  (fixed — ignores VTOR)
+              ▼
+   ┌──────────────────────────────┐   VTOR = 0x08000000 (reset default)
+   │ BOOTLOADER vector table       │   minimal — mostly weak Default_Handler aliases;
+   │ @ 0x08000000                  │   the bootloader enables no interrupts of its own
+   └──────────────────────────────┘
+              │   jumpToApp(): SCB->VTOR = 0x08004000; set MSP; branch to app reset
+              ▼
+   ┌──────────────────────────────┐   VTOR = 0x08004000 (the app re-asserts it in SystemInit)
+   │ APPLICATION vector table      │   real handlers: SysTick, TIM6/7, USART, SVC/PendSV, faults…
+   │ @ 0x08004000                  │   every runtime interrupt vectors through here
+   └──────────────────────────────┘
+```
+
+So the bootloader's table only matters during its brief post-reset window; once the
+app is running, **all** interrupts go through the app's own table at `0x08004000`.
+(That's the reason the app had to move above the bootloader: two tables can't both
+own `0x08000000`.) The bootloader is therefore not self-updatable — see §9.
+
 ---
 
 ## 3. The update, end to end
@@ -82,6 +119,20 @@ The two CRC checks cover the two ways the image can be wrong: a **bad SD read** 
 
 ## 4. Why interruption can't brick it
 
+Whatever step power is lost in, the next boot lands somewhere safe:
+
+```
+  power lost during…                  next boot sees…              outcome
+  ──────────────────────────────────────────────────────────────────────────────────
+  SD stream → staging              no committed header          old OS boots (staging is scratch)
+  the commit (magic write, last)   magic absent / hdr CRC bad   old OS boots (treated as not-pending)
+  erasing the app region           pending set, app CRC bad     re-apply from intact staging
+  copying staging → app            pending set, app CRC bad     re-apply from intact staging
+  clearing the magic (consume)     app already verified         boots app (or re-verify → re-clear)
+  ──────────────────────────────────────────────────────────────────────────────────
+  unrecoverable only if sector 0 (the bootloader) is corrupted — which self-flash never writes
+```
+
 Every dangerous step is either reversible or idempotent:
 
 - **During the SD transfer** only staging is written. The running OS is intact, so a yanked card or dead battery just means "no committed update" — the old OS boots normally.
@@ -102,6 +153,20 @@ Because the bootloader runs only briefly after each reset, you see its logs by h
 ## 6. The low-level driver (`flash_ll.c`)
 
 Shared by the app (writes staging) and the bootloader (writes the app). Erase and program are `.RamFunc` — copied to SRAM at boot — so they keep executing while the flash array is stalled mid-operation, and they run with interrupts masked (`PRIMASK`) so no ISR is fetched from the stalled array. The *callers* orchestrate from flash and read flash back normally between operations; the invariant is simply **never erase or program the sector you are executing from** (the app touches only sectors 6-7; the bootloader touches only sectors 1-5, never its own sector 0).
+
+```
+  caller in FLASH                  flashLlProgramWord()  (RAM, IRQ masked)
+  ───────────────                  ─────────────────────────────────────
+  …loop body…                      FLASH->CR |= PG
+     │  bl ───────────────────▶    *addr = word            ┐ flash array now stalls
+     │                             while (FLASH->SR & BSY)  │ EVERY flash access — but this
+     │                             { }                      │ code runs from RAM, so it
+     │                             FLASH->CR &= ~PG          ┘ keeps polling and completes
+     ▼  ◀──────────────── bx lr    return
+  …next fetch from flash OK…       (flash readable again between ops)
+```
+
+Because the op code lives in RAM, the stall costs only the program/erase time — not a fault. The orchestration (loops, `src[]` reads, CRC) stays in flash and only ever touches it *between* ops, when the array is idle.
 
 ---
 
@@ -130,5 +195,18 @@ The bootloader is a minimal separate target: it reuses the console's `startup.s`
 | `Bootloader/Src/trace.c` | SWO/ITM glue so the bootloader reuses the console's `logger.c` (`swoInit`/`_write`/`getSysTime`) |
 | `Bootloader/bootloader.ld` | sector-0 link map |
 | `common.ld` | relinks the app above the bootloader |
+
+---
+
+## 9. Known limits & sharp edges
+
+- **The bootloader is not self-updatable.** It lives in sector 0, which the self-flash never erases (so an interrupted update can't corrupt it). Changing the bootloader's code or vector table therefore needs an SWD reflash (`make -C Bootloader flash`).
+- **The OS image must fit the 240 KB app region.** Staging is 256 KB, so the app region is the binding limit. `osFlasherStage` rejects an oversized image (`OS_FLASH_TOO_BIG`), and the app link itself fails (region overflow) if the firmware ever grows past 240 KB — at which point the partition in `flash_map.h` / `common.ld` must be rebalanced.
+- **A persistently failing flash chip reset-loops.** Once `applyStaging` has erased the app region, there is no old app to fall back to; if the readback never verifies (genuine hardware failure), the bootloader keeps resetting and re-applying from the intact staging. There is no retry cap — the assumption is that the staging copy is good and a stable supply will eventually let the apply complete. A dead flash needs servicing regardless.
+- **The last SWO log line before a bootloader reset can be truncated** (pending fix). `applyStaging` calls `NVIC_SystemReset()` while the SWO serializer may still be draining the final line — and the bootloader has no SysTick-based delay to cover the drain — so e.g. `…rebooting into new OS` can be cut off mid-byte before the next boot banner. Cosmetic only (the apply already completed and verified). A short drain before the reset (a busy-wait on the cycle counter, or polling the TPIU) would fix it; left out to keep the reset path minimal.
+- **`getSysTime()` in the bootloader is a per-reset DWT-cycle timestamp** (there is no SysTick), so `[BOOT]` ticks restart at 0 on every boot/stage rather than being monotonic with the app.
+- **The bootloader runs at HSI 16 MHz** (it never starts the PLL). Flash erase/program timing is independent of the CPU clock, so this only makes the CRC and copy loop a few× slower than the app would at 168 MHz — negligible for a one-shot apply.
+
+---
 
 See also: `docu/memory.md` (the full flash/SRAM map) and `docu/flasher.md` (the ESP-01 flasher, the sibling flow this shares its modal UI with).
