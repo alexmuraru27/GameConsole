@@ -3,9 +3,15 @@
 #include "game_console.h"
 #include "main_menu.h"
 #include "logger.h"
+#include "flash_map.h"
 
 void SystemInit(void)
 {
+    /* The app is linked above the bootloader (sector 0), so point the vector table
+     * at the app's table before any interrupt can fire. The bootloader hands off
+     * here after validating us; on a plain reset this relocates VTOR from its
+     * 0x08000000 reset default. */
+    SCB->VTOR = APP_FLASH_ADDR;
     systemClockConfig();
 }
 

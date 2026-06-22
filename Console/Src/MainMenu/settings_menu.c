@@ -6,6 +6,7 @@
 #include "fonts.h"
 #include "logger.h"
 #include "wifi_update.h"
+#include "os_update.h"
 #include "wifi_menu.h"
 #include "remote_update.h"
 
@@ -56,10 +57,16 @@ static void buzzerSoundSet(bool on)
 
 /* ---- The tree ---- */
 
-/* All WiFi-related settings live under one "WiFi" category. */
+/* WiFi connectivity settings live under one "WiFi" category. */
 static const SettingNode s_wifi_children[] = {
     {.label = "Networks", .kind = SETTING_ACTION, .action = wifiMenuRun},
     {.label = "Server address", .kind = SETTING_ACTION, .action = remoteServerAddrRun},
+};
+
+/* Firmware upgrades (the console OS and the WiFi module) live together under
+ * "Firmware" — both flash an image off the SD card. */
+static const SettingNode s_firmware_children[] = {
+    {.label = "Upgrade OS", .kind = SETTING_ACTION, .action = osUpdateRun},
     {.label = "Upgrade WiFi module", .kind = SETTING_ACTION, .action = wifiUpdateRun},
 };
 
@@ -67,6 +74,8 @@ static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
     {.label = "WiFi", .kind = SETTING_CATEGORY, .children = s_wifi_children,
      .child_count = (uint8_t)(sizeof(s_wifi_children) / sizeof(s_wifi_children[0]))},
+    {.label = "Firmware", .kind = SETTING_CATEGORY, .children = s_firmware_children,
+     .child_count = (uint8_t)(sizeof(s_firmware_children) / sizeof(s_firmware_children[0]))},
 };
 
 static const SettingNode s_root = {

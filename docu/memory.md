@@ -26,11 +26,17 @@ Total: 2K + 94K + 32K = 128K ✓
 
 ## Flash
 
-| Region        | Origin     | Size | Perms | Purpose                                                     |
-| ------------- | ---------- | ---- | ----- | ----------------------------------------------------------- |
-| CONSOLE_FLASH | 0x08000000 | 512K | rx    | Console firmware: .isr_vector, .text, .rodata, LMA of .data |
+The 512 KB flash is partitioned for power-fail-safe OS self-flashing (see the OS Self-Flash subsystem in `CLAUDE.md`). The map is the single source of truth in `Console/Inc/Flasher/flash_map.h`, mirrored by `common.ld` (app) and `Bootloader/bootloader.ld`:
 
-The console firmware runs directly from flash. Its `.data` section LMA is in flash (copied to CONSOLE_RAM by startup code), and `.bss` is zeroed at boot.
+| Region        | Origin     | Sectors | Size | Perms | Purpose                                                          |
+| ------------- | ---------- | ------- | ---- | ----- | --------------------------------------------------------------- |
+| BOOTLOADER    | 0x08000000 | 0       |  16K | rx    | Self-flash bootloader: reset vector + the apply/verify logic. SWD-flashed once; never self-updated. |
+| CONSOLE_FLASH | 0x08004000 | 1-5     | 240K | rx    | Console firmware / app: .isr_vector, .text, .rodata, LMA of .data. App sets `SCB->VTOR` here. |
+| OS_STAGING    | 0x08040000 | 6-7     | 256K | rx    | OS-update staging scratch: `OsStagingHeader` + the new image, written before a verified, committed swap. |
+
+STM32F407 sector geometry: sectors 0-3 = 16K, sector 4 = 64K, sectors 5-7 = 128K (single bank — any flash access stalls while a program/erase is in flight, so the erase/program primitives run from SRAM via `.RamFunc`).
+
+The bootloader runs first on reset and either applies a committed staging image (erase app → copy → **readback-CRC verify** → clear pending → reset) or jumps to the validated app. The console firmware runs directly from flash at `0x08004000`; its `.data` section LMA is in flash (copied to CONSOLE_RAM by startup code), and `.bss` is zeroed at boot.
 
 
 ## Game binary layout

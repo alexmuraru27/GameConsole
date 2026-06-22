@@ -47,12 +47,16 @@ Src/MainMenu/menu_common.c \
 Src/MainMenu/game_list.c \
 Src/MainMenu/settings_menu.c \
 Src/MainMenu/wifi_update.c \
+Src/MainMenu/os_update.c \
+Src/MainMenu/flash_ui.c \
 Src/MainMenu/keyboard.c \
 Src/MainMenu/download_ui.c \
 Src/MainMenu/wifi_menu.c \
 Src/MainMenu/remote_update.c \
 Src/Flasher/esp_flasher.c \
 Src/Flasher/esp_flasher_port.c \
+Src/Flasher/flash_ll.c \
+Src/Flasher/os_flasher.c \
 Src/Loader/loader.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
@@ -185,6 +189,15 @@ $(BUILD_DIR):
 
 flash: $(BUILD_DIR)/$(TARGET).elf
 	$(OPENOCD) $(OPENOCD_CFG) -c "program $(BUILD_DIR)/$(TARGET).elf verify reset exit"
+
+# Stage the OS image into the update-server tree as os/Console.bin, so the console
+# can pull it over WiFi (Poll Updates -> Firmware/Console.bin) and self-flash it
+# (Settings -> Firmware -> Upgrade OS). The on-server name is Console.bin
+# regardless of the build's TARGET.
+deploy: $(BUILD_DIR)/$(TARGET).bin
+	@mkdir -p $(UPDATE_SERVER_CONTENT)/os
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(UPDATE_SERVER_CONTENT)/os/Console.bin
+	@echo "$(TARGET).bin -> update server $(UPDATE_SERVER_CONTENT)/os/Console.bin"
 
 #######################################
 # clean up

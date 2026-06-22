@@ -39,10 +39,11 @@
 #define LOGGER_EEPROM LOGGER_LEVEL_WARN
 #define LOGGER_NETWORK LOGGER_LEVEL_DEBUG
 #define LOGGER_USART LOGGER_LEVEL_DEBUG  /* USART1/ESP-01 link: DMA rx/tx faults, overruns, baud changes */
-#define LOGGER_FLASHER LOGGER_LEVEL_WARN /* ESP-01 firmware flashing over USART1 */
-#define LOGGER_ESP01 LOGGER_LEVEL_DEBUG  /* diagnostics from inside the ESP firmware, forwarded over UART */
+#define LOGGER_FLASHER LOGGER_LEVEL_DEBUG /* firmware flashing (ESP-01 + console OS self-flash): per-sector/byte progress, verify */
+#define LOGGER_ESP01 LOGGER_LEVEL_DEBUG   /* diagnostics from inside the ESP firmware, forwarded over UART */
 #define LOGGER_MENU LOGGER_LEVEL_DEBUG
 #define LOGGER_GAME LOGGER_LEVEL_WARN   /* logs funnelled in from loaded games via api.log() */
 #define LOGGER_KERNEL LOGGER_LEVEL_WARN /* syscall trust-boundary events: rejected pointers, bad ids */
+#define LOGGER_BOOT LOGGER_LEVEL_DEBUG  /* the self-flash bootloader: boot decision, apply/erase/copy/verify state */
 
 #endif /* __LOGGER_CONFIG_H */

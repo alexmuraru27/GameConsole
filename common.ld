@@ -25,7 +25,12 @@ MEMORY
     GAME_RAM        (rwx)   : ORIGIN = RAM_START_GAME, LENGTH = GAME_RAM_SIZE
     /* Asset arena in CCM — D-bus only, not executable. */
     GAME_RAM_ASSET  (rw)    : ORIGIN = 0x10000000, LENGTH = 64K
-    CONSOLE_FLASH   (rx)    : ORIGIN = 0x8000000, LENGTH = 512K
+    /* The console OS (application) runs above the bootloader: sector 0 (16K at
+     * 0x08000000) is the self-flash bootloader, sectors 1-5 (240K at 0x08004000)
+     * are the app, sectors 6-7 (256K at 0x08040000) are the OS-update staging
+     * scratch. The app must fit its 240K window (a link overflow flags growth past
+     * the staging region). Keep this in sync with Console/Inc/Flasher/flash_map.h. */
+    CONSOLE_FLASH   (rx)    : ORIGIN = 0x8004000, LENGTH = 240K
 }
 
 /* Region bounds exported as absolute symbols so the console kernel (MPU setup,
