@@ -117,9 +117,11 @@ MenuTransition settingsMenuUpdate(void)
     {
         if (s_depth == 0U)
         {
+            LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: back to root");
             return MENU_GOTO_ROOT;
         }
         s_depth--;
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: back to '%s'", s_stack[s_depth].node->label);
         return MENU_STAY;
     }
 
@@ -132,11 +134,13 @@ MenuTransition settingsMenuUpdate(void)
     {
         frame->selected++;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: highlight '%s'", category->children[frame->selected].label);
     }
     else if (nav.up && (frame->selected > 0U))
     {
         frame->selected--;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: highlight '%s'", category->children[frame->selected].label);
     }
     else if (nav.enter)
     {
@@ -145,15 +149,18 @@ MenuTransition settingsMenuUpdate(void)
         {
             item->set(!item->get());
             buzzerPlay(0U, false, s_toggle_notes, 2U);
+            LOGGER_LOG_INFO(LOGGER_MENU, "settings: '%s' -> %s", item->label, item->get() ? "ON" : "OFF");
         }
         else if (item->kind == SETTING_ACTION && item->action)
         {
             buzzerPlay(0U, false, s_toggle_notes, 2U);
+            LOGGER_LOG_INFO(LOGGER_MENU, "settings: run '%s'", item->label);
             item->action();      /* blocks for the action's lifetime */
             menuResetSurface();  /* the action owned the screen; restore ours */
         }
         else if (item->kind == SETTING_CATEGORY && (s_depth + 1U < SETTINGS_MAX_DEPTH))
         {
+            LOGGER_LOG_INFO(LOGGER_MENU, "settings: enter '%s'", item->label);
             s_depth++;
             s_stack[s_depth].node = item;
             s_stack[s_depth].selected = 0U;

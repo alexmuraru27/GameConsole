@@ -60,15 +60,18 @@ static MenuTransition rootUpdate(void)
     {
         s_root_selected++;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "root: highlight '%s'", s_root_items[s_root_selected].label);
     }
     else if (nav.up && (s_root_selected > 0U))
     {
         s_root_selected--;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "root: highlight '%s'", s_root_items[s_root_selected].label);
     }
     else if (nav.enter)
     {
         buzzerPlay(0U, false, s_select_notes, 2U);
+        LOGGER_LOG_INFO(LOGGER_MENU, "root: select '%s'", s_root_items[s_root_selected].label);
         return s_root_items[s_root_selected].target;
     }
     return MENU_STAY; /* root is home: Special Button 2 does nothing here */

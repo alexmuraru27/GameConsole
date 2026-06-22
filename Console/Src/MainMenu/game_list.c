@@ -77,6 +77,7 @@ MenuTransition gameListUpdate(void)
 
     if (nav.back)
     {
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "games: back to root");
         return MENU_GOTO_ROOT;
     }
 
@@ -89,23 +90,25 @@ MenuTransition gameListUpdate(void)
     {
         s_selected++;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "games: highlight '%s'", s_names[s_selected]);
     }
     else if (nav.up && (s_selected > 0U))
     {
         s_selected--;
         buzzerPlay(0U, false, s_move_notes, 1U);
+        LOGGER_LOG_DEBUG(LOGGER_MENU, "games: highlight '%s'", s_names[s_selected]);
     }
     else if (nav.enter)
     {
         buzzerPlay(0U, false, s_select_notes, 2U);
-        LOGGER_LOG_INFO(LOGGER_MENU, "launching '%s'", s_names[s_selected]);
+        LOGGER_LOG_INFO(LOGGER_MENU, "game start: '%s'", s_names[s_selected]);
         const uint8_t result = gameLoaderLoadGame((uint8_t)s_selected);
         /* Game returned: it owned the renderer, so rebuild the surface. */
         rendererInit();
         menuResetSurface();
         if (result == GAME_LOADER_RET_CRASHED)
         {
-            LOGGER_LOG_WARN(LOGGER_MENU, "game '%s' crashed", s_names[s_selected]);
+            LOGGER_LOG_WARN(LOGGER_MENU, "game end: '%s' crashed", s_names[s_selected]);
             s_crash_banner = true;
             s_crash_banner_until = getSysTime() + GL_CRASH_BANNER_MS;
             strncpy(s_crash_name, s_names[s_selected], sizeof(s_crash_name) - 1U);
@@ -113,7 +116,7 @@ MenuTransition gameListUpdate(void)
         }
         else
         {
-            LOGGER_LOG_INFO(LOGGER_MENU, "game '%s' returned (code %u)", s_names[s_selected], (unsigned)result);
+            LOGGER_LOG_INFO(LOGGER_MENU, "game end: '%s' returned (code %u)", s_names[s_selected], (unsigned)result);
         }
     }
 
