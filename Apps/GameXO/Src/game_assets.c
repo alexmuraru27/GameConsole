@@ -4,21 +4,20 @@
 #include <string.h>
 
 
-/* The CCM asset arena reserved by game.ld (.asset_area over GAME_RAM_ASSET).
- * Graphics are bump-allocated here; it is never reset after the one-time load. */
-extern uint8_t __asset_area_start[];
-extern uint8_t __asset_area_end[];
+/* The CCM asset arena (ASSET_ARENA_START..END, the .asset_area over GAME_RAM_ASSET,
+ * exposed by the ConsoleAPI). Graphics are bump-allocated here; it is never reset
+ * after the one-time load. */
 static uint8_t *s_arena;
 
 void gameAssetsInit(void)
 {
-    s_arena = __asset_area_start;
+    s_arena = ASSET_ARENA_START;
 }
 
 static uint8_t *arenaAlloc(uint32_t size)
 {
     uint8_t *p = (uint8_t *)(((uintptr_t)s_arena + 3U) & ~(uintptr_t)3U);
-    if (p + size > __asset_area_end)
+    if (p + size > ASSET_ARENA_END)
     {
         return NULL;
     }

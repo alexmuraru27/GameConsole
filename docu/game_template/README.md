@@ -92,7 +92,9 @@ the player back to the menu with a "crashed" banner.
 | CCM asset arena (`0x10000000`) | 64 KB | scratch buffers for `.pak`-loaded assets (data only — not executable) |
 
 Keep total code+data+stack under 32 KB. Stream large assets through the CCM arena
-rather than holding them all resident. See [`../memory.md`](../memory.md).
+rather than holding them all resident — its bounds are exposed by the ConsoleAPI as
+`ASSET_ARENA_START` / `ASSET_ARENA_END` / `ASSET_ARENA_SIZE` (no need to declare the
+linker symbols yourself). See [`../memory.md`](../memory.md).
 
 ---
 

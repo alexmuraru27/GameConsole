@@ -18,4 +18,19 @@ typedef struct
     uint32_t crc32; /* CRC32 of the asset blob, verified on load */
 } __attribute__((packed, aligned(1))) AssetMetaData;
 
+/*
+ * The CCM "asset arena": a ~64 KB scratch region (the GAME_RAM_ASSET CCM bank) a
+ * game may freely use to stage assets it streams from its pak — or any large
+ * game-owned data. Its bounds are fixed by the game linker script, which emits
+ * these symbols over the .asset_area section (linker/app.ld). The macros give a
+ * game typed access to the region without re-declaring the linker symbols. The
+ * symbols exist only in the game link; the console never references them.
+ */
+extern uint8_t __asset_area_start[];
+extern uint8_t __asset_area_end[];
+
+#define ASSET_ARENA_START ((uint8_t *)__asset_area_start)
+#define ASSET_ARENA_END   ((uint8_t *)__asset_area_end)
+#define ASSET_ARENA_SIZE  ((uint32_t)(ASSET_ARENA_END - ASSET_ARENA_START))
+
 #endif /* __ASSET_API_H */

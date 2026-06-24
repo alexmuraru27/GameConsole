@@ -82,11 +82,10 @@ enum
 };
 static Tile s_tile[T_COUNT];
 
-/* Asset pools. The CCM arena (64 KB, otherwise idle — this game's tile blobs are
- * tiny) holds the world/HUD tile blobs followed by the three per-layer Sprite
- * arrays; a small GAME_RAM buffer holds the 4bpp actor blobs. See the file header. */
-extern uint8_t __asset_area_start[];
-extern uint8_t __asset_area_end[];
+/* Asset pools. The CCM arena (ASSET_ARENA_START..END from the ConsoleAPI — 64 KB,
+ * otherwise idle since this game's tile blobs are tiny) holds the world/HUD tile
+ * blobs followed by the three per-layer Sprite arrays; a small GAME_RAM buffer
+ * holds the 4bpp actor blobs. See the file header. */
 static uint8_t s_gram_assets[384] __attribute__((aligned(4)));
 static Sprite *s_bg; /* [LAYER_CAP], in the CCM arena */
 static Sprite *s_fg; /* [LAYER_CAP], in the CCM arena */
@@ -404,16 +403,16 @@ static void buildVisibleScene(void)
  * (exercising both pools); the Sprite arrays follow the tiles in the CCM arena. */
 static bool loadAssets(void)
 {
-    uint8_t *ccm = __asset_area_start;
+    uint8_t *ccm = ASSET_ARENA_START;
     uint8_t *gram = s_gram_assets;
     bool ok = true;
 
-    ok = ok && loadTile(TESTRENDERER_GFX_BRICK, &s_tile[T_BRICK], &ccm, __asset_area_end);
-    ok = ok && loadTile(TESTRENDERER_GFX_STONE, &s_tile[T_STONE], &ccm, __asset_area_end);
-    ok = ok && loadTile(TESTRENDERER_GFX_GROUND, &s_tile[T_GROUND], &ccm, __asset_area_end);
-    ok = ok && loadTile(TESTRENDERER_GFX_TORCH, &s_tile[T_TORCH], &ccm, __asset_area_end);
-    ok = ok && loadTile(TESTRENDERER_GFX_COIN, &s_tile[T_COIN], &ccm, __asset_area_end);
-    ok = ok && loadTile(TESTRENDERER_GFX_HEART, &s_tile[T_HEART], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_BRICK, &s_tile[T_BRICK], &ccm, ASSET_ARENA_END);
+    ok = ok && loadTile(TESTRENDERER_GFX_STONE, &s_tile[T_STONE], &ccm, ASSET_ARENA_END);
+    ok = ok && loadTile(TESTRENDERER_GFX_GROUND, &s_tile[T_GROUND], &ccm, ASSET_ARENA_END);
+    ok = ok && loadTile(TESTRENDERER_GFX_TORCH, &s_tile[T_TORCH], &ccm, ASSET_ARENA_END);
+    ok = ok && loadTile(TESTRENDERER_GFX_COIN, &s_tile[T_COIN], &ccm, ASSET_ARENA_END);
+    ok = ok && loadTile(TESTRENDERER_GFX_HEART, &s_tile[T_HEART], &ccm, ASSET_ARENA_END);
     /* the 4bpp actor sprites stream into GAME_RAM instead, to use both pools */
     ok = ok && loadTile(TESTRENDERER_GFX_HERO, &s_tile[T_HERO], &gram, s_gram_assets + sizeof(s_gram_assets));
     ok = ok && loadTile(TESTRENDERER_GFX_SLIME, &s_tile[T_SLIME], &gram, s_gram_assets + sizeof(s_gram_assets));
