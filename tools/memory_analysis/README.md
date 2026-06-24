@@ -30,7 +30,7 @@ python3 tools/memory_analysis/memory_analysis.py --map build/GameXO/GameXO.map
 python3 tools/memory_analysis/memory_analysis.py --map build/Console/GameConsole.map build/GameXO/GameXO.map
 
 # Parse linker scripts for theoretical region capacities (no build needed)
-python3 tools/memory_analysis/memory_analysis.py --ld game.ld --name "GameXO (theoretical)"
+python3 tools/memory_analysis/memory_analysis.py --ld linker/app.ld --name "GameXO (theoretical)"
 
 # JSON output
 python3 tools/memory_analysis/memory_analysis.py --json

@@ -6,7 +6,7 @@ SD card via **Settings → "Upgrade WiFi module"**.
 
 This is an independent build target — a different MCU and toolchain from the
 STM32 `Console/` firmware — which is why it sits at the repo root alongside
-`Console/` and `GameXO/` rather than inside the console source tree.
+`Console/` and the games under `Apps/` rather than inside the console source tree.
 
 > **Current milestone:** a single **blinky**. The runtime console↔ESP protocol
 > (the "pull games/content over WiFi" path) is future work; `src/main.cpp`

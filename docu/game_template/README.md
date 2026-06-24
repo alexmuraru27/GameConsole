@@ -10,16 +10,19 @@ isolation internals are in [`../kernel.md`](../kernel.md); this is the how-to.
 
 The **OS owns the game loop**. A game is not a `main()` that runs forever — it is
 three callbacks the console calls: `init` once, then `update` then `render` every
-frame. The console paces the frame and does its own work (the WiFi link, etc.)
-between frames, so a game must return promptly from each callback rather than spin.
-Game state lives in globals (it persists across calls); locals do not.
+frame, back to back. The console runs the loop **uncapped** and does its own work
+(the WiFi link, etc.) between frames, so a game must return promptly from each
+callback rather than spin. The OS does not cap the frame rate; a game that wants a
+fixed rate paces itself by calling `delay()` once per frame (e.g. GameXO holds
+~60 FPS). Game state lives in globals (it persists across calls); locals do not.
 
 ---
 
 ## Quick start
 
-1. **Linker script** — set `LDSCRIPT = ../game.ld` in your Makefile. It places the
-   game at its `GAME_RAM` addresses and reserves the CCM asset arena. The image is
+1. **Linker script** — set `LDSCRIPT = $(REPO_ROOT)/linker/app.ld` in your Makefile
+   and pass `-L$(REPO_ROOT)/linker` (so its `INCLUDE "common.ld"` resolves). It places
+   the game at its `GAME_RAM` addresses and reserves the CCM asset arena. The image is
    RAM-resident, so there is no LMA copy.
 
 2. **Link the syscall stubs + headers** — the API is a set of typed C functions
@@ -228,4 +231,5 @@ Special Button 2) to return to the console — there is no `main()` to fall out 
 - [Kernel / game isolation](../kernel.md) — privilege model, the syscall ABI, MPU protection, fault recovery
 - [ConsoleAPI module internals](../API_README.md)
 - [Memory layout](../memory.md) — SRAM/CCM map, game binary layout
-- [Example game source](../../GameXO/) — the reference implementation
+- [Example game source](../../Apps/GameXO/) — the reference implementation
+- [Renderer benchmark game](../../Apps/TestRenderer/) — a minimal endless scroller, heavy on sprites, with an on-screen min/avg/max FPS overlay

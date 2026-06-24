@@ -93,10 +93,14 @@ def _eval_expr(expr: str, constants: Dict[str, int]) -> int:
 
 
 def _guess_project_root() -> Optional[str]:
-    """Walk up from this file's directory looking for ``common.ld``."""
+    """Walk up from this file's directory looking for the repo root.
+
+    Anchored on ``common.mk`` since the linker scripts now live under
+    ``linker/`` rather than at the root.
+    """
     d = os.path.dirname(os.path.abspath(__file__))
     for _ in range(8):
-        if os.path.isfile(os.path.join(d, 'common.ld')):
+        if os.path.isfile(os.path.join(d, 'common.mk')):
             return d
         parent = os.path.dirname(d)
         if parent == d:
@@ -125,22 +129,20 @@ def _read_with_includes(ld_path: str, seen: Optional[Set[str]] = None) -> str:
         # GNU LD resolves relative INCLUDE paths against:
         #   1. CWD
         #   2. The directory containing the current script
-        # We add a third fallback — the project root — because the user
-        # may invoke us from any directory, unlike `make` which always
-        # runs from a known subdirectory.
+        # The linker scripts live together under linker/, so (2) — the script's
+        # own directory — resolves `INCLUDE "common.ld"` directly. We add a
+        # fallback to linker/ under the project root so the tool still works when
+        # invoked from an unrelated directory, unlike `make` (which runs from a
+        # known subdirectory and passes -L linker/).
         candidates = [
             os.path.normpath(os.path.join(os.getcwd(), inc_path)),
             os.path.normpath(os.path.join(os.path.dirname(abs_path), inc_path)),
         ]
-        # Heuristic: if the include has a "../" prefix, the target is
-        # probably in the project root (a sibling to Console/ and GameXO/).
-        # Try the basename relative to the directory that contains common.ld.
-        if inc_path.startswith('..'):
-            project_root = _guess_project_root()
-            if project_root:
-                candidates.append(
-                    os.path.normpath(os.path.join(project_root, os.path.basename(inc_path)))
-                )
+        project_root = _guess_project_root()
+        if project_root:
+            candidates.append(
+                os.path.normpath(os.path.join(project_root, 'linker', os.path.basename(inc_path)))
+            )
 
         for candidate in candidates:
             if os.path.isfile(candidate):

@@ -28,7 +28,7 @@ The fix is a second, always-present stage: a **bootloader** in sector 0 that the
 
 STM32F407 sector geometry: sectors 0-3 = 16K, sector 4 = 64K, sectors 5-7 = 128K.
 
-- The **application** relinks at `0x08004000` (`common.ld` sets `CONSOLE_FLASH` there) and points `SCB->VTOR` at that base in `SystemInit` so its interrupt vectors are found.
+- The **application** relinks at `0x08004000` (`linker/common.ld` sets `CONSOLE_FLASH` there) and points `SCB->VTOR` at that base in `SystemInit` so its interrupt vectors are found.
 - **Staging** is scratch: an update is written there and verified there *before* anything irreversible happens. Its first bytes are the header:
 
 ```c
@@ -179,7 +179,7 @@ make flash                  # SWD-flash BOTH stages (bootloader then app)
 make deploy                 # stage the app image as content/os/Console.bin for OTA
 ```
 
-The bootloader is a minimal separate target: it reuses the console's `startup.s` (unused peripheral ISRs stay weak-aliased to the default handler) and shares `crc.c` and `flash_ll.c`, with its own `bootloader.ld`. Flash it once over SWD; thereafter the OS updates itself over WiFi + SD.
+The bootloader is a minimal separate target: it reuses the console's `startup.s` (unused peripheral ISRs stay weak-aliased to the default handler) and shares `crc.c` and `flash_ll.c`, with its own `linker/bootloader.ld`. Flash it once over SWD; thereafter the OS updates itself over WiFi + SD.
 
 ---
 
@@ -193,15 +193,15 @@ The bootloader is a minimal separate target: it reuses the console's `startup.s`
 | `Console/Src/MainMenu/os_update.c` | the "Upgrade OS" modal (shares `flash_ui.c` with the ESP flow) |
 | `Bootloader/Src/main.c` | apply (with readback verify) or boot the app; traces every step on `LOGGER_BOOT` |
 | `Bootloader/Src/trace.c` | SWO/ITM glue so the bootloader reuses the console's `logger.c` (`swoInit`/`_write`/`getSysTime`) |
-| `Bootloader/bootloader.ld` | sector-0 link map |
-| `common.ld` | relinks the app above the bootloader |
+| `linker/bootloader.ld` | sector-0 link map |
+| `linker/common.ld` | relinks the app above the bootloader |
 
 ---
 
 ## 9. Known limits & sharp edges
 
 - **The bootloader is not self-updatable.** It lives in sector 0, which the self-flash never erases (so an interrupted update can't corrupt it). Changing the bootloader's code or vector table therefore needs an SWD reflash (`make -C Bootloader flash`).
-- **The OS image must fit the 240 KB app region.** Staging is 256 KB, so the app region is the binding limit. `osFlasherStage` rejects an oversized image (`OS_FLASH_TOO_BIG`), and the app link itself fails (region overflow) if the firmware ever grows past 240 KB — at which point the partition in `flash_map.h` / `common.ld` must be rebalanced.
+- **The OS image must fit the 240 KB app region.** Staging is 256 KB, so the app region is the binding limit. `osFlasherStage` rejects an oversized image (`OS_FLASH_TOO_BIG`), and the app link itself fails (region overflow) if the firmware ever grows past 240 KB — at which point the partition in `flash_map.h` / `linker/common.ld` must be rebalanced.
 - **A persistently failing flash chip reset-loops.** Once `applyStaging` has erased the app region, there is no old app to fall back to; if the readback never verifies (genuine hardware failure), the bootloader keeps resetting and re-applying from the intact staging. There is no retry cap — the assumption is that the staging copy is good and a stable supply will eventually let the apply complete. A dead flash needs servicing regardless.
 - **The last SWO log line before a bootloader reset can be truncated** (pending fix). `applyStaging` calls `NVIC_SystemReset()` while the SWO serializer may still be draining the final line — and the bootloader has no SysTick-based delay to cover the drain — so e.g. `…rebooting into new OS` can be cut off mid-byte before the next boot banner. Cosmetic only (the apply already completed and verified). A short drain before the reset (a busy-wait on the cycle counter, or polling the TPIU) would fix it; left out to keep the reset path minimal.
 - **`getSysTime()` in the bootloader is a per-reset DWT-cycle timestamp** (there is no SysTick), so `[BOOT]` ticks restart at 0 on every boot/stage rather than being monotonic with the app.

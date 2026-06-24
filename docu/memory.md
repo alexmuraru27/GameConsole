@@ -4,7 +4,7 @@ The STM32F407VET6 provides **128 KB SRAM** at `0x20000000`, **64 KB CCM** at `0x
 
 ## SRAM regions
 
-Defined in `common.ld`. There is no shared-RAM window: a game reaches the console only through SVC syscalls, so the old 2 KB `SHARED_RAM` was reclaimed into `CONSOLE_RAM`.
+Defined in `linker/common.ld`. There is no shared-RAM window: a game reaches the console only through SVC syscalls, so the old 2 KB `SHARED_RAM` was reclaimed into `CONSOLE_RAM`.
 
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
@@ -34,7 +34,7 @@ Total: 96K + 32K = 128K ✓
 
 ## Flash
 
-The 512 KB flash is partitioned for power-fail-safe OS self-flashing (see the OS Self-Flash subsystem in `CLAUDE.md`). The map is the single source of truth in `Console/Inc/Flasher/flash_map.h`, mirrored by `common.ld` (app) and `Bootloader/bootloader.ld`:
+The 512 KB flash is partitioned for power-fail-safe OS self-flashing (see the OS Self-Flash subsystem in `CLAUDE.md`). The map is the single source of truth in `Console/Inc/Flasher/flash_map.h`, mirrored by `linker/common.ld` (app) and `linker/bootloader.ld`:
 
 | Region        | Origin     | Sectors | Size | Perms | Purpose                                                          |
 | ------------- | ---------- | ------- | ---- | ----- | --------------------------------------------------------------- |
@@ -98,7 +98,7 @@ A 28-byte prefix at offset 0 of the binary. The loader reads it, validates the g
 2. Copy the whole `.bin` to `GAME_RAM` base (`.text`/`.rodata`/`.data` land at their linked addresses)
 3. `kernelRunGame()` programs the MPU regions, then drives the game **OS-first**: it invokes each callback by building a fresh **unprivileged** PSP exception frame at the top of `GAME_RAM` and entering via an SVC (`SYS_INVOKE`), parking the console's context on the MSP
 4. The first invoke runs `_game_start` (zero `.bss`, `__libc_init_array`), the second runs `init`; each returns to the OS via the `_game_return` trampoline (`SYS_FRAME_DONE`), leaving the MPU/session up
-5. The OS then loops `update`/`render` (servicing the console + pacing the frame in between). The game ends the session with `gameExit()` (an `SVC` / `SYS_EXIT`), or crashes — either way **PendSV** switches back to the parked console context, releases the MPU regions, and resumes the loader
+5. The OS then loops `update`/`render` uncapped (servicing the console between frames; it does not pace — a game self-paces with `delay()` if it wants a fixed rate). The game ends the session with `gameExit()` (an `SVC` / `SYS_EXIT`), or crashes — either way **PendSV** switches back to the parked console context, releases the MPU regions, and resumes the loader
 
 The game runs **unprivileged on PSP** (confined to `GAME_RAM` + the CCM asset arena by the MPU); the console and all exception handlers run privileged on MSP. A game fault is caught, decoded over SWO, and recovered from — control returns to the menu, which shows a "crashed" banner. See the Kernel subsystem in `CLAUDE.md` for the switch mechanics.
 
@@ -147,10 +147,13 @@ Game saves are keyed by the game's `.bin` name (extension stripped, matched case
 
 ## Linker scripts
 
-| File         | Used by          | Purpose                                                                            |
-| ------------ | ---------------- | ---------------------------------------------------------------------------------- |
-| `common.ld`  | Both             | MEMORY region definitions, the `.game_header` output section, region-bound symbols (`__game_ram_start/size`, …) the kernel uses for the MPU and pointer validation |
-| `console.ld` | Console firmware | `.isr_vector`, `.text`, `.rodata` → flash; `.data`, `.bss` → CONSOLE_RAM           |
-| `game.ld`    | Games            | `.text`, `.rodata`, `.data`, `.bss`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
+All linker scripts live in `linker/`.
 
-`common.ld` is included by both linker scripts via `INCLUDE "../common.ld"`. The ASSERTs validate that `GAME_RAM` stays 32K-aligned at `0x20018000` (so it is a single clean MPU region) and that the SRAM region sizes sum to 128K.
+| File                 | Used by          | Purpose                                                                            |
+| -------------------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `linker/common.ld`   | Both             | MEMORY region definitions, the `.game_header` output section, region-bound symbols (`__game_ram_start/size`, …) the kernel uses for the MPU and pointer validation |
+| `linker/console.ld`  | Console firmware | `.isr_vector`, `.text`, `.rodata` → flash; `.data`, `.bss` → CONSOLE_RAM           |
+| `linker/app.ld`      | Games / apps     | `.text`, `.rodata`, `.data`, `.bss`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
+| `linker/bootloader.ld` | Bootloader     | standalone sector-0 link map (its own MEMORY block, no INCLUDE) |
+
+`linker/common.ld` is included by `app.ld` and `console.ld` via `INCLUDE "common.ld"`, resolved from the linker search path (the Makefiles pass `-L .../linker`). The ASSERTs validate that `GAME_RAM` stays 32K-aligned at `0x20018000` (so it is a single clean MPU region) and that the SRAM region sizes sum to 128K.

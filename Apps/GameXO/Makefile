@@ -1,4 +1,7 @@
-include ../common.mk
+# Apps live two levels under the repo root (Apps/<name>/), so point REPO_ROOT up
+# two and express every shared path against it (see common.mk).
+REPO_ROOT = ../..
+include $(REPO_ROOT)/common.mk
 
 ######################################
 # target
@@ -8,8 +11,9 @@ TARGET = GameXO
 #######################################
 # paths
 #######################################
-# Build path
-BUILD_DIR = ../build/GameXO
+# Build path (kept at <root>/build/GameXO so the map-file tooling and the VS Code
+# launch config find it regardless of where the sources live).
+BUILD_DIR = $(REPO_ROOT)/build/GameXO
 
 OPT = -Og
 
@@ -23,7 +27,7 @@ Src/game_state_manager.c \
 Src/tic_tac_toe_logic.c\
 Src/game_assets.c \
 Src/syscalls.c \
-../Shared/Syscall/console_syscalls.c
+$(REPO_ROOT)/Shared/Syscall/console_syscalls.c
 
 # ASM sources
 # None: a game has no vector table and no startup.s. The binary header is emitted
@@ -43,11 +47,11 @@ C_DEFS =  \
 C_INCLUDES =  \
 -IInc \
 -IAssets/pak \
--I../Shared \
--I../Shared/Api \
--I../Shared/Syscall \
--I../tools/graphics \
--I../tools/music_creator
+-I$(REPO_ROOT)/Shared \
+-I$(REPO_ROOT)/Shared/Api \
+-I$(REPO_ROOT)/Shared/Syscall \
+-I$(REPO_ROOT)/tools/graphics \
+-I$(REPO_ROOT)/tools/music_creator
 
 
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
@@ -62,13 +66,14 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 #######################################
 # LDFLAGS
 #######################################
-# link script
-LDSCRIPT = ../game.ld
+# link script. The linker scripts live in linker/; app.ld pulls in common.ld via
+# an INCLUDE resolved against the linker search path, so -L points ld at linker/.
+LDSCRIPT = $(REPO_ROOT)/linker/app.ld
 
 # libraries
-LIBS = -lc -lm -lnosys 
-LIBDIR = 
-LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LIBS = -lc -lm -lnosys
+LIBDIR =
+LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) -L$(REPO_ROOT)/linker $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
 #######################################
 # asset pack (.pak)
@@ -77,7 +82,7 @@ LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BU
 # Assets/{Graphics,Music}; the packer bundles them (per Assets/manifest.yaml)
 # into GameXO.pak + a GameXOAssetEnum.h of asset ids the game includes. The
 # .pak ships next to GameXO.bin on the SD card and is loaded at runtime.
-PACKER     = python3 ../tools/packer/packer.py
+PACKER     = python3 $(REPO_ROOT)/tools/packer/packer.py
 ASSET_DIR  = Assets
 MANIFEST   = $(ASSET_DIR)/manifest.yaml
 PAK_DIR    = $(ASSET_DIR)/pak
@@ -136,7 +141,7 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf | $(BUILD_DIR)
 	$(BIN) $< $@	
 		
 $(BUILD_DIR):
-	mkdir $@
+	mkdir -p $@
 
 
 flash: $(BUILD_DIR)/$(TARGET).elf

@@ -72,7 +72,6 @@ Src/Fonts/font5x5.c \
 Src/Fonts/font8x8.c \
 Src/Fonts/font_utils.c \
 Src/Renderer/renderer.c \
-Src/Renderer/renderer_testing.c \
 Src/Kernel/faults.c \
 Src/Kernel/syscall.c \
 Src/Kernel/mpu.c \
@@ -94,8 +93,7 @@ startup.s
 #######################################
 # C defines
 C_DEFS =  \
--DSTM32F407xx 
-# -DRENDERER_TESTING
+-DSTM32F407xx
 
 # C includes
 C_INCLUDES =  \
@@ -141,13 +139,14 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 #######################################
 # LDFLAGS
 #######################################
-# link script
-LDSCRIPT = console.ld
+# link script. The linker scripts live in linker/; console.ld pulls in common.ld
+# via an INCLUDE resolved against the linker search path, so -L points at linker/.
+LDSCRIPT = $(REPO_ROOT)/linker/console.ld
 
 # libraries
-LIBS = -lc -lm -lnosys 
-LIBDIR = 
-LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LIBS = -lc -lm -lnosys
+LIBDIR =
+LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) -L$(REPO_ROOT)/linker $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin

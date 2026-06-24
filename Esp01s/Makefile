@@ -7,6 +7,10 @@ PIO ?= $(shell command -v pio 2>/dev/null || echo $(HOME)/.platformio/penv/bin/p
 # PlatformIO build output for the [env:esp01s] environment.
 FIRMWARE = .pio/build/esp01s/firmware.bin
 
+# The repo's sub-makes are driven uniformly via `all`; `build` is kept as an
+# alias (PlatformIO's vocabulary, and what `make esp` maps to).
+all: build
+
 # Build the ESP-01S firmware via PlatformIO.
 build:
 	$(PIO) run

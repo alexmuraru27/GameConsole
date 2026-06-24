@@ -11,10 +11,10 @@ An embedded game console platform for the STM32F407VET6, with a [scanline sprite
 Requires `arm-none-eabi-gcc` and `openocd` on PATH.
 
 ```bash
-make all       # build Console firmware + GameXO game
+make all       # build Console firmware + the Apps (GameXO + TestRenderer)
 make flash     # flash firmware via OpenOCD/STLink
 make flashswo  # flash and start SWO trace output
-make deploy    # copy GameXO.bin to SD card at /mnt/sd
+make deploy    # stage the apps' .bin/.pak (+ OS/ESP images) into the update-server tree
 make clean     # remove all build artifacts
 ```
 

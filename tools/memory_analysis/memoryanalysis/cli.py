@@ -18,10 +18,14 @@ from .utils import resolve_path
 
 
 def _find_project_root() -> str:
-    """Walk up from this file's directory to find the project root."""
+    """Walk up from this file's directory to find the project root.
+
+    Anchored on ``common.mk`` (a stable repo-root marker) rather than a linker
+    script, since the linker scripts live under ``linker/`` and not at the root.
+    """
     d = os.path.dirname(os.path.abspath(__file__))
     for _ in range(6):
-        if os.path.isfile(os.path.join(d, 'common.ld')):
+        if os.path.isfile(os.path.join(d, 'common.mk')):
             return d
         parent = os.path.dirname(d)
         if parent == d:
@@ -69,7 +73,7 @@ Examples:
   %(prog)s
   %(prog)s --map build/Console/GameConsole.map
   %(prog)s --map build/Console/GameConsole.map build/GameXO/GameXO.map
-  %(prog)s --ld game.ld --name "GameXO (theoretical)"
+  %(prog)s --ld linker/app.ld --name "GameXO (theoretical)"
   %(prog)s --map build/GameXO/GameXO.map --json
   %(prog)s --quiet
         ''',
@@ -153,7 +157,7 @@ Examples:
             'Error: no map files found and no linker scripts provided.\n'
             'Run "make all" first to generate map files, or specify paths:\n'
             f'  {sys.argv[0]} --map build/Console/GameConsole.map\n'
-            f'  {sys.argv[0]} --ld Console/console.ld',
+            f'  {sys.argv[0]} --ld linker/console.ld',
             file=sys.stderr,
         )
         sys.exit(1)

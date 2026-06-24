@@ -145,7 +145,7 @@ The **OS owns the game loop**. A game is not a `main()` that runs forever — th
     invoke(entry_point)   ── bootstrap: zero .bss, run ctors
     invoke(init)          ── game one-time setup
     while (game active):
-        service()         ── console: pace frame + background work (privileged)
+        service()         ── console: inter-frame background work (privileged; no pacing — games self-pace)
         invoke(update)    ── game logic        ┐ two excursions
         invoke(render)    ── game draw          ┘ per frame
     (session ended by gameExit/crash → PendSV released the wall)

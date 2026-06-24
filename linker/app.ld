@@ -1,4 +1,7 @@
-INCLUDE "../common.ld"
+/* common.ld sits next to this script in linker/; it is found via the linker
+ * search path (-L points at linker/), so this is independent of how deep the
+ * app's build directory sits under the tree. */
+INCLUDE "common.ld"
 
 /* Game code + data + stack all live in GAME_RAM (regular SRAM, I-bus + D-bus).
  * Assets live in GAME_RAM_ASSET (CCM, D-bus only — data, not code). */

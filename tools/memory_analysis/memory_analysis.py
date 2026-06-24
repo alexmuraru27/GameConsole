@@ -10,7 +10,7 @@ Usage::
 
     python3 tools/memory_analysis/memory_analysis.py
     python3 tools/memory_analysis/memory_analysis.py --map build/Console/GameConsole.map
-    python3 tools/memory_analysis/memory_analysis.py --ld game.ld --name "GameXO"
+    python3 tools/memory_analysis/memory_analysis.py --ld linker/app.ld --name "GameXO"
     python3 tools/memory_analysis/memory_analysis.py --json
 
 See README.md for full documentation.

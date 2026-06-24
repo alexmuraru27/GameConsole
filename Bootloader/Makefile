@@ -54,7 +54,9 @@ CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
 #######################################
 # LDFLAGS
 #######################################
-LDSCRIPT = bootloader.ld
+# Standalone link map (its own MEMORY block, no INCLUDE), kept with the other
+# linker scripts under linker/.
+LDSCRIPT = $(REPO_ROOT)/linker/bootloader.ld
 LIBS = -lc -lm -lnosys
 LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections

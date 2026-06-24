@@ -34,22 +34,40 @@ static void bumpLaunchCount(void)
 }
 
 /*
- * The OS owns the loop. It runs the C-runtime bootstrap, then calls gameInit()
- * once, then gameUpdate()/gameRender() every frame (pacing the frame and servicing
- * the console in between). There is no handshake: the loader validated this
- * binary's magic + ABI version before loading it, and the API is reached through
- * SVC traps.
+ * The OS owns the loop but runs games uncapped: it runs the C-runtime bootstrap,
+ * then calls gameInit() once, then gameUpdate()/gameRender() back to back every
+ * frame. A game that wants a fixed frame rate paces itself — GameXO holds a steady
+ * ~60 FPS by sleeping out the rest of each frame budget with delay(). There is no
+ * handshake: the loader validated this binary's magic + ABI version before loading
+ * it, and the API is reached through SVC traps.
  */
+#define TARGET_FRAME_MS (1000U / 60U) /* ~60 FPS frame budget */
+static uint32_t s_frame_deadline_ms;
+
+/* Hold the target frame rate: sleep out whatever time is left until the current
+ * frame's deadline, then arm the next one. A frame that overruns its budget just
+ * runs back to back (no catch-up), so a slow frame can't snowball. */
+static void paceFrame(void)
+{
+    const int32_t remaining = (int32_t)(s_frame_deadline_ms - getSysTime());
+    if (remaining > 0)
+    {
+        delay((uint32_t)remaining);
+    }
+    s_frame_deadline_ms = getSysTime() + TARGET_FRAME_MS;
+}
 
 static void gameInit(void)
 {
     gameLog("GameXO started");
     bumpLaunchCount();
     gameStateManagerInit();
+    s_frame_deadline_ms = getSysTime() + TARGET_FRAME_MS;
 }
 
 static void gameUpdate(void)
 {
+    paceFrame(); /* OS no longer caps the loop; GameXO self-paces to ~60 FPS */
     gameStateManagerUpdate();
     if (joystickGetSpecialBtn2())
     {

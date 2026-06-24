@@ -1,10 +1,19 @@
 ######################################
+# REPO ROOT
+######################################
+# Path from a sub-makefile back to the repo root. Makefiles one level down
+# (Console/, Bootloader/, Esp01s/) get the default `..`; deeper ones (the apps
+# under Apps/<name>/) set REPO_ROOT = ../.. before including this file. Every
+# shared path below is expressed against it, so the tree can be re-nested without
+# editing each Makefile.
+REPO_ROOT ?= ..
+
+######################################
 # DEPLOY
 ######################################
-# Update-server content tree (the console will pull these over WiFi). Path is
-# relative to the deploying sub-makefile (GameXO/, Esp01s/), which sit one level
-# under the repo root, so ../tools/... resolves from either.
-UPDATE_SERVER_CONTENT = ../tools/update_server/content
+# Update-server content tree (the console will pull these over WiFi), resolved
+# from the repo root so it works at any sub-makefile depth.
+UPDATE_SERVER_CONTENT = $(REPO_ROOT)/tools/update_server/content
 
 ######################################
 # OPENOCD
