@@ -19,7 +19,8 @@ OPT = -Og
 ######################################
 # source
 ######################################
-# A renderer benchmark game: no .pak, it builds its tile art procedurally at init.
+# A renderer benchmark game: its tile graphics ship in TestRenderer.pak and are
+# streamed into RAM at init (see the asset pack section below).
 C_SOURCES =  \
 Src/main.c \
 Src/syscalls.c \
@@ -41,9 +42,11 @@ C_DEFS =  \
 # C includes
 C_INCLUDES =  \
 -IInc \
+-IAssets/pak \
 -I$(REPO_ROOT)/Shared \
 -I$(REPO_ROOT)/Shared/Api \
--I$(REPO_ROOT)/Shared/Syscall
+-I$(REPO_ROOT)/Shared/Syscall \
+-I$(REPO_ROOT)/tools/graphics
 
 CFLAGS += $(MCU) $(C_DEFS) $(C_INCLUDES) $(OPT) -Wall -fdata-sections -ffunction-sections
 
@@ -66,7 +69,34 @@ LIBS = -lc -lm -lnosys
 LIBDIR =
 LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) -L$(REPO_ROOT)/linker $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
 
-all: $(BUILD_DIR) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
+#######################################
+# asset pack (.pak)
+#######################################
+# The tile graphics are GfxAsset .bin files generated from ASCII art by
+# Assets/gen_tiles.py (committed, like Pixel Forge output). The packer bundles
+# them (per Assets/manifest.yaml) into TestRenderer.pak + a TestRendererAssetEnum.h
+# of asset ids the game includes. The .pak ships next to TestRenderer.bin on the SD
+# card and is streamed at runtime. Re-packed every build (FORCE) so an edited .bin
+# is never skipped; the packer is cheap.
+PACKER     = python3 $(REPO_ROOT)/tools/packer/packer.py
+ASSET_DIR  = Assets
+MANIFEST   = $(ASSET_DIR)/manifest.yaml
+PAK_DIR    = $(ASSET_DIR)/pak
+PAK        = $(PAK_DIR)/$(TARGET).pak
+ASSET_ENUM = $(PAK_DIR)/$(TARGET)AssetEnum.h
+ASSET_BINS = $(wildcard $(ASSET_DIR)/Graphics/*.bin)
+
+$(ASSET_ENUM): $(PAK)
+$(PAK): $(MANIFEST) $(ASSET_BINS) FORCE
+	@mkdir -p $(PAK_DIR)
+	$(PACKER) $(MANIFEST) --output-name $(TARGET) --output-dir $(PAK_DIR) --assets-root $(ASSET_DIR)
+
+FORCE:
+.PHONY: FORCE
+
+pak: $(PAK)
+
+all: $(BUILD_DIR) $(PAK) $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin
 
 #######################################
 # build the application
@@ -81,7 +111,7 @@ vpath %.s $(sort $(dir $(ASM_SOURCES)))
 ######################################
 # targets
 ######################################
-$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) $(ASSET_ENUM)
 	$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
@@ -107,10 +137,10 @@ flash: $(BUILD_DIR)/$(TARGET).elf
 	@echo "TestRenderer — nothing to flash -> .bin loaded at runtime"
 
 
-deploy: $(BUILD_DIR)/$(TARGET).bin
+deploy: $(BUILD_DIR)/$(TARGET).bin $(PAK)
 	@mkdir -p $(UPDATE_SERVER_CONTENT)/games
-	cp -f $(BUILD_DIR)/$(TARGET).bin $(UPDATE_SERVER_CONTENT)/games/
-	@echo "$(TARGET).bin -> update server $(UPDATE_SERVER_CONTENT)/games"
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(PAK) $(UPDATE_SERVER_CONTENT)/games/
+	@echo "$(TARGET).bin + $(TARGET).pak -> update server $(UPDATE_SERVER_CONTENT)/games"
 #######################################
 # clean up
 #######################################

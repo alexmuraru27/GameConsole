@@ -1,0 +1,33 @@
+# TestRenderer asset pack manifest.
+#
+# The tile .bin assets are GfxAsset (GFX1) files generated from ASCII art by
+# gen_tiles.py (run it after editing a tile; the .bin files are committed). The
+# Makefile runs the packer (tools/packer/packer.py) over this manifest to produce
+# TestRenderer.pak + TestRendererAssetEnum.h. Text is drawn with the console fonts
+# exposed through the ConsoleAPI, so no glyphs are packed here.
+version: 1
+assets:
+  - id: 1
+    name: TESTRENDERER_GFX_BRICK
+    path: Graphics/brick.bin
+  - id: 2
+    name: TESTRENDERER_GFX_STONE
+    path: Graphics/stone.bin
+  - id: 3
+    name: TESTRENDERER_GFX_GROUND
+    path: Graphics/ground.bin
+  - id: 4
+    name: TESTRENDERER_GFX_TORCH
+    path: Graphics/torch.bin
+  - id: 5
+    name: TESTRENDERER_GFX_COIN
+    path: Graphics/coin.bin
+  - id: 6
+    name: TESTRENDERER_GFX_HEART
+    path: Graphics/heart.bin
+  - id: 7
+    name: TESTRENDERER_GFX_HERO
+    path: Graphics/hero.bin
+  - id: 8
+    name: TESTRENDERER_GFX_SLIME
+    path: Graphics/slime.bin

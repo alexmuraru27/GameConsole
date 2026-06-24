@@ -1,6 +1,9 @@
 #include "game_console_api.h"
+#include "gfx_asset.h"               /* GfxAssetHeader / GFX1 format (tools/graphics) */
+#include "TestRendererAssetEnum.h"   /* TESTRENDERER_GFX_* ids (packer-generated) */
 #include <string.h>
 #include <stdio.h>
+#include <stdint.h>
 
 /*
  * TestRenderer — a renderer benchmark, shipped as an ordinary loadable game.
@@ -8,19 +11,24 @@
  * It was the console's old in-tree perf harness (renderer_testing.c); turning it
  * into a game removes the special-case from the OS and exercises the exact path a
  * real game takes: it runs unprivileged, MPU-confined, reaching the renderer only
- * through SVC syscalls.
+ * through SVC syscalls, and it streams its graphics from a .pak like any game.
  *
- * It is an endless auto-scroller with almost no game logic — the world just slides
- * left at a fixed rate and repeats forever — but it is deliberately *heavy on
- * sprites across all three layers*, which is the point: it stresses the scanline
- * compositor with high overdraw (a full BG tile grid, a dense FG of terrain +
- * structures + props + enemies on top of it, and a busy UI HUD over both).
+ * It is an endless auto-scroller with almost no game logic — the world slides past
+ * and repeats forever — over a base scene heavy on all three layers (a full BG tile
+ * grid, a dense FG of terrain + structures + props + enemies, a busy UI HUD). On
+ * top of that the *load is swept continuously between 50% and 100% of the renderer's
+ * sprite budget* (3 layers x 350 = 1050 sprites): a slow triangle wave adds a
+ * drifting swarm of filler sprites, spread across the screen so no 16-line chunk
+ * overflows the compositor's per-chunk bin. The OS runs games uncapped, so the
+ * on-screen counters (current / min / avg / max FPS) show how throughput tracks the
+ * load. Special Button 2 quits back to the console.
  *
- * Opaque tiles keep SPRITE_OPAQUE so the renderer's decoded-tile cache applies;
- * scrolling moves their screen x but the cache is keyed by graphic + palette, so
- * it survives the motion. The OS runs games uncapped, so the three live counters
- * top-left — min / avg / max FPS over a one-second window — report raw renderer
- * throughput. Special Button 2 quits back to the console.
+ * Memory: the tile graphics ship in TestRenderer.pak and are streamed once at init.
+ * To exercise both asset pools, the load is split — the world + HUD tiles go into
+ * the CCM asset arena, the 4bpp actor sprites (hero, slime) into a small GAME_RAM
+ * buffer. The three per-layer Sprite arrays (1050 * 20 B = 21 KB) also live in the
+ * CCM arena (GAME_RAM has no room): the renderer reads sprite data with the CPU,
+ * for which CCM is zero-wait, and the arena is RW for the game under the MPU.
  */
 
 #define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
@@ -30,233 +38,83 @@
 #define VIS_COLS (COLS + 1)           /* one extra column for the partial edge tile */
 #define SCROLL_SPEED 1                /* world pixels per frame; endless */
 
+/* The renderer caps each layer at 350 sprites; the whole-frame budget is 3x that.
+ * The load sweep targets a fraction of this budget. */
+#define LAYER_CAP 350U
+#define SPRITE_BUDGET (3U * LAYER_CAP) /* 1050 */
+#define LOAD_MIN_PCT 50U
+#define LOAD_MAX_PCT 100U
+#define SWEEP_PERIOD_MS 8000U /* one 50 -> 100 -> 50 sweep every 8 s (real time) */
+
 /* The world repeats every LCM(8,5,6,3) = 120 columns, so wrapping the camera by
  * that many tiles keeps the procedural structures seamless while bounding the
  * integer. (Every structure period below divides 120.) */
 #define WORLD_PERIOD_COLS 120
 #define WORLD_PERIOD_PX (WORLD_PERIOD_COLS * TILE)
 
-/* ---- Palettes (index 0 is transparent for the actors/decorations) ---- */
-static const uint16_t s_pal_brick[4] = {RGB(45, 25, 22), RGB(150, 55, 45), RGB(105, 100, 105), RGB(190, 90, 72)};
-static const uint16_t s_pal_stone[4] = {RGB(35, 35, 42), RGB(125, 125, 135), RGB(55, 55, 65), RGB(180, 182, 195)};
-static const uint16_t s_pal_ground[4] = {RGB(60, 40, 25), RGB(120, 80, 45), RGB(70, 165, 60), RGB(95, 62, 35)};
-static const uint16_t s_pal_torch[4] = {0, RGB(120, 72, 35), RGB(240, 140, 30), RGB(255, 232, 95)};
-static const uint16_t s_pal_coin[4] = {0, RGB(120, 90, 10), RGB(240, 200, 40), RGB(255, 245, 180)};
-static const uint16_t s_pal_heart[4] = {0, RGB(220, 50, 55), RGB(150, 25, 35), RGB(255, 150, 150)};
-static const uint16_t s_pal_hero[16] = {
-    0, RGB(45, 65, 170), RGB(240, 195, 155), RGB(25, 18, 18),
-    RGB(205, 55, 55), RGB(95, 72, 145), RGB(70, 45, 32)};
-static const uint16_t s_pal_slime[16] = {0, RGB(90, 205, 95), RGB(45, 130, 55), RGB(15, 15, 15)};
+/* Top-left rectangle holding the FPS/load readouts. Filler is kept out of it so
+ * the small text stays legible against an otherwise busy screen — it is wider and
+ * taller than the text (which spans ~x[4..88], y[4..55]) so no 16px filler tile
+ * starting outside can creep in over a glyph. */
+#define READOUT_W 96
+#define READOUT_H 62
 
-/* ---- Font-colour palettes (slot 0 transparent, 1-3 the ink) ---- */
+/* ---- Font-colour palettes (slot 0 transparent, 1-3 the ink). Tile palettes come
+ * from the loaded assets (system-palette indices mapped to RGB565). ---- */
 static const uint16_t s_pal_font_white[4] = {0x0000, 0xFFFF, 0xFFFF, 0xFFFF};
 static const uint16_t s_pal_font_green[4] = {0x0000, 0x07E0, 0x07E0, 0x07E0};
 static const uint16_t s_pal_font_amber[4] = {0x0000, 0xFD20, 0xFD20, 0xFD20};
 static const uint16_t s_pal_font_cyan[4] = {0x0000, 0x07FF, 0x07FF, 0x07FF};
 
-/* ---- Tile art: one character per pixel, indices into the tile's palette ---- */
-static const char s_art_brick[] = /* opaque: running-bond brick */
-    "3333333333333332"
-    "1111111111111112"
-    "1111111111111112"
-    "1111111111111112"
-    "1111111111111112"
-    "1111111111111112"
-    "1111111111111112"
-    "2222222222222222"
-    "3333333233333333"
-    "1111111211111111"
-    "1111111211111111"
-    "1111111211111111"
-    "1111111211111111"
-    "1111111211111111"
-    "1111111211111111"
-    "2222222222222222";
-static const char s_art_stone[] = /* opaque: beveled stone block */
-    "2222222222222222"
-    "2333333333333332"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2311111111111132"
-    "2111111111111112"
-    "2222222222222222";
-static const char s_art_ground[] = /* opaque: dirt with a grass top */
-    "2222222222222222"
-    "2122212221222122"
-    "1111111111111111"
-    "1113111111311111"
-    "1111111111111111"
-    "1131111113111111"
-    "1111111111111111"
-    "1111311111111131"
-    "1111111111111111"
-    "1311111111311111"
-    "1111111111111111"
-    "1111111311111111"
-    "3111111111111311"
-    "1111111111111111"
-    "1111131111111111"
-    "1111111111111111";
-static const char s_art_torch[] = /* transparent 2bpp: wall torch with flame */
-    "0000000000000000"
-    "0000000330000000"
-    "0000003223000000"
-    "0000003223000000"
-    "0000000330000000"
-    "0000000110000000"
-    "0000000110000000"
-    "0000000110000000"
-    "0000000110000000"
-    "0000000110000000"
-    "0000000110000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000";
-static const char s_art_coin[] = /* transparent 2bpp: spinning coin / pickup */
-    "0000011111100000"
-    "0001133333311000"
-    "0013322222233100"
-    "0133222222223310"
-    "0132222332222310"
-    "1322223333222231"
-    "1322233333322231"
-    "1322233333322231"
-    "1322233333322231"
-    "1322223333222231"
-    "0132222332222310"
-    "0133222222223310"
-    "0013322222233100"
-    "0001133333311000"
-    "0000011111100000"
-    "0000000000000000";
-static const char s_art_heart[] = /* transparent 2bpp: HUD heart */
-    "0000000000000000"
-    "0011100011100000"
-    "0122210122210000"
-    "1233321233321000"
-    "1222222222221000"
-    "1222222222221000"
-    "0122222222210000"
-    "0012222222100000"
-    "0001222221000000"
-    "0000122210000000"
-    "0000012100000000"
-    "0000001000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000";
-static const char s_art_hero[] = /* transparent 4bpp: the player */
-    "0000011111100000"
-    "0000111111110000"
-    "0001111111111000"
-    "0001222222221000"
-    "0001232232321000"
-    "0001222222221000"
-    "0000122222210000"
-    "0000444444440000"
-    "0004444444444000"
-    "0004444444444000"
-    "0004444444444000"
-    "0000455555540000"
-    "0000555005550000"
-    "0000555005550000"
-    "0000666006660000"
-    "0006660000666000";
-static const char s_art_slime[] = /* transparent 4bpp: enemy */
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000000000000000"
-    "0000011111100000"
-    "0000111111110000"
-    "0001113113111000"
-    "0011111111111100"
-    "0111111111111110"
-    "0111111111111110"
-    "0111111111111110"
-    "0111111111111110"
-    "0011111111111100"
-    "0001111111111000"
-    "0021021021021200"
-    "0000000000000000";
+/* One decoded tile: a pointer into its loaded GfxAsset blob plus the RGB565 palette
+ * (system indices resolved through rendererSystemColor) and the sprite flags
+ * (format + opacity) the asset carries. Built once at init, referenced every frame. */
+typedef struct
+{
+    const uint8_t *pixels;
+    uint16_t palette[16];
+    uint8_t flags;
+} Tile;
 
-/* Packed tiles (built once from the art above). 2bpp = 64 B, 4bpp = 128 B. The
- * game's own RAM (.bss in GAME_RAM) holds these — no special section is needed,
- * unlike the old in-console harness which had to tag them out of CONSOLE_RAM. */
-static uint8_t s_brick[64];
-static uint8_t s_stone[64];
-static uint8_t s_ground[64];
-static uint8_t s_torch[64];
-static uint8_t s_coin[64];
-static uint8_t s_heart[64];
-static uint8_t s_hero[128];
-static uint8_t s_slime[128];
+enum
+{
+    T_BRICK, T_STONE, T_GROUND, T_TORCH, T_COIN, T_HEART, T_HERO, T_SLIME, T_COUNT
+};
+static Tile s_tile[T_COUNT];
 
-/* Scene arrays, borrowed by the renderer; sized for one heavy visible window.
- * (The renderer caps each layer at 350; these stay comfortably under it.) */
-static Sprite s_bg[VIS_COLS * ROWS]; /* 315 brick tiles — full grid */
-static Sprite s_fg[256];             /* terrain, towers, platforms, props, enemies */
-static Sprite s_ui[128];             /* HUD icons + FPS counters + font showcase */
-
-/* Pool for scaled-glyph pixel data. A draw_text_scaled call advances a write
- * pointer through it; each glyph gets a fresh slot so every sprite's .pixels
- * pointer stays valid until rendererRender() returns. */
-#define SCALED_POOL_SIZE 1024U
-static uint8_t s_scaled_pool[SCALED_POOL_SIZE];
+/* Asset pools. The CCM arena (64 KB, otherwise idle — this game's tile blobs are
+ * tiny) holds the world/HUD tile blobs followed by the three per-layer Sprite
+ * arrays; a small GAME_RAM buffer holds the 4bpp actor blobs. See the file header. */
+extern uint8_t __asset_area_start[];
+extern uint8_t __asset_area_end[];
+static uint8_t s_gram_assets[384] __attribute__((aligned(4)));
+static Sprite *s_bg; /* [LAYER_CAP], in the CCM arena */
+static Sprite *s_fg; /* [LAYER_CAP], in the CCM arena */
+static Sprite *s_ui; /* [LAYER_CAP], in the CCM arena */
 
 /* World/animation state. Almost no game logic: a free-running frame counter for
  * cheap bobbing, and a camera that slides right forever (wrapped to stay bounded). */
 static uint32_t s_tick;
 static int s_camera_x;
 
-/* ---- FPS measurement (min / avg / max over a ~1 s window) -------------------
- * Frames are timed with getSysTime() (1 ms tick): coarse at ~70 FPS, but plenty
- * for an on-screen overlay. The instantaneous min/max naturally show the jitter;
- * the average is steady. The latched values update once per window. */
-static uint16_t s_fps_min, s_fps_avg, s_fps_max; /* displayed */
-static uint32_t s_win_start_ms;                  /* current window start */
-static uint32_t s_win_frames;                    /* frames counted this window */
-static uint32_t s_last_frame_ms;                 /* timestamp of the previous frame */
-static uint16_t s_win_fps_lo, s_win_fps_hi;      /* instantaneous extremes this window */
+/* Load-sweep state, updated once per frame from real time. */
+static uint16_t s_load_pct;      /* 50..100, displayed */
+static uint16_t s_sprite_target; /* target total sprites for this frame */
 
-static void packTile(uint8_t *out, const char *art, bool is_4bpp)
-{
-    uint16_t stride = is_4bpp ? 8U : 4U;
-    memset(out, 0, stride * TILE);
-    for (uint16_t y = 0U; y < TILE; y++)
-    {
-        for (uint16_t x = 0U; x < TILE; x++)
-        {
-            char ch = art[y * TILE + x];
-            uint8_t idx = (ch <= '9') ? (uint8_t)(ch - '0') : (uint8_t)(ch - 'a' + 10);
-            if (is_4bpp)
-            {
-                out[y * stride + (x >> 1)] |= (uint8_t)(idx << (4U - (x & 1U) * 4U));
-            }
-            else
-            {
-                out[y * stride + (x >> 2)] |= (uint8_t)(idx << (6U - (x & 3U) * 2U));
-            }
-        }
-    }
-}
+/* ---- FPS measurement -------------------------------------------------------
+ * Frames are timed with getSysTime() (1 ms tick). The "current" value updates 4x
+ * a second so it tracks the load sweep; min/avg/max latch once per second. */
+static uint16_t s_fps_cur, s_fps_min, s_fps_avg, s_fps_max; /* displayed */
+static uint32_t s_last_frame_ms;                            /* previous frame timestamp */
+static uint32_t s_cur_start_ms, s_cur_frames;               /* 250 ms "current" sub-window */
+static uint32_t s_win_start_ms, s_win_frames;               /* 1 s min/avg/max window */
+static uint16_t s_win_fps_lo, s_win_fps_hi;                 /* instantaneous extremes this window */
 
-static Sprite tile(int16_t x, int16_t y, uint8_t z, uint8_t flags,
-                   const uint8_t *pixels, const uint16_t *palette)
+/* All tiles are 16x16; flags/pixels/palette come from the loaded asset. */
+static Sprite tileAt(int16_t x, int16_t y, uint8_t z, const Tile *t)
 {
-    return (Sprite){.x = x, .y = y, .w = TILE, .h = TILE, .z = z, .flags = flags, .pixels = pixels, .palette = palette};
+    return (Sprite){.x = x, .y = y, .w = TILE, .h = TILE, .z = z,
+                    .flags = t->flags, .pixels = t->pixels, .palette = t->palette};
 }
 
 /* A 0..amp..0 triangle wave from the frame counter, for cheap bobbing. */
@@ -267,15 +125,8 @@ static int bob(uint32_t phase, uint32_t period, int amp)
     return (int)((long)v * amp / (long)period);      /* 0..amp */
 }
 
-/* ---- Text helpers ----------------------------------------------------------
- * Unlike the old harness (which held a console-internal Font*), a game names a
- * font by its FontSize and reaches the glyph data through the font syscalls. */
-
-#define MAX_UI_TEXT (sizeof(s_ui) / sizeof(s_ui[0]))
-
-/* Render a C string into consecutive UI sprites. Returns the next free index in
- * the caller's sprite array. The glyph pixels point straight at console flash
- * (returned by fontGet), so no pool is needed. */
+/* Render a C string into consecutive UI sprites. Returns the next free index.
+ * Glyph pixels point straight at console flash (fontGet), so no pool is needed. */
 static uint16_t draw_text(Sprite *ui, uint16_t idx, FontSize size,
                           int16_t x, int16_t y, uint8_t z,
                           const uint16_t *palette, const char *text)
@@ -283,7 +134,7 @@ static uint16_t draw_text(Sprite *ui, uint16_t idx, FontSize size,
     uint16_t glyphW = fontGlyphW(size);
     uint16_t glyphH = fontGlyphH(size);
 
-    for (const char *scan = text; *scan != '\0' && idx < MAX_UI_TEXT; scan++)
+    for (const char *scan = text; *scan != '\0' && idx < LAYER_CAP; scan++)
     {
         uint8_t ascii = (uint8_t)*scan;
         if (ascii >= 0x20U && ascii <= 0x7EU)
@@ -299,38 +150,59 @@ static uint16_t draw_text(Sprite *ui, uint16_t idx, FontSize size,
     return idx;
 }
 
-/* Scale a string into a caller-owned buffer pool and emit sprites. *writeCursor
- * advances by one glyph slot per character; the caller seeds it to the start of a
- * pool large enough for the whole string and must keep the pool alive until
- * rendererRender() returns. */
-static uint16_t draw_text_scaled(Sprite *ui, uint16_t idx, FontSize size,
-                                 int16_t x, int16_t y, uint8_t z,
-                                 uint8_t factor, const uint16_t *palette,
-                                 const char *text,
-                                 uint8_t **writeCursor, uint16_t poolRemain)
+/* Stream one tile asset from the bound .pak into the arena at *cursor (bump
+ * allocated, 4-aligned, bounded by end), decode its header, and resolve its
+ * system-palette indices to RGB565. Returns false on any failure. */
+static bool loadTile(uint32_t asset_id, Tile *out, uint8_t **cursor, const uint8_t *end)
 {
-    uint8_t scaledW = (uint8_t)(fontGlyphW(size) * factor);
-    uint8_t scaledH = (uint8_t)(fontGlyphH(size) * factor);
-    uint16_t slotBytes = fontSize(size, factor);
-
-    for (const char *scan = text; *scan != '\0' && idx < MAX_UI_TEXT; scan++)
+    AssetMetaData meta;
+    if (assetLoaderGetAssetMetadata(asset_id, &meta) != 0U)
     {
-        uint8_t ascii = (uint8_t)*scan;
-        if (ascii >= 0x20U && ascii <= 0x7EU && poolRemain >= slotBytes)
-        {
-            fontScale(ascii, size, factor, *writeCursor);
-            ui[idx] = (Sprite){.x = x, .y = y, .w = scaledW, .h = scaledH, .z = z,
-                               .flags = 0U, .pixels = *writeCursor, .palette = palette};
-            idx++;
-            *writeCursor = *writeCursor + slotBytes;
-            poolRemain = (uint16_t)(poolRemain - slotBytes);
-        }
-        x = (int16_t)(x + scaledW + factor);
+        return false;
     }
-    return idx;
+    uint8_t *blob = (uint8_t *)(((uintptr_t)*cursor + 3U) & ~(uintptr_t)3U);
+    if (blob + meta.size > end)
+    {
+        return false;
+    }
+    if (assetLoaderGetAssetData(asset_id, blob, meta.size) != 0U)
+    {
+        return false;
+    }
+    *cursor = blob + meta.size;
+
+    const GfxAssetHeader *h = (const GfxAssetHeader *)blob;
+    if (h->magic != GFX_ASSET_MAGIC)
+    {
+        return false;
+    }
+    const uint8_t *pixels = blob + sizeof(GfxAssetHeader);
+    const uint8_t *index_palette = pixels + h->dataSize;
+    const uint32_t colors = (h->format == GFX_FMT_4BPP) ? 16U : 4U;
+    for (uint32_t i = 0U; i < colors; i++)
+    {
+        out->palette[i] = rendererSystemColor(index_palette[i]);
+    }
+    out->pixels = pixels;
+    out->flags = (uint8_t)h->flags; /* GFX_FLAG_* mirror the renderer's SpriteFlags */
+    return true;
 }
 
-/* Sample one frame's duration and, once per ~1 s window, latch min/avg/max FPS. */
+/* Derive this frame's load percentage and sprite target from a real-time triangle
+ * wave sweeping LOAD_MIN_PCT -> LOAD_MAX_PCT -> LOAD_MIN_PCT. */
+static void updateLoad(void)
+{
+    const uint32_t phase = getSysTime() % SWEEP_PERIOD_MS;
+    const uint32_t half = SWEEP_PERIOD_MS / 2U;
+    const uint32_t tri = (phase < half) /* 0..1000..0 */
+                             ? (phase * 1000U / half)
+                             : (1000U - (phase - half) * 1000U / half);
+    s_load_pct = (uint16_t)(LOAD_MIN_PCT + (LOAD_MAX_PCT - LOAD_MIN_PCT) * tri / 1000U);
+    s_sprite_target = (uint16_t)((uint32_t)SPRITE_BUDGET * s_load_pct / 100U);
+}
+
+/* Sample one frame's duration; refresh the current FPS (4 Hz) and, once per
+ * second, the min/avg/max window. */
 static void fpsSample(void)
 {
     const uint32_t now = getSysTime();
@@ -353,15 +225,22 @@ static void fpsSample(void)
         }
     }
     s_last_frame_ms = now;
+    s_cur_frames++;
     s_win_frames++;
 
-    const uint32_t elapsed = now - s_win_start_ms;
-    if (elapsed >= 1000U)
+    if (now - s_cur_start_ms >= 250U)
     {
-        s_fps_avg = (uint16_t)(s_win_frames * 1000U / elapsed);
+        s_fps_cur = (uint16_t)(s_cur_frames * 1000U / (now - s_cur_start_ms));
+        s_cur_start_ms = now;
+        s_cur_frames = 0U;
+    }
+    if (now - s_win_start_ms >= 1000U)
+    {
+        s_fps_avg = (uint16_t)(s_win_frames * 1000U / (now - s_win_start_ms));
         s_fps_min = s_win_fps_lo;
         s_fps_max = s_win_fps_hi;
-        gameLog("renderer test: fps min=%u avg=%u max=%u",
+        gameLog("renderer test: load=%u%% (%u spr)  fps cur=%u min=%u avg=%u max=%u",
+                (unsigned)s_load_pct, (unsigned)s_sprite_target, (unsigned)s_fps_cur,
                 (unsigned)s_fps_min, (unsigned)s_fps_avg, (unsigned)s_fps_max);
         s_win_start_ms = now;
         s_win_frames = 0U;
@@ -378,7 +257,7 @@ static uint8_t terrainTop(uint16_t col)
     return profile[(col / 2U) % 8U];
 }
 
-/* LAYER_BG: a full screen-filling brick grid behind everything. */
+/* LAYER_BG: a full screen-filling brick grid behind everything. Returns its count. */
 static uint16_t buildBackground(uint16_t first_col)
 {
     uint16_t nb = 0U;
@@ -387,104 +266,169 @@ static uint16_t buildBackground(uint16_t first_col)
         int16_t sx = (int16_t)((int)(first_col + vc) * TILE - s_camera_x);
         for (uint8_t row = 0U; row < ROWS; row++)
         {
-            s_bg[nb++] = tile(sx, (int16_t)(row * TILE), 0U, SPRITE_OPAQUE, s_brick, s_pal_brick);
+            s_bg[nb++] = tileAt(sx, (int16_t)(row * TILE), 0U, &s_tile[T_BRICK]);
         }
     }
-    return nb;
+    return nb; /* VIS_COLS * ROWS = 315 */
 }
 
 /* LAYER_FG: dense midground over the bricks — terrain, towers, platforms, torches,
- * floating coins and patrolling slimes, plus the bobbing hero centred on screen.
- * Heavy on overdraw on purpose (opaque tiles stacked over the full BG grid). */
+ * floating coins and patrolling slimes, plus the bobbing hero centred on screen. */
 static uint16_t buildForeground(uint16_t first_col)
 {
     uint16_t nf = 0U;
 
-    for (uint16_t vc = 0U; vc < VIS_COLS && nf < (uint16_t)(sizeof(s_fg) / sizeof(s_fg[0]) - 1U); vc++)
+    for (uint16_t vc = 0U; vc < VIS_COLS && nf < LAYER_CAP - 1U; vc++)
     {
         uint16_t col = first_col + vc;
         int16_t sx = (int16_t)((int)col * TILE - s_camera_x);
 
         for (uint8_t r = terrainTop(col); r < ROWS; r++) /* hilly ground column */
         {
-            s_fg[nf++] = tile(sx, (int16_t)(r * TILE), 1U, SPRITE_OPAQUE, s_ground, s_pal_ground);
+            s_fg[nf++] = tileAt(sx, (int16_t)(r * TILE), 1U, &s_tile[T_GROUND]);
         }
         if (col % 8U == 0U || col % 8U == 1U) /* a stone tower every 8 columns */
         {
             for (uint8_t r = 6U; r <= 13U; r++)
             {
-                s_fg[nf++] = tile(sx, (int16_t)(r * TILE), 2U, SPRITE_OPAQUE, s_stone, s_pal_stone);
+                s_fg[nf++] = tileAt(sx, (int16_t)(r * TILE), 2U, &s_tile[T_STONE]);
             }
             if (col % 8U == 0U) /* torch on the tower */
             {
-                s_fg[nf++] = tile(sx, (int16_t)(7 * TILE), 10U, 0U, s_torch, s_pal_torch);
+                s_fg[nf++] = tileAt(sx, (int16_t)(7 * TILE), 10U, &s_tile[T_TORCH]);
             }
         }
         if (col % 5U == 2U) /* floating stone platform */
         {
-            s_fg[nf++] = tile(sx, (int16_t)(8 * TILE), 3U, SPRITE_OPAQUE, s_stone, s_pal_stone);
+            s_fg[nf++] = tileAt(sx, (int16_t)(8 * TILE), 3U, &s_tile[T_STONE]);
         }
         if (col % 3U == 0U) /* bobbing coin */
         {
             int16_t cy = (int16_t)(5 * TILE + bob(col, 6U, TILE));
-            s_fg[nf++] = tile(sx, cy, 12U, 0U, s_coin, s_pal_coin);
+            s_fg[nf++] = tileAt(sx, cy, 12U, &s_tile[T_COIN]);
         }
         if (col % 6U == 4U) /* a slime patrolling the terrain top */
         {
             int16_t gy = (int16_t)((terrainTop(col) - 1U) * TILE);
-            s_fg[nf++] = tile(sx, gy, 20U, SPRITE_IS_FMT_4BPP, s_slime, s_pal_slime);
+            s_fg[nf++] = tileAt(sx, gy, 20U, &s_tile[T_SLIME]);
         }
     }
 
     /* The hero sits centred and just bobs — the world scrolls past him. */
-    s_fg[nf++] = tile((int16_t)((RENDERER_WIDTH - TILE) / 2),
-                      (int16_t)(10 * TILE - bob(0U, 4U, 4)),
-                      30U, SPRITE_IS_FMT_4BPP, s_hero, s_pal_hero);
+    s_fg[nf++] = tileAt((int16_t)((RENDERER_WIDTH - TILE) / 2),
+                        (int16_t)(10 * TILE - bob(0U, 4U, 4)), 30U, &s_tile[T_HERO]);
     return nf;
 }
 
-/* LAYER_UI: a busy HUD over everything — a row of hearts and coins, the three FPS
- * counters the test exists to show, and a font showcase that doubles as load. */
+/* LAYER_UI: the HUD (hearts + coins) and the readouts — current/min/avg/max FPS and
+ * the live load. Text sits at high z so the load-sweep filler never covers it. */
 static uint16_t buildOverlay(void)
 {
     uint16_t nu = 0U;
-    char line[16];
-    uint8_t *poolCursor = s_scaled_pool;
+    char line[24];
 
     for (uint8_t i = 0U; i < 8U; i++) /* hearts top-right */
     {
-        s_ui[nu++] = tile((int16_t)(196 + i * 15), 2, 0U, 0U, s_heart, s_pal_heart);
+        s_ui[nu++] = tileAt((int16_t)(196 + i * 15), 2, 55U, &s_tile[T_HEART]);
     }
     for (uint8_t i = 0U; i < 8U; i++) /* coins below the hearts */
     {
-        s_ui[nu++] = tile((int16_t)(196 + i * 15), 20, 0U, 0U, s_coin, s_pal_coin);
+        s_ui[nu++] = tileAt((int16_t)(196 + i * 15), 20, 55U, &s_tile[T_COIN]);
     }
 
+    snprintf(line, sizeof(line), "FPS %u", (unsigned)s_fps_cur);
+    nu = draw_text(s_ui, nu, FONT_8x8, 4, 4, 60U, s_pal_font_amber, line);
     snprintf(line, sizeof(line), "MIN %u", (unsigned)s_fps_min);
-    nu = draw_text(s_ui, nu, FONT_8x8, 4, 4, 0U, s_pal_font_amber, line);
+    nu = draw_text(s_ui, nu, FONT_8x8, 4, 14, 60U, s_pal_font_green, line);
     snprintf(line, sizeof(line), "AVG %u", (unsigned)s_fps_avg);
-    nu = draw_text(s_ui, nu, FONT_8x8, 4, 14, 0U, s_pal_font_green, line);
+    nu = draw_text(s_ui, nu, FONT_8x8, 4, 24, 60U, s_pal_font_white, line);
     snprintf(line, sizeof(line), "MAX %u", (unsigned)s_fps_max);
-    nu = draw_text(s_ui, nu, FONT_8x8, 4, 24, 0U, s_pal_font_cyan, line);
+    nu = draw_text(s_ui, nu, FONT_8x8, 4, 34, 60U, s_pal_font_cyan, line);
 
-    nu = draw_text_scaled(s_ui, nu, FONT_3x5, 96, 104, 0U, 3U,
-                          s_pal_font_white, "RENDERER TEST",
-                          &poolCursor, SCALED_POOL_SIZE);
-
-    nu = draw_text(s_ui, nu, FONT_3x5, 96, 124, 0U, s_pal_font_white, "The quick brown fox jumps");
-    nu = draw_text(s_ui, nu, FONT_5x5, 4, 226, 0U, s_pal_font_cyan, "SB2 EXIT");
+    snprintf(line, sizeof(line), "LOAD %u%% %u", (unsigned)s_load_pct, (unsigned)s_sprite_target);
+    nu = draw_text(s_ui, nu, FONT_5x5, 4, 50, 60U, s_pal_font_amber, line);
+    nu = draw_text(s_ui, nu, FONT_5x5, 4, 226, 60U, s_pal_font_cyan, "SB2 EXIT");
     return nu;
 }
 
-/* Rebuild and submit the whole visible window. Structures are decided procedurally
- * from the absolute column, so the level repeats with variety forever — no map. */
+/* Append up to `want` drifting filler coins to a layer (capped at LAYER_CAP).
+ * Positions are scattered across the whole screen — crucially the y is spread so
+ * the renderer's per-chunk bin (16 scanlines, cap 200) never overflows — and drift
+ * horizontally with the frame counter. `seed` offsets each layer's swarm. */
+static uint16_t addFiller(Sprite *arr, uint16_t n, uint16_t want, uint8_t z, uint16_t seed)
+{
+    for (uint16_t k = 0U; k < want && n < LAYER_CAP; k++, n++)
+    {
+        const uint32_t i = (uint32_t)seed + k;
+        int16_t x = (int16_t)((i * 53U + s_tick) % RENDERER_WIDTH);
+        int16_t y = (int16_t)((i * 97U) % RENDERER_HEIGHT);
+        if (x < READOUT_W && y < READOUT_H) /* shove it below the readout panel, keeping the count exact */
+        {
+            y = (int16_t)(y + READOUT_H);
+        }
+        arr[n] = tileAt(x, y, z, &s_tile[T_COIN]);
+    }
+    return n;
+}
+
+/* Rebuild and submit the whole visible window, then top it up with filler so the
+ * total tracks s_sprite_target. Filler pours into FG, then UI, then BG — each up to
+ * its 350 cap — so at 100% all three layers are maxed (3 x 350 = 1050). */
 static void buildVisibleScene(void)
 {
-    uint16_t first_col = (uint16_t)(s_camera_x / TILE);
+    const uint16_t first_col = (uint16_t)(s_camera_x / TILE);
+    uint16_t bg_n = buildBackground(first_col);
+    uint16_t fg_n = buildForeground(first_col);
+    uint16_t ui_n = buildOverlay();
 
-    rendererSubmitLayer(LAYER_BG, s_bg, buildBackground(first_col));
-    rendererSubmitLayer(LAYER_FG, s_fg, buildForeground(first_col));
-    rendererSubmitLayer(LAYER_UI, s_ui, buildOverlay());
+    const uint16_t have = (uint16_t)(bg_n + fg_n + ui_n);
+    uint16_t filler = (s_sprite_target > have) ? (uint16_t)(s_sprite_target - have) : 0U;
+    uint16_t take;
+
+    take = (filler < (uint16_t)(LAYER_CAP - fg_n)) ? filler : (uint16_t)(LAYER_CAP - fg_n);
+    fg_n = addFiller(s_fg, fg_n, take, 15U, 0U);
+    filler -= take;
+    take = (filler < (uint16_t)(LAYER_CAP - ui_n)) ? filler : (uint16_t)(LAYER_CAP - ui_n);
+    ui_n = addFiller(s_ui, ui_n, take, 10U, 1000U);
+    filler -= take;
+    take = (filler < (uint16_t)(LAYER_CAP - bg_n)) ? filler : (uint16_t)(LAYER_CAP - bg_n);
+    bg_n = addFiller(s_bg, bg_n, take, 1U, 2000U);
+
+    rendererSubmitLayer(LAYER_BG, s_bg, bg_n);
+    rendererSubmitLayer(LAYER_FG, s_fg, fg_n);
+    rendererSubmitLayer(LAYER_UI, s_ui, ui_n);
+}
+
+/* Load all tile assets from the .pak and carve the per-layer Sprite arrays. The
+ * world/HUD tiles stream into the CCM arena, the 4bpp actors into a GAME_RAM buffer
+ * (exercising both pools); the Sprite arrays follow the tiles in the CCM arena. */
+static bool loadAssets(void)
+{
+    uint8_t *ccm = __asset_area_start;
+    uint8_t *gram = s_gram_assets;
+    bool ok = true;
+
+    ok = ok && loadTile(TESTRENDERER_GFX_BRICK, &s_tile[T_BRICK], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_STONE, &s_tile[T_STONE], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_GROUND, &s_tile[T_GROUND], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_TORCH, &s_tile[T_TORCH], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_COIN, &s_tile[T_COIN], &ccm, __asset_area_end);
+    ok = ok && loadTile(TESTRENDERER_GFX_HEART, &s_tile[T_HEART], &ccm, __asset_area_end);
+    /* the 4bpp actor sprites stream into GAME_RAM instead, to use both pools */
+    ok = ok && loadTile(TESTRENDERER_GFX_HERO, &s_tile[T_HERO], &gram, s_gram_assets + sizeof(s_gram_assets));
+    ok = ok && loadTile(TESTRENDERER_GFX_SLIME, &s_tile[T_SLIME], &gram, s_gram_assets + sizeof(s_gram_assets));
+    if (!ok)
+    {
+        return false;
+    }
+
+    /* Carve the three per-layer Sprite arrays from the CCM arena, after the tiles.
+     * 6 tile blobs (~0.5 KB) + 3 * 350 * 20 B (21 KB) fits the 64 KB arena easily. */
+    ccm = (uint8_t *)(((uintptr_t)ccm + 3U) & ~(uintptr_t)3U);
+    s_bg = (Sprite *)ccm;
+    s_fg = s_bg + LAYER_CAP;
+    s_ui = s_fg + LAYER_CAP;
+    return true;
 }
 
 /*
@@ -495,21 +439,20 @@ static void buildVisibleScene(void)
 
 static void gameInit(void)
 {
-    packTile(s_brick, s_art_brick, false);
-    packTile(s_stone, s_art_stone, false);
-    packTile(s_ground, s_art_ground, false);
-    packTile(s_torch, s_art_torch, false);
-    packTile(s_coin, s_art_coin, false);
-    packTile(s_heart, s_art_heart, false);
-    packTile(s_hero, s_art_hero, true);
-    packTile(s_slime, s_art_slime, true);
+    if (!loadAssets())
+    {
+        gameLog("renderer test: asset load failed");
+        gameExit(); /* nothing to draw without the tiles */
+    }
 
     rendererSetBackground(RGB(20, 18, 30)); /* shows only where nothing draws */
 
-    s_win_start_ms = getSysTime();
+    s_cur_start_ms = getSysTime();
+    s_win_start_ms = s_cur_start_ms;
     s_win_fps_lo = 0xFFFFU;
     s_win_fps_hi = 0U;
-    gameLog("renderer test: endless auto-scroller, heavy on all 3 layers; SB2 to exit");
+    gameLog("renderer test: endless scroller, load swept 50-100%% of %u sprites; SB2 to exit",
+            (unsigned)SPRITE_BUDGET);
 }
 
 static void gameUpdate(void)
@@ -528,6 +471,7 @@ static void gameUpdate(void)
         s_camera_x -= WORLD_PERIOD_PX;
     }
 
+    updateLoad();
     fpsSample();
     buildVisibleScene();
 }

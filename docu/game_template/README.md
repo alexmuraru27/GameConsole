@@ -232,4 +232,4 @@ Special Button 2) to return to the console — there is no `main()` to fall out 
 - [ConsoleAPI module internals](../API_README.md)
 - [Memory layout](../memory.md) — SRAM/CCM map, game binary layout
 - [Example game source](../../Apps/GameXO/) — the reference implementation
-- [Renderer benchmark game](../../Apps/TestRenderer/) — a minimal endless scroller, heavy on sprites, with an on-screen min/avg/max FPS overlay
+- [Renderer benchmark game](../../Apps/TestRenderer/) — an endless scroller that sweeps its sprite load 50–100% of the renderer budget with a live FPS overlay; streams its tiles from a `.pak` into both the CCM arena and a GAME_RAM buffer
