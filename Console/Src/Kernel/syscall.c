@@ -12,6 +12,7 @@
 #include "settings_storage.h"
 #include "fonts.h"
 #include "font_utils.h"
+#include "game_loader.h"
 #include "logger.h"
 
 /*
@@ -119,6 +120,8 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_DELAY:
         delay(a[0]);
         return 0;
+    case SYS_GET_DELTA_US:
+        return gameLoaderGetDeltaUs();
 
     /* ---- buzzer ---- */
     case SYS_BUZZER_GET_MAX_TRACKS:

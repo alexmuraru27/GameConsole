@@ -22,6 +22,13 @@
 uint32_t getSysTime(void);
 void delay(uint32_t sys_time_delta);
 
+/* Microseconds elapsed between the previous two update() calls — the OS measures
+ * it (from the 168 MHz cycle counter) so a game can scale movement/animation by
+ * real time and run identically at any frame rate. Returns 0 on the first frame;
+ * clamped to a sane maximum so a momentary stall can't teleport things. Typical
+ * use: pos += velocity_per_second * (getDeltaTimeUs() * 1e-6f). */
+uint32_t getDeltaTimeUs(void);
+
 /* ---- buzzer ---- */
 uint8_t buzzerGetMaxTracks(void);
 bool buzzerPlay(uint8_t track_number, bool is_looped, const uint16_t *notes_data, uint16_t notes_number);

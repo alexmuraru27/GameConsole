@@ -14,7 +14,10 @@ frame, back to back. The console runs the loop **uncapped** and does its own wor
 (the WiFi link, etc.) between frames, so a game must return promptly from each
 callback rather than spin. The OS does not cap the frame rate; a game that wants a
 fixed rate paces itself by calling `delay()` once per frame (e.g. GameXO holds
-~60 FPS). Game state lives in globals (it persists across calls); locals do not.
+~60 FPS). For movement/animation that looks the same at any frame rate, scale it by
+`getDeltaTimeUs()` — the microseconds since the previous `update()` — instead of
+assuming a fixed step: `pos += velocity_per_second * (getDeltaTimeUs() * 1e-6f)`.
+Game state lives in globals (it persists across calls); locals do not.
 
 ---
 

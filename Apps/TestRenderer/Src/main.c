@@ -14,8 +14,10 @@
  * through SVC syscalls, and it streams its graphics from a .pak like any game.
  *
  * It is an endless auto-scroller with almost no game logic — the world slides past
- * and repeats forever — over a base scene heavy on all three layers (a full BG tile
- * grid, a dense FG of terrain + structures + props + enemies, a busy UI HUD). On
+ * (at a constant real-world speed via getDeltaTimeUs(), so it scrolls uniformly even
+ * as the frame rate swings wildly under the load sweep) and repeats forever — over a
+ * base scene heavy on all three layers (a full BG tile grid, a dense FG of terrain +
+ * structures + props + enemies, a busy UI HUD). On
  * top of that the *load is swept continuously between 50% and 100% of the renderer's
  * sprite budget* (3 layers x 350 = 1050 sprites): a slow triangle wave adds a
  * drifting swarm of filler sprites, spread across the screen so no 16-line chunk
@@ -36,7 +38,7 @@
 #define COLS (RENDERER_WIDTH / TILE)  /* 20 on-screen columns */
 #define ROWS (RENDERER_HEIGHT / TILE) /* 15 rows */
 #define VIS_COLS (COLS + 1)           /* one extra column for the partial edge tile */
-#define SCROLL_SPEED 1                /* world pixels per frame; endless */
+#define SCROLL_PX_PER_SEC 60.0f       /* world scroll speed (frame-rate independent) */
 
 /* The renderer caps each layer at 350 sprites; the whole-frame budget is 3x that.
  * The load sweep targets a fraction of this budget. */
@@ -91,23 +93,31 @@ static Sprite *s_bg; /* [LAYER_CAP], in the CCM arena */
 static Sprite *s_fg; /* [LAYER_CAP], in the CCM arena */
 static Sprite *s_ui; /* [LAYER_CAP], in the CCM arena */
 
-/* World/animation state. Almost no game logic: a free-running frame counter for
- * cheap bobbing, and a camera that slides right forever (wrapped to stay bounded). */
-static uint32_t s_tick;
-static int s_camera_x;
+/* World/animation state. Almost no game logic: an animation clock counting real
+ * elapsed milliseconds (so all motion is frame-rate independent), and a camera that
+ * slides right forever (wrapped to stay bounded). */
+static uint32_t s_anim_ms; /* real elapsed ms; drives all bobbing/drift */
+static float s_scroll_px;  /* world scroll offset, advanced by real time (delta-time) */
+static int s_camera_x;     /* = (int)s_scroll_px, used by the scene builders */
 
 /* Load-sweep state, updated once per frame from real time. */
 static uint16_t s_load_pct;      /* 50..100, displayed */
 static uint16_t s_sprite_target; /* target total sprites for this frame */
 
 /* ---- FPS measurement -------------------------------------------------------
- * Frames are timed with getSysTime() (1 ms tick). The "current" value updates 4x
- * a second so it tracks the load sweep; min/avg/max latch once per second. */
+ * Frames are timed with getSysTime() (1 ms tick). "FPS" is the live value (a 250 ms
+ * rolling window, so it tracks the load sweep); MIN / AVG / MAX are absolute for the
+ * whole session — min and max only ratchet (they never reset), and avg is the
+ * cumulative frames/time since launch. A few startup frames are skipped before
+ * latching min/max so a cold first frame can't pin the minimum for the whole run. */
+#define FPS_WARMUP_FRAMES 5U
 static uint16_t s_fps_cur, s_fps_min, s_fps_avg, s_fps_max; /* displayed */
-static uint32_t s_last_frame_ms;                            /* previous frame timestamp */
-static uint32_t s_cur_start_ms, s_cur_frames;               /* 250 ms "current" sub-window */
-static uint32_t s_win_start_ms, s_win_frames;               /* 1 s min/avg/max window */
-static uint16_t s_win_fps_lo, s_win_fps_hi;                 /* instantaneous extremes this window */
+static uint32_t s_last_frame_ms;              /* previous frame timestamp */
+static uint32_t s_cur_start_ms, s_cur_frames; /* 250 ms rolling "current" window */
+static uint32_t s_session_start_ms;           /* first frame timestamp (avg baseline) */
+static uint32_t s_session_frames;             /* frame intervals since launch (for avg) */
+static uint32_t s_log_ms;                     /* last SWO-summary timestamp */
+static bool s_fps_latched;                    /* min/max seeded (past warmup) */
 
 /* All tiles are 16x16; flags/pixels/palette come from the loaded asset. */
 static Sprite tileAt(int16_t x, int16_t y, uint8_t z, const Tile *t)
@@ -116,12 +126,13 @@ static Sprite tileAt(int16_t x, int16_t y, uint8_t z, const Tile *t)
                     .flags = t->flags, .pixels = t->pixels, .palette = t->palette};
 }
 
-/* A 0..amp..0 triangle wave from the frame counter, for cheap bobbing. */
-static int bob(uint32_t phase, uint32_t period, int amp)
+/* A 0..amp..0 triangle wave driven by the real-time animation clock (phase and
+ * period in milliseconds), so bobbing speed is independent of the frame rate. */
+static int bob(uint32_t phase_ms, uint32_t period_ms, int amp)
 {
-    uint32_t p = ((s_tick / 4U) + phase) % (period * 2U);
-    int v = (int)(p < period ? p : period * 2U - p); /* 0..period */
-    return (int)((long)v * amp / (long)period);      /* 0..amp */
+    uint32_t t = (s_anim_ms + phase_ms) % (period_ms * 2U);
+    uint32_t v = (t < period_ms) ? t : (period_ms * 2U - t); /* 0..period_ms */
+    return (int)((uint32_t)amp * v / period_ms);            /* 0..amp */
 }
 
 /* Render a C string into consecutive UI sprites. Returns the next free index.
@@ -200,51 +211,72 @@ static void updateLoad(void)
     s_sprite_target = (uint16_t)((uint32_t)SPRITE_BUDGET * s_load_pct / 100U);
 }
 
-/* Sample one frame's duration; refresh the current FPS (4 Hz) and, once per
- * second, the min/avg/max window. */
+/* Sample one frame's duration. Updates the live FPS (250 ms rolling) and the
+ * session-absolute min/avg/max, and emits a SWO summary once a second. */
 static void fpsSample(void)
 {
     const uint32_t now = getSysTime();
 
-    if (s_last_frame_ms != 0U)
+    if (s_last_frame_ms == 0U) /* first frame: set baselines, no stats yet */
     {
-        uint32_t dt = now - s_last_frame_ms;
-        if (dt == 0U)
+        s_last_frame_ms = now;
+        s_session_start_ms = now;
+        s_cur_start_ms = now;
+        s_log_ms = now;
+        return;
+    }
+
+    uint32_t dt = now - s_last_frame_ms;
+    if (dt == 0U)
+    {
+        dt = 1U; /* sub-millisecond frame: clamp so the division stays sane */
+    }
+    const uint16_t inst = (uint16_t)(1000U / dt);
+    s_last_frame_ms = now;
+    s_session_frames++;
+    s_cur_frames++;
+
+    /* MIN / MAX: absolute over the session — only ratchet, never reset. Seeded past
+     * a short warmup so a cold startup frame can't pin the minimum for the run. */
+    if (s_session_frames > FPS_WARMUP_FRAMES)
+    {
+        if (!s_fps_latched)
         {
-            dt = 1U; /* sub-millisecond frame: clamp so the division stays sane */
+            s_fps_latched = true;
+            s_fps_min = inst;
+            s_fps_max = inst;
         }
-        const uint16_t inst = (uint16_t)(1000U / dt);
-        if (inst < s_win_fps_lo)
+        else if (inst < s_fps_min)
         {
-            s_win_fps_lo = inst;
+            s_fps_min = inst;
         }
-        if (inst > s_win_fps_hi)
+        else if (inst > s_fps_max)
         {
-            s_win_fps_hi = inst;
+            s_fps_max = inst;
         }
     }
-    s_last_frame_ms = now;
-    s_cur_frames++;
-    s_win_frames++;
 
+    /* AVG: cumulative frames / elapsed over the whole session. */
+    const uint32_t elapsed = now - s_session_start_ms;
+    if (elapsed > 0U)
+    {
+        s_fps_avg = (uint16_t)(s_session_frames * 1000U / elapsed);
+    }
+
+    /* FPS: the live readout — a 250 ms rolling window, so it still moves. */
     if (now - s_cur_start_ms >= 250U)
     {
         s_fps_cur = (uint16_t)(s_cur_frames * 1000U / (now - s_cur_start_ms));
         s_cur_start_ms = now;
         s_cur_frames = 0U;
     }
-    if (now - s_win_start_ms >= 1000U)
+
+    if (now - s_log_ms >= 1000U)
     {
-        s_fps_avg = (uint16_t)(s_win_frames * 1000U / (now - s_win_start_ms));
-        s_fps_min = s_win_fps_lo;
-        s_fps_max = s_win_fps_hi;
         gameLog("renderer test: load=%u%% (%u spr)  fps cur=%u min=%u avg=%u max=%u",
                 (unsigned)s_load_pct, (unsigned)s_sprite_target, (unsigned)s_fps_cur,
                 (unsigned)s_fps_min, (unsigned)s_fps_avg, (unsigned)s_fps_max);
-        s_win_start_ms = now;
-        s_win_frames = 0U;
-        s_win_fps_lo = 0xFFFFU;
-        s_win_fps_hi = 0U;
+        s_log_ms = now;
     }
 }
 
@@ -303,7 +335,7 @@ static uint16_t buildForeground(uint16_t first_col)
         }
         if (col % 3U == 0U) /* bobbing coin */
         {
-            int16_t cy = (int16_t)(5 * TILE + bob(col, 6U, TILE));
+            int16_t cy = (int16_t)(5 * TILE + bob((uint32_t)col * 64U, 400U, TILE)); /* ~0.8 s, phased per column */
             s_fg[nf++] = tileAt(sx, cy, 12U, &s_tile[T_COIN]);
         }
         if (col % 6U == 4U) /* a slime patrolling the terrain top */
@@ -315,7 +347,7 @@ static uint16_t buildForeground(uint16_t first_col)
 
     /* The hero sits centred and just bobs — the world scrolls past him. */
     s_fg[nf++] = tileAt((int16_t)((RENDERER_WIDTH - TILE) / 2),
-                        (int16_t)(10 * TILE - bob(0U, 4U, 4)), 30U, &s_tile[T_HERO]);
+                        (int16_t)(10 * TILE - bob(0U, 270U, 4)), 30U, &s_tile[T_HERO]); /* gentle ~0.54 s bob */
     return nf;
 }
 
@@ -353,13 +385,14 @@ static uint16_t buildOverlay(void)
 /* Append up to `want` drifting filler coins to a layer (capped at LAYER_CAP).
  * Positions are scattered across the whole screen — crucially the y is spread so
  * the renderer's per-chunk bin (16 scanlines, cap 200) never overflows — and drift
- * horizontally with the frame counter. `seed` offsets each layer's swarm. */
+ * horizontally in real time (~60 px/s). `seed` offsets each layer's swarm. */
 static uint16_t addFiller(Sprite *arr, uint16_t n, uint16_t want, uint8_t z, uint16_t seed)
 {
+    const uint32_t drift = (s_anim_ms * 60U) / 1000U; /* 60 px/s, frame-rate independent */
     for (uint16_t k = 0U; k < want && n < LAYER_CAP; k++, n++)
     {
         const uint32_t i = (uint32_t)seed + k;
-        int16_t x = (int16_t)((i * 53U + s_tick) % RENDERER_WIDTH);
+        int16_t x = (int16_t)((i * 53U + drift) % RENDERER_WIDTH);
         int16_t y = (int16_t)((i * 97U) % RENDERER_HEIGHT);
         if (x < READOUT_W && y < READOUT_H) /* shove it below the readout panel, keeping the count exact */
         {
@@ -446,10 +479,7 @@ static void gameInit(void)
 
     rendererSetBackground(RGB(20, 18, 30)); /* shows only where nothing draws */
 
-    s_cur_start_ms = getSysTime();
-    s_win_start_ms = s_cur_start_ms;
-    s_win_fps_lo = 0xFFFFU;
-    s_win_fps_hi = 0U;
+    /* FPS baselines are set lazily on the first fpsSample() call. */
     gameLog("renderer test: endless scroller, load swept 50-100%% of %u sprites; SB2 to exit",
             (unsigned)SPRITE_BUDGET);
 }
@@ -461,14 +491,17 @@ static void gameUpdate(void)
         gameExit(); /* Special Button 2 returns to the console OS (does not return) */
     }
 
-    /* The only "game logic": advance time and slide the camera, wrapped so the
-     * procedural world is seamless and the integer stays bounded. */
-    s_tick++;
-    s_camera_x += SCROLL_SPEED;
-    if (s_camera_x >= WORLD_PERIOD_PX)
+    /* The only "game logic": advance everything by the real time since the last
+     * frame, so all motion (camera scroll, bobbing, filler drift) is identical at
+     * any frame rate. This is the delta-time pattern: displacement = speed * dt. */
+    const uint32_t dt_us = getDeltaTimeUs();
+    s_anim_ms += dt_us / 1000U; /* animation clock for bob()/filler drift */
+    s_scroll_px += SCROLL_PX_PER_SEC * (dt_us * 1e-6f);
+    while (s_scroll_px >= (float)WORLD_PERIOD_PX)
     {
-        s_camera_x -= WORLD_PERIOD_PX;
+        s_scroll_px -= (float)WORLD_PERIOD_PX;
     }
+    s_camera_x = (int)s_scroll_px;
 
     updateLoad();
     fpsSample();

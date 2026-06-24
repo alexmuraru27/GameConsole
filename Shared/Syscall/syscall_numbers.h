@@ -17,7 +17,7 @@
  * plain integer (no suffix) so it is usable from both C and assembly.
  */
 
-#define CONSOLE_ABI_VERSION 2
+#define CONSOLE_ABI_VERSION 3
 
 #ifndef __ASSEMBLER__
 
@@ -28,6 +28,7 @@ typedef enum
 {
     SYS_GET_SYSTIME = 0,
     SYS_DELAY,
+    SYS_GET_DELTA_US,
 
     SYS_BUZZER_GET_MAX_TRACKS,
     SYS_BUZZER_PLAY,

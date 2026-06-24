@@ -7,6 +7,7 @@
 #include "sysclock.h"
 #include "scheduler.h"
 #include "sd_layout.h"
+#include <stm32f407xx.h> /* DWT->CYCCNT for the frame delta */
 #include <stdio.h>
 #include <string.h>
 
@@ -15,15 +16,46 @@ extern uint32_t __game_ram_start, __game_ram_size;
 #define GAME_RAM_BASE ((uint32_t)&__game_ram_start)
 #define GAME_RAM_LEN ((uint32_t)&__game_ram_size)
 
-/* Run between every frame, privileged, from inside kernelRunGame's loop. This is
- * the seam where the OS does its own work while a game is loaded. The OS does NOT
- * cap the frame rate — a game runs uncapped and paces itself with delay() if it
- * wants a fixed rate (the renderer test runs flat out to measure raw throughput;
- * GameXO sleeps out each frame to hold ~60 FPS). The WiFi RX is a continuous DMA
- * ring so nothing must be polled today, but this is the seam for inter-frame
- * USART/network work as it lands. */
+/* Frame delta — the wall-clock time between successive update() calls, exposed to
+ * games as getDeltaTimeUs() for frame-rate-independent movement/animation. It is
+ * measured in gameRuntimeService (run once per frame, just before update) from
+ * DWT->CYCCNT, the free-running 168 MHz cycle counter enabled in swoInit: ~6 ns
+ * resolution at zero interrupt cost. The first frame of a session reports 0 (no
+ * prior frame), and the delta is clamped so a one-off stall (a long SD access,
+ * say) can't fling a game's sprites across the screen in a single step. */
+#define CPU_CYCLES_PER_US 168U      /* DWT->CYCCNT runs at the 168 MHz CPU clock */
+#define FRAME_DELTA_MAX_US 100000U  /* 100 ms safety cap */
+static uint32_t s_prev_frame_cyc;
+static bool s_frame_timing_started;
+static volatile uint32_t s_frame_delta_us;
+
+uint32_t gameLoaderGetDeltaUs(void)
+{
+    return s_frame_delta_us;
+}
+
+/* Run between every frame, privileged, from inside kernelRunGame's loop. Measures
+ * the frame delta (above) and is the seam where the OS does its own work while a
+ * game is loaded. The OS does NOT cap the frame rate — a game runs uncapped and
+ * paces itself with delay() if it wants a fixed rate (the renderer test runs flat
+ * out to measure raw throughput; GameXO sleeps out each frame to hold ~60 FPS).
+ * The WiFi RX is a continuous DMA ring so nothing must be polled today, but this is
+ * the seam for inter-frame USART/network work as it lands. */
 static void gameRuntimeService(void)
 {
+    const uint32_t now = DWT->CYCCNT;
+    if (!s_frame_timing_started)
+    {
+        s_frame_timing_started = true; /* first frame: no elapsed time yet */
+        s_frame_delta_us = 0U;
+    }
+    else
+    {
+        const uint32_t us = (now - s_prev_frame_cyc) / CPU_CYCLES_PER_US; /* wrap-safe */
+        s_frame_delta_us = (us > FRAME_DELTA_MAX_US) ? FRAME_DELTA_MAX_US : us;
+    }
+    s_prev_frame_cyc = now;
+
     /* No frame pacing here by design — see above. Inter-frame console work goes
      * here when it lands; today there is none. */
 }
@@ -115,6 +147,7 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
 {
     FRESULT res;
     s_is_game_header_valid = false;
+    s_frame_timing_started = false; /* fresh frame-delta baseline for this game */
 
     LOGGER_LOG_INFO(LOGGER_LOADER, "loading game index %u", binary_index);
 
