@@ -8,6 +8,7 @@
 #include "asset_interface.h"
 #include "settings_interface.h"
 #include "joystick_interface.h"
+#include "multiplayer_interface.h"
 
 /*
  * The strongly-typed console API as seen by a game. Every function here is a
@@ -86,6 +87,57 @@ void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);
  * bytes — no format string ever reaches the console, so there is no way for a
  * game to make the console deref an arbitrary pointer via %s. */
 void gameLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+/* ---- multiplayer (ESP-NOW local wireless, up to MP_MAX_PLAYERS consoles) ----
+ * The game owns the lobby UI and drives the session; the OS owns discovery, the
+ * peer table, player indices, heartbeat liveness and the message mailboxes. A
+ * host advertises THIS running game; a joiner only discovers hosts of the same
+ * game. Send/receive are non-blocking mailbox ops — the OS exchanges them with
+ * the ESP once per frame at the inter-frame seam. See docu/espnow.md. */
+
+/* This console's role, or MP_ROLE_NONE when no session is active. */
+MpRole mpGetRole(void);
+
+/* Begin hosting: advertise this game and accept joiners (you become index 0). */
+MpStatus mpHostStart(void);
+
+/* Begin discovery: listen for hosts of this game (call mpScanHosts to read them). */
+MpStatus mpJoinStart(void);
+
+/* Copy up to `max` discovered hosts into `out`; returns the count (or -1). Only
+ * valid after mpJoinStart(); the list refreshes as beacons arrive each frame. */
+int mpScanHosts(MpHostInfo *out, int max);
+
+/* Join a scanned host by its MpHostInfo.handle. On success the role becomes
+ * MP_ROLE_CLIENT and mpGetSelfIndex()/mpGetPlayerCount() reflect the roster. */
+MpStatus mpJoin(uint8_t host_handle);
+
+/* End the session and release the ESP-NOW link. Safe to call when not in a
+ * session. The OS also calls this automatically when the game exits or crashes. */
+void mpStop(void);
+
+/* This console's player index (0 = host). Meaningful once connected. */
+uint8_t mpGetSelfIndex(void);
+
+/* Number of players currently in the session (1..MP_MAX_PLAYERS). */
+uint8_t mpGetPlayerCount(void);
+
+/* Whether player `index` is present and within its heartbeat window. */
+bool mpIsConnected(uint8_t index);
+
+/* Copy player `index`'s display name into `buf` (NUL-terminated). Returns length. */
+int mpGetName(uint8_t index, char *buf, int max);
+
+/* Copy this console's own display name into `buf`. Returns length. */
+int mpGetSelfName(char *buf, int max);
+
+/* Queue `len` (<= MP_MSG_MAX) bytes for player `dst_index` (or MP_BROADCAST_INDEX
+ * for everyone). Non-blocking; sent at the next inter-frame service. */
+bool mpSend(uint8_t dst_index, const void *data, uint16_t len);
+
+/* Pop one received message into `data` (up to `max`), storing the sender's index
+ * in *src_index_out. Returns the byte count, or 0 when the mailbox is empty. */
+int mpReceive(uint8_t *src_index_out, void *data, uint16_t max);
 
 /* ---- lifecycle ---- */
 /* Return control to the console. Does not return. A game may call this to quit;

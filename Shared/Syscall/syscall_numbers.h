@@ -17,7 +17,7 @@
  * plain integer (no suffix) so it is usable from both C and assembly.
  */
 
-#define CONSOLE_ABI_VERSION 3
+#define CONSOLE_ABI_VERSION 4
 
 #ifndef __ASSEMBLER__
 
@@ -77,6 +77,21 @@ typedef enum
     SYS_FONT_SCALE,
 
     SYS_LOG,
+
+    /* ---- multiplayer (ESP-NOW; the game drives the lobby, the OS owns the session) ---- */
+    SYS_MP_GET_ROLE,
+    SYS_MP_HOST_START,
+    SYS_MP_JOIN_START,
+    SYS_MP_SCAN_HOSTS,
+    SYS_MP_JOIN,
+    SYS_MP_STOP,
+    SYS_MP_GET_SELF_INDEX,
+    SYS_MP_GET_PLAYER_COUNT,
+    SYS_MP_IS_CONNECTED,
+    SYS_MP_GET_NAME,
+    SYS_MP_GET_SELF_NAME,
+    SYS_MP_SEND,
+    SYS_MP_RECEIVE,
 
     /* ---- lifecycle / context switch (kernel-internal, not game-facing stubs) ----
      * The OS owns the game loop: it INVOKEs one callback (init/update/render) at a

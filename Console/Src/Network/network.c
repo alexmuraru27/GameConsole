@@ -1,4 +1,5 @@
 #include "network.h"
+#include "network_internal.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -251,6 +252,27 @@ static bool npTransact(uint8_t cmd, const uint8_t *payload, uint16_t len,
         return false;
     }
     return npRecvFrame(rsp_type, rsp_len, timeout_ms);
+}
+
+/* Internal seam (network_internal.h): a one-shot transaction for other drivers
+ * that speak this protocol (espnow_link.c), reusing the framing above. Uses the
+ * instant RX flush rather than npBegin's idle-wait drain — see the header. */
+bool networkTransact(uint8_t cmd, const uint8_t *payload, uint16_t len,
+                     uint8_t *rsp_type, uint16_t *rsp_len, const uint8_t **rsp_payload,
+                     uint32_t timeout_ms)
+{
+    usartSetBaud(NETWORK_UART_BAUD);
+    usartFlushRx(); /* drop stale bytes instantly; the line is idle at a boundary */
+
+    if (!npTransact(cmd, payload, len, rsp_type, rsp_len, timeout_ms))
+    {
+        return false;
+    }
+    if (rsp_payload != NULL)
+    {
+        *rsp_payload = &s_rx[3]; /* payload sits after [type, len_lo, len_hi] */
+    }
+    return true;
 }
 
 /* ---- Public API ---------------------------------------------------- */

@@ -9,6 +9,8 @@
 #include "os_update.h"
 #include "wifi_menu.h"
 #include "remote_update.h"
+#include "keyboard.h"
+#include <string.h>
 
 /* ------------------------------------------------------------------ *
  *  Tree-like settings. The screen renders one level of a static
@@ -55,6 +57,26 @@ static void buzzerSoundSet(bool on)
     LOGGER_LOG_INFO(LOGGER_SETTINGS, "buzzer sound %s", on ? "on" : "off");
 }
 
+/* ---- Player Name leaf (player_name, the multiplayer display name) ---- */
+
+static void playerNameRun(void)
+{
+    menuResetSurface();
+
+    char name[CONSOLE_PLAYER_NAME_SIZE];
+    strncpy(name, s_console_settings.player_name, sizeof(name) - 1U); /* pre-fill current */
+    name[sizeof(name) - 1U] = '\0';
+
+    if (keyboardEnter("PLAYER NAME", name, sizeof(name), false))
+    {
+        menuResetSurface();
+        strncpy(s_console_settings.player_name, name, sizeof(s_console_settings.player_name) - 1U);
+        s_console_settings.player_name[sizeof(s_console_settings.player_name) - 1U] = '\0';
+        consoleSettingsSave(&s_console_settings);
+        LOGGER_LOG_INFO(LOGGER_SETTINGS, "player name -> '%s'", s_console_settings.player_name);
+    }
+}
+
 /* ---- The tree ---- */
 
 /* WiFi connectivity settings live under one "WiFi" category. */
@@ -72,6 +94,7 @@ static const SettingNode s_firmware_children[] = {
 
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
+    {.label = "Player Name", .kind = SETTING_ACTION, .action = playerNameRun},
     {.label = "WiFi", .kind = SETTING_CATEGORY, .children = s_wifi_children,
      .child_count = (uint8_t)(sizeof(s_wifi_children) / sizeof(s_wifi_children[0]))},
     {.label = "Firmware", .kind = SETTING_CATEGORY, .children = s_firmware_children,

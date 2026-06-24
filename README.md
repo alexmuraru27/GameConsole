@@ -26,6 +26,7 @@ make clean     # remove all build artifacts
 | Kernel & game isolation  | [docu/kernel.md](docu/kernel.md)                                   |
 | Renderer deep-dive       | [docu/renderer.md](docu/renderer.md)                               |
 | Memory layout & EEPROM   | [docu/memory.md](docu/memory.md)                                   |
+| ESP-NOW multiplayer      | [docu/espnow.md](docu/espnow.md)                                   |
 | Hardware & pinout        | [docu/HW.md](docu/HW.md)                                           |
 | Game creation & API      | [docu/game_template/README.md](docu/game_template/README.md)       |
 | Pixel Forge (graphics)   | [tools/graphics/README.md](tools/graphics/README.md)               |

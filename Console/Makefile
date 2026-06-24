@@ -62,7 +62,9 @@ Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
 Src/Crc/crc.c \
 Src/Network/network.c \
+Src/Network/espnow_link.c \
 Src/Network/downloader.c \
+Src/Multiplayer/mp_session.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \
@@ -105,6 +107,7 @@ C_INCLUDES =  \
 -IInc/Crc \
 -IInc/Renderer \
 -IInc/Loader \
+-IInc/Multiplayer \
 -IInc/MainMenu \
 -IInc/Swo \
 -IInc/Logger \

@@ -68,11 +68,13 @@ static void gameInit(void)
 static void gameUpdate(void)
 {
     paceFrame(); /* OS no longer caps the loop; GameXO self-paces to ~60 FPS */
-    gameStateManagerUpdate();
-    if (joystickGetSpecialBtn2())
+    /* The state manager handles Special Button 2 contextually (back out one menu
+     * level); it returns true only when SP2 is pressed at the top-level mode menu,
+     * which is our cue to quit back to the console OS. */
+    if (gameStateManagerUpdate())
     {
         buzzerStopAll(); /* don't leave the buzzer reading game RAM after we return */
-        gameExit();      /* Special Button 2 returns to the console OS (does not return) */
+        gameExit();      /* does not return */
     }
 }
 

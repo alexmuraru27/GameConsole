@@ -50,14 +50,19 @@ static const uint16_t s_key_notes[] = {NOTE_A5, 18U};
 static const uint16_t s_done_notes[] = {NOTE_E5, 40U, NOTE_A5, 60U};
 
 /*
- * Split-pad input: the RIGHT pad navigates the key grid, the LEFT pad moves the
- * text caret through what's already typed. A single debounced edge per window
- * (across all inputs) keeps it from racing while a direction is held.
+ * Split input: the RIGHT side (d-pad OR right analog stick) navigates the key
+ * grid, the LEFT side (d-pad OR left analog stick) moves the text caret through
+ * what's already typed. Each direction reads either the digital button or the
+ * matching analog axis, so both input styles work interchangeably. A single
+ * debounced edge per window (across all inputs) keeps it from racing while a
+ * direction is held — including a stick pushed and held.
+ *
+ * Analog convention (joystick.c): Positive X = right, Positive Y = up.
  */
 typedef struct
 {
-    bool grid_up, grid_down, grid_left, grid_right; /* right pad */
-    bool caret_left, caret_right, caret_home, caret_end; /* left pad */
+    bool grid_up, grid_down, grid_left, grid_right; /* right pad / right stick */
+    bool caret_left, caret_right, caret_home, caret_end; /* left pad / left stick */
     bool type;   /* Special Button 1 */
     bool cancel; /* Special Button 2 */
 } KbNav;
@@ -74,35 +79,35 @@ static KbNav kbPoll(void)
         return nav;
     }
 
-    if (joystickGetRBtnUp())
+    if (joystickGetRBtnUp() || joystickGetRAnalogY() == JoystickAxisStatePositive)
     {
         nav.grid_up = true;
     }
-    else if (joystickGetRBtnDown())
+    else if (joystickGetRBtnDown() || joystickGetRAnalogY() == JoystickAxisStateNegative)
     {
         nav.grid_down = true;
     }
-    else if (joystickGetRBtnLeft())
+    else if (joystickGetRBtnLeft() || joystickGetRAnalogX() == JoystickAxisStateNegative)
     {
         nav.grid_left = true;
     }
-    else if (joystickGetRBtnRight())
+    else if (joystickGetRBtnRight() || joystickGetRAnalogX() == JoystickAxisStatePositive)
     {
         nav.grid_right = true;
     }
-    else if (joystickGetLBtnLeft())
+    else if (joystickGetLBtnLeft() || joystickGetLAnalogX() == JoystickAxisStateNegative)
     {
         nav.caret_left = true;
     }
-    else if (joystickGetLBtnRight())
+    else if (joystickGetLBtnRight() || joystickGetLAnalogX() == JoystickAxisStatePositive)
     {
         nav.caret_right = true;
     }
-    else if (joystickGetLBtnUp())
+    else if (joystickGetLBtnUp() || joystickGetLAnalogY() == JoystickAxisStatePositive)
     {
         nav.caret_home = true;
     }
-    else if (joystickGetLBtnDown())
+    else if (joystickGetLBtnDown() || joystickGetLAnalogY() == JoystickAxisStateNegative)
     {
         nav.caret_end = true;
     }
@@ -209,7 +214,7 @@ static void render(const char *title, const char *text, uint16_t len, uint16_t c
         n = menuDrawText(n, &font8x8, KB_ACTION_X[a], ay, pal, KB_ACTIONS[a]);
     }
 
-    n = menuDrawFooter(n, "L-pad: cursor   R-pad: keys   A: type   B: cancel");
+    n = menuDrawFooter(n, "L: cursor   R: keys   A: type   B: cancel");
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();

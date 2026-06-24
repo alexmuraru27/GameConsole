@@ -152,6 +152,42 @@ void gameLog(const char *fmt, ...)
     (void)svcCall(SYS_LOG, (uint32_t)buf, (uint32_t)n, 0, 0);
 }
 
+/* ---- multiplayer ---- */
+MpRole mpGetRole(void) { return (MpRole)svcCall(SYS_MP_GET_ROLE, 0, 0, 0, 0); }
+MpStatus mpHostStart(void) { return (MpStatus)svcCall(SYS_MP_HOST_START, 0, 0, 0, 0); }
+MpStatus mpJoinStart(void) { return (MpStatus)svcCall(SYS_MP_JOIN_START, 0, 0, 0, 0); }
+
+int mpScanHosts(MpHostInfo *out, int max)
+{
+    return (int)svcCall(SYS_MP_SCAN_HOSTS, (uint32_t)out, (uint32_t)max, 0, 0);
+}
+
+MpStatus mpJoin(uint8_t host_handle) { return (MpStatus)svcCall(SYS_MP_JOIN, host_handle, 0, 0, 0); }
+void mpStop(void) { (void)svcCall(SYS_MP_STOP, 0, 0, 0, 0); }
+uint8_t mpGetSelfIndex(void) { return (uint8_t)svcCall(SYS_MP_GET_SELF_INDEX, 0, 0, 0, 0); }
+uint8_t mpGetPlayerCount(void) { return (uint8_t)svcCall(SYS_MP_GET_PLAYER_COUNT, 0, 0, 0, 0); }
+bool mpIsConnected(uint8_t index) { return (bool)svcCall(SYS_MP_IS_CONNECTED, index, 0, 0, 0); }
+
+int mpGetName(uint8_t index, char *buf, int max)
+{
+    return (int)svcCall(SYS_MP_GET_NAME, index, (uint32_t)buf, (uint32_t)max, 0);
+}
+
+int mpGetSelfName(char *buf, int max)
+{
+    return (int)svcCall(SYS_MP_GET_SELF_NAME, (uint32_t)buf, (uint32_t)max, 0, 0);
+}
+
+bool mpSend(uint8_t dst_index, const void *data, uint16_t len)
+{
+    return (bool)svcCall(SYS_MP_SEND, dst_index, (uint32_t)data, len, 0);
+}
+
+int mpReceive(uint8_t *src_index_out, void *data, uint16_t max)
+{
+    return (int)svcCall(SYS_MP_RECEIVE, (uint32_t)src_index_out, (uint32_t)data, max, 0);
+}
+
 /* ---- lifecycle ---- */
 void gameExit(void)
 {

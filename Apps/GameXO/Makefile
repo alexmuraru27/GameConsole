@@ -26,6 +26,7 @@ Src/main.c \
 Src/game_state_manager.c \
 Src/tic_tac_toe_logic.c\
 Src/game_assets.c \
+Src/xo_net.c \
 Src/syscalls.c \
 $(REPO_ROOT)/Shared/Syscall/console_syscalls.c
 

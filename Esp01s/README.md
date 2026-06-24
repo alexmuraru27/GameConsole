@@ -8,16 +8,20 @@ This is an independent build target — a different MCU and toolchain from the
 STM32 `Console/` firmware — which is why it sits at the repo root alongside
 `Console/` and the games under `Apps/` rather than inside the console source tree.
 
-> **Current milestone:** a single **blinky**. The runtime console↔ESP protocol
-> (the "pull games/content over WiFi" path) is future work; `src/main.cpp`
-> already includes the shared contract so that wiring is in place.
+> **What it does:** the slave side of the framed console↔ESP protocol
+> (`src/main.cpp` + the shared `../Shared/Esp01s/network_protocol.h`), in two
+> modes: **WiFi pull** — scan / connect / HTTP-GET, so the console can download
+> games and its own firmware — and **ESP-NOW local multiplayer**, console-to-console
+> play for up to four consoles. The multiplayer stack (this firmware's `MP_*`
+> handlers, the session protocol, and the diagrams) is documented in
+> [`../docu/espnow.md`](../docu/espnow.md).
 
 ## Layout
 
 | Path | What |
 | ---- | ---- |
 | `platformio.ini` | board (`esp01_1m`), framework (`arduino`), build flags |
-| `src/main.cpp` | the firmware — blinky for now |
+| `src/main.cpp` | the firmware — protocol slave (WiFi scan/connect/HTTP + ESP-NOW multiplayer) |
 | `Makefile` | `build` (PlatformIO) + `deploy` (copy firmware to SD as `ESP01.bin`) |
 | `../Shared/Esp01s/network_protocol.h` | the console↔ESP wire contract, **shared with the console firmware** |
 

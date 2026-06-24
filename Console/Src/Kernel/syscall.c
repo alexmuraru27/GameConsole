@@ -13,6 +13,7 @@
 #include "fonts.h"
 #include "font_utils.h"
 #include "game_loader.h"
+#include "mp_session.h"
 #include "logger.h"
 
 /*
@@ -294,6 +295,71 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         }
         loggerGameLog("%.*s", (int)a[1], (const char *)a[0]);
         return 0;
+
+    /* ---- multiplayer (the game drives; mp_session.c owns the session) ---- */
+    case SYS_MP_GET_ROLE:
+        return (uint32_t)mpSessionGetRole();
+    case SYS_MP_HOST_START:
+        return (uint32_t)mpSessionHostStart();
+    case SYS_MP_JOIN_START:
+        return (uint32_t)mpSessionJoinStart();
+    case SYS_MP_SCAN_HOSTS:
+    {
+        int max = (int)a[1];
+        if (max < 0)
+        {
+            max = 0;
+        }
+        if (max > 64)
+        {
+            max = 64; /* mp scan never yields more than MP_MAX_HOSTS; cap guards the multiply */
+        }
+        if (!gameCanWrite((void *)a[0], (uint32_t)max * sizeof(MpHostInfo)))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return (uint32_t)(-1);
+        }
+        return (uint32_t)mpSessionScan((MpHostInfo *)a[0], max);
+    }
+    case SYS_MP_JOIN:
+        return (uint32_t)mpSessionJoin((uint8_t)a[0]);
+    case SYS_MP_STOP:
+        mpSessionStop();
+        return 0;
+    case SYS_MP_GET_SELF_INDEX:
+        return mpSessionGetSelfIndex();
+    case SYS_MP_GET_PLAYER_COUNT:
+        return mpSessionGetPlayerCount();
+    case SYS_MP_IS_CONNECTED:
+        return (uint32_t)mpSessionIsConnected((uint8_t)a[0]);
+    case SYS_MP_GET_NAME:
+        if (!gameCanWrite((void *)a[1], a[2]))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return 0;
+        }
+        return (uint32_t)mpSessionGetName((uint8_t)a[0], (char *)a[1], (int)a[2]);
+    case SYS_MP_GET_SELF_NAME:
+        if (!gameCanWrite((void *)a[0], a[1]))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return 0;
+        }
+        return (uint32_t)mpSessionGetSelfName((char *)a[0], (int)a[1]);
+    case SYS_MP_SEND:
+        if (!gameCanRead((const void *)a[1], a[2]))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return false;
+        }
+        return (uint32_t)mpSessionSend((uint8_t)a[0], (const uint8_t *)a[1], (uint16_t)a[2]);
+    case SYS_MP_RECEIVE:
+        if (!gameCanWrite((void *)a[0], sizeof(uint8_t)) || !gameCanWrite((void *)a[1], a[2]))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return 0;
+        }
+        return (uint32_t)mpSessionReceive((uint8_t *)a[0], (uint8_t *)a[1], (uint16_t)a[2]);
 
     /* ---- lifecycle ---- */
     case SYS_EXIT:

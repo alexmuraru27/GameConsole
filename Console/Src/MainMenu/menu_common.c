@@ -146,8 +146,11 @@ MenuNav menuPollNav(void)
         return nav; /* still inside the lockout window */
     }
 
-    const bool up = joystickGetLBtnUp() || joystickGetRBtnUp();
-    const bool down = joystickGetLBtnDown() || joystickGetRBtnDown();
+    /* Up/down comes from either d-pad or the right analog stick (Positive Y = up). */
+    const bool up = joystickGetLBtnUp() || joystickGetRBtnUp() ||
+                    (joystickGetRAnalogY() == JoystickAxisStatePositive);
+    const bool down = joystickGetLBtnDown() || joystickGetRBtnDown() ||
+                      (joystickGetRAnalogY() == JoystickAxisStateNegative);
     const bool enter = joystickGetSpecialBtn1();
     const bool back = joystickGetSpecialBtn2();
 

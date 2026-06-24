@@ -32,8 +32,9 @@
  * per-frame CRC + retry is the backstop if a byte ever is corrupted. */
 #define NETWORK_UART_BAUD 923076u
 
-/* Bumped whenever the wire format below changes incompatibly. */
-#define NETWORK_PROTOCOL_VERSION 2u
+/* Bumped whenever the wire format below changes incompatibly.
+ * v3 added the ESP-NOW multiplayer commands (NP_CMD_MP_*). */
+#define NETWORK_PROTOCOL_VERSION 3u
 
 /* ---- Framing ---- */
 #define NP_SYNC0 0xA5u
@@ -49,6 +50,13 @@
 #define NP_PASS_MAX 63u
 #define NP_URL_MAX 256u
 
+/* ---- ESP-NOW multiplayer (v3) ----
+ * A peer is addressed on the wire by its 6-byte WiFi MAC; an all-FF MAC is the
+ * ESP-NOW broadcast address. One MP_SERVICE frame carries a *batch* of packets,
+ * each {dst/src mac[6], len:u8, bytes[len]}, len <= NP_MP_PKT_MAX. */
+#define NP_MP_MAC_LEN 6u
+#define NP_MP_PKT_MAX 250u /* ESP-NOW per-packet payload hard limit */
+
 /* Frame types. Responses have the high bit set so the two spaces never collide. */
 typedef enum
 {
@@ -62,6 +70,13 @@ typedef enum
     NP_CMD_HTTP_CLOSE = 0x07,  /* -> OK                                          */
     NP_CMD_DISCONNECT = 0x08,  /* -> OK                                          */
 
+    /* ESP-NOW multiplayer (v3). MP_BEGIN/END bracket the ESP-NOW mode; the ESP is
+     * a dumb byte mover — all session logic lives in the console (mp_session.c). */
+    NP_CMD_MP_BEGIN = 0x09,    /* {channel:u8} -> MP_BEGIN {self mac[6]}          */
+    NP_CMD_MP_END = 0x0A,      /* -> OK                                          */
+    NP_CMD_MP_SERVICE = 0x0B,  /* {n:u8, n x {dst mac[6],len:u8,bytes}}           */
+                               /*   -> MP_SERVICE {n:u8, n x {src mac[6],len,bytes}} */
+
     /* responses: esp -> console */
     NP_RSP_PONG = 0x81,
     NP_RSP_SCAN = 0x82,        /* {count:u8, count x {rssi:i8,enc:u8,len:u8,ssid}} */
@@ -71,6 +86,8 @@ typedef enum
     NP_RSP_OK = 0x87,
     NP_RSP_LOG = 0x88,         /* {level:u8, message bytes} — diagnostic, sent    */
                                /* before the real response; console -> SWO        */
+    NP_RSP_MP_BEGIN = 0x89,    /* {self mac[6]}                                  */
+    NP_RSP_MP_SERVICE = 0x8A,  /* {n:u8, n x {src mac[6], len:u8, bytes}}         */
     NP_RSP_ERR = 0xEE,         /* {code:u8}                                      */
 } NetworkFrameType;
 

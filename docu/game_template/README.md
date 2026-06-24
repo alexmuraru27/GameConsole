@@ -220,6 +220,33 @@ uint16_t fontSize(FontSize size, uint8_t scale);            // bytes a scaled gl
 void     fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);  // scale into your buffer
 ```
 
+### Multiplayer (ESP-NOW; local wireless, up to 4 consoles)
+```c
+MpRole   mpGetRole(void);                          // NONE / HOST / CLIENT
+MpStatus mpHostStart(void);                        // advertise THIS game, become player 0
+MpStatus mpJoinStart(void);                        // listen for hosts of THIS game
+int      mpScanHosts(MpHostInfo *out, int max);    // discovered hosts (name / handle / count)
+MpStatus mpJoin(uint8_t host_handle);              // connect to a scanned host
+void     mpStop(void);                             // end the session / release the link
+
+uint8_t  mpGetSelfIndex(void);                     // your player index (0 = host)
+uint8_t  mpGetPlayerCount(void);                   // 1..4
+bool     mpIsConnected(uint8_t index);             // heartbeat liveness
+int      mpGetName(uint8_t index, char *buf, int max);
+int      mpGetSelfName(char *buf, int max);
+
+bool     mpSend(uint8_t dst_index, const void *data, uint16_t len);   // dst 0xFF = broadcast, len ≤ MP_MSG_MAX
+int      mpReceive(uint8_t *src_index, void *data, uint16_t max);     // 0 = mailbox empty
+```
+Your game owns the lobby UI and drives the session; the OS owns discovery, the
+peer table, player indices, heartbeat liveness, and the message mailboxes. A host
+advertises the *running* game, so a joiner only discovers hosts of the same game.
+`mpSend`/`mpReceive` are non-blocking — the OS exchanges them with the ESP once per
+frame, so your update loop never stalls on the radio. The player's display name is
+a console-wide setting (Settings → Player Name). Types live in
+`multiplayer_interface.h`; the full protocol, diagrams and the host-authoritative
+pattern are in [`../espnow.md`](../espnow.md).
+
 ### Logging & lifecycle
 ```c
 void gameLog(const char *fmt, ...);   // info log on the GAME channel over SWO (printf-style)
@@ -234,6 +261,7 @@ Special Button 2) to return to the console — there is no `main()` to fall out 
 ## Reference
 
 - [Kernel / game isolation](../kernel.md) — privilege model, the syscall ABI, MPU protection, fault recovery
+- [ESP-NOW multiplayer](../espnow.md) — the wireless multiplayer stack: wire protocol, discovery, the join handshake, heartbeat ping-pong, and host-authoritative netcode
 - [ConsoleAPI module internals](../API_README.md)
 - [Memory layout](../memory.md) — SRAM/CCM map, game binary layout
 - [Example game source](../../Apps/GameXO/) — the reference implementation

@@ -204,14 +204,17 @@ bool joystickIsAnyButtonPressed(void)
     return (s_btn_data & BTN_MASK_ALL) != 0U;
 }
 
+/* Axis convention (both sticks): Positive = up (Y) / right (X). The Y axes use the
+ * same raw->sign mapping as X so up reads Positive, matching the cartesian sense a
+ * caller expects (and the on-screen keyboard's stick navigation). */
 JoystickAxisState joystickGetRAnalogY(void)
 {
     switch ((s_analog_data & ANALOG_MASK_RY) >> JoystickAnalogBitRY)
     {
     case RawAnalogStateLow:
-        return JoystickAxisStatePositive;
-    case RawAnalogStateHigh:
         return JoystickAxisStateNegative;
+    case RawAnalogStateHigh:
+        return JoystickAxisStatePositive;
     default:
         return JoystickAxisStateOff;
     }
@@ -235,9 +238,9 @@ JoystickAxisState joystickGetLAnalogY(void)
     switch ((s_analog_data & ANALOG_MASK_LY) >> JoystickAnalogBitLY)
     {
     case RawAnalogStateLow:
-        return JoystickAxisStatePositive;
-    case RawAnalogStateHigh:
         return JoystickAxisStateNegative;
+    case RawAnalogStateHigh:
+        return JoystickAxisStatePositive;
     default:
         return JoystickAxisStateOff;
     }

@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "sysclock.h"
 #include "scheduler.h"
+#include "mp_session.h"
 #include "sd_layout.h"
 #include <stm32f407xx.h> /* DWT->CYCCNT for the frame delta */
 #include <stdio.h>
@@ -56,8 +57,14 @@ static void gameRuntimeService(void)
     }
     s_prev_frame_cyc = now;
 
-    /* No frame pacing here by design — see above. Inter-frame console work goes
-     * here when it lands; today there is none. */
+    /* No frame pacing here by design — see above. This is the seam for inter-frame
+     * console work: while a multiplayer session is up, exchange one ESP-NOW batch
+     * with the ESP (send due beacons/heartbeats + queued messages, drain inbound)
+     * so the game's mp* syscalls stay non-blocking mailbox ops. */
+    if (mpSessionActive())
+    {
+        mpSessionService(getSysTime());
+    }
 }
 
 GameBinaryHeader s_game_header;
@@ -200,6 +207,11 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
      * when the game exits cleanly or crashes — either way the console resumes
      * privileged on the MSP. */
     kernelRunGame(&s_game_header, gameRuntimeService);
+
+    /* A game may have opened a multiplayer session; tear it down unconditionally so
+     * a clean exit OR a crash can never leave the ESP-NOW link or a peer session up
+     * for the next game. Idempotent when no session was active. */
+    mpSessionStop();
 
     const bool crashed = kernelGameCrashed();
     if (crashed)
