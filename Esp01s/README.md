@@ -9,7 +9,7 @@ STM32 `Console/` firmware — which is why it sits at the repo root alongside
 `Console/` and the games under `Apps/` rather than inside the console source tree.
 
 > **What it does:** the slave side of the framed console↔ESP protocol
-> (`src/main.cpp` + the shared `../Shared/Esp01s/network_protocol.h`), in two
+> (the `src/` modules + the shared `../Shared/Esp01s/network_protocol.h`), in two
 > modes: **WiFi pull** — scan / connect / HTTP-GET, so the console can download
 > games and its own firmware — and **ESP-NOW local multiplayer**, console-to-console
 > play for up to four consoles. The multiplayer stack (this firmware's `MP_*`
@@ -21,7 +21,11 @@ STM32 `Console/` firmware — which is why it sits at the repo root alongside
 | Path | What |
 | ---- | ---- |
 | `platformio.ini` | board (`esp01_1m`), framework (`arduino`), build flags |
-| `src/main.cpp` | the firmware — protocol slave (WiFi scan/connect/HTTP + ESP-NOW multiplayer) |
+| `src/main.cpp` | entry points — `setup()` (radio bring-up) + `loop()` (read one command, dispatch) |
+| `src/protocol.{h,cpp}` | framing layer (`np::`): send/read framed packets, owns the TX/RX buffers |
+| `src/wifi.{h,cpp}` | scan / connect / status / disconnect + radio regulatory bring-up |
+| `src/http.{h,cpp}` | HTTP GET open / read / close (the download path) |
+| `src/espnow_link.{h,cpp}` | ESP-NOW multiplayer transport (`MP_*` — begin / end / service) |
 | `Makefile` | `build` (PlatformIO) + `deploy` (copy firmware to SD as `ESP01.bin`) |
 | `../Shared/Esp01s/network_protocol.h` | the console↔ESP wire contract, **shared with the console firmware** |
 
@@ -77,8 +81,8 @@ the flashing internals.
 - **LED pin:** the on-board ESP-01S LED is on **GPIO2** and is **active-low**
   (drive LOW = on). Do *not* use `LED_BUILTIN` — for this board's `generic`
   variant it maps to GPIO1, which is also UART0 TX (owned by `Serial`), so it
-  matches neither the physical LED nor a free pin. `main.cpp` drives GPIO2
-  directly.
+  matches neither the physical LED nor a free pin. `wifi.cpp` drives GPIO2
+  directly (it's the WiFi-status light).
 - **Heartbeat / aliveness check:** the firmware prints `blink N` once per second
   on `Serial` (UART0, 921600). That TX line is wired to the console's USART1, so
   **Settings → Test WiFi module** shows the received byte count and last line —
