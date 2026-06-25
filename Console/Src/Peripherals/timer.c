@@ -88,15 +88,15 @@ static void timer6Init()
 
 static void timer7Init(uint16_t time_ms)
 {
-    // timer frequency = fCK_PSC / (PSC[15:0] + 1).
-    // 84MHz on APB1 timer bus
-    // 1ms timer resolution PSC = 839
-    TIM7->PSC = 839U;
+    // TIM7 runs off the 84 MHz APB1 timer clock. Prescale to a 100 us tick
+    // (84 MHz / 8400 = 10 kHz), so a period in milliseconds maps to
+    // ARR = time_ms * 10 - 1, and the 16-bit ARR still spans up to ~6.5 s.
+    // (The previous PSC=839 was a 10 us tick, NOT the 1 ms its comment claimed,
+    // so ARR=time_ms-1 fired the ISR 100x too fast — every 0.5 ms, not 50 ms.)
+    TIM7->PSC = (8400U - 1U);
 
-    // ARR = (desired timer / period of PSC) -1
-    // (50ms/1ms)-1 = 50-1 =49
-    // if time_ms = 0 we can't subtract 1 because we would overflow the counter
-    TIM7->ARR = (time_ms != 0U ? (time_ms - 1U) : 0U);
+    const uint32_t ticks = (uint32_t)time_ms * 10U; // 100 us ticks per millisecond
+    TIM7->ARR = (uint16_t)(ticks != 0U ? ticks - 1U : 0U);
 
     // Enable interrupt
     TIM7->DIER |= TIM_DIER_UIE;
@@ -116,7 +116,7 @@ void timerInit(void)
     timer3Init();
     // timer 6 -  period of 1ms
     timer6Init();
-    // timer 7 - period of 50ms
-    timer7Init(50U);
-    LOGGER_LOG_DEBUG(LOGGER_CORE, "timers init: TIM3 PWM (buzzer), TIM6 1ms, TIM7 50ms");
+    // timer 7 - joystick poll, 10ms
+    timer7Init(10U);
+    LOGGER_LOG_DEBUG(LOGGER_CORE, "timers init: TIM3 PWM (buzzer), TIM6 1ms, TIM7 10ms");
 }

@@ -1,6 +1,7 @@
 #include "i2c.h"
 #include <stm32f407xx.h>
 #include "stddef.h"
+#include "gpio.h"
 #include "logger.h"
 
 #define I2C_CCR_VALUE 0x23U   // Calculated for 400kHz with 42MHz APB1
@@ -11,6 +12,16 @@
 
 void i2cInit(void)
 {
+    // Free the bus before configuring the peripheral: a slave left mid-byte by a
+    // prior reset can hold SDA low and wedge every START. Recovery bit-bangs the
+    // pins as GPIO (they're set up by gpioInit, which runs first), then restores AF.
+    const uint8_t recovery_pulses = gpioI2cBusRecovery();
+    if (recovery_pulses > 0U)
+    {
+        LOGGER_LOG_WARN(LOGGER_CORE, "I2C bus was stuck; freed with %u SCL pulse(s)",
+                        (unsigned)recovery_pulses);
+    }
+
     // trigger reset
     I2C1->CR1 |= I2C_CR1_SWRST;
     I2C1->CR1 &= ~I2C_CR1_SWRST;

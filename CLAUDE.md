@@ -125,7 +125,7 @@ Scanline **sprite compositor** (`Console/Src/Renderer/renderer.c`) — full deep
 - **RAM cost**: the scanline buffers + per-chunk bins + z-sort lists + tile cache dominate `CONSOLE_RAM` (~41 KB); `tools/memory_analysis` reports the live budget.
 
 ### Joystick
-Two analog joysticks with digital d-pads + 2 special buttons. Polled by TIM7 ISR every 50ms. Digital buttons: 5ms debounce on each of 10 GPIO pins (active-low with pull-ups). Analog axes: ADC1 channels 10–13 (PC0–PC3) in DMA circular mode, thresholded at 2048±1500 to produce 3-state output (Mid/Low/High) with 5ms debounce. Public API returns `bool` for buttons and `JoystickAxisState` (Off/Negative/Positive) for axes.
+Two analog joysticks with digital d-pads + 2 special buttons. Polled by TIM7 ISR every 10ms. Digital buttons: 5ms debounce on each of 10 GPIO pins (active-low with pull-ups). Analog axes: ADC1 channels 10–13 (PC0–PC3) in DMA circular mode, thresholded at 2048±1500 to produce 3-state output (Mid/Low/High) with 5ms debounce. Public API returns `bool` for buttons and `JoystickAxisState` (Off/Negative/Positive) for axes.
 
 ### Buzzer
 5-track software synthesizer (`buzzer.c`). TIM6 fires at 1ms, advances each active track's note counter. Notes are interleaved `uint16` pairs: `{frequency_hz, duration_ms}…`; frequency 0 = pause. The highest-numbered playing track drives TIM3 PWM output on PB5 at 50% duty. Supports play with optional done-flag, pause, resume, stop, loop. Frequency constants from C2 (65 Hz) through B8 (7902 Hz) defined in `buzzer.h`.
@@ -184,7 +184,7 @@ Loaded games can't link the logger, so they log via the ConsoleAPI: `api.log("sc
 - **Map to the right channel** from `logger_config.h` (e.g. `LOGGER_CORE`, `LOGGER_KERNEL`, `LOGGER_SDIO`, `LOGGER_EEPROM`, …). Add a new channel there if a subsystem has none.
 - **Level discipline:** `INFO` for once-per-boot / lifecycle milestones (init done, game launched/exited); `DEBUG` for per-driver detail and frequent-but-cold events; `WARN` for recoverable anomalies (rejected input, validation failures); `ERROR` for hard failures. Aim for INFO to read as the session narrative on its own, with DEBUG as the layer beneath it.
 - **Log at boundaries, not internals:** public-API entry/exit, state transitions, and every error/early-return path — not every internal step.
-- **Never log on hot paths or in ISRs.** The renderer per-frame compositor, the 1 ms buzzer ISR (and `buzzerStop`, which it calls), the 50 ms joystick ISR, the per-syscall SVC dispatch, and PendSV teardown stay silent — a single SWO line (~5 µs/byte) there breaks audio/frame timing. Log their *init* and *lifecycle*, never their per-tick work.
+- **Never log on hot paths or in ISRs.** The renderer per-frame compositor, the 1 ms buzzer ISR (and `buzzerStop`, which it calls), the 10 ms joystick ISR, the per-syscall SVC dispatch, and PendSV teardown stay silent — a single SWO line (~5 µs/byte) there breaks audio/frame timing. Log their *init* and *lifecycle*, never their per-tick work.
 - **Don't instrument** third-party code (`ff.c`, `ffunicode.c`), pure data tables (fonts), the SWO sink itself (`logger.c`, `syscalls.c` — recursion risk), or `faults.c` (it uses raw `printf` by design).
 
 ## Pixel Forge (graphics creator)

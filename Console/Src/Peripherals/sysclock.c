@@ -20,6 +20,10 @@ static volatile uint32_t s_system_time = 0U;
 #define HSI_CLOCK_VALUE ((uint32_t)16000000)
 #endif
 
+// DWT cycle counter ticks per microsecond at the 168 MHz SYSCLK
+// (pllSystemClockConfig) — the basis for delayUs().
+#define CPU_CYCLES_PER_US 168U
+
 // Interrupt handler
 void SysTick_Handler(void)
 {
@@ -34,6 +38,24 @@ void delay(const uint32_t sys_time_delta)
     while (s_timing_delay > s_system_time)
     {
     };
+}
+
+void delayUs(uint32_t us)
+{
+    /* Short busy-wait off the free-running 168 MHz DWT cycle counter, for the
+     * sub-millisecond delays the SysTick-based delay() can't express (peripheral
+     * stabilization, I2C bus-recovery clocking). swoInit() enables CYCCNT early in
+     * boot, but enable it here too so the function is self-sufficient: without a
+     * running counter the wrap-safe compare below would never advance and spin
+     * forever. Intended for short waits (us * 168 must fit in 32 bits). */
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+    const uint32_t start = DWT->CYCCNT;
+    const uint32_t cycles = us * CPU_CYCLES_PER_US;
+    while ((DWT->CYCCNT - start) < cycles)
+    {
+    }
 }
 
 uint32_t getSysTime()

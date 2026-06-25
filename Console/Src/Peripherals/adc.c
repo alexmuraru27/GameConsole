@@ -1,5 +1,6 @@
 #include "adc.h"
 #include <stm32f407xx.h>
+#include "sysclock.h"
 #include "logger.h"
 
 #define ADC_BUFFER_SIZE 4U
@@ -44,6 +45,11 @@ void adcInit(void)
 
     // 4 conversions (L = 3 -> 4 conversions)
     ADC1->SQR1 = (3U << ADC_SQR1_L_Pos);
+
+    // The ADC needs a stabilization time (t_STAB, a few us) after it is powered on
+    // with ADON before the first conversion may be started; the register writes
+    // above don't reliably cover it. Wait it out before SWSTART.
+    delayUs(10U);
 
     // start ADC conversion
     ADC1->CR2 |= ADC_CR2_SWSTART;
