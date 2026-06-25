@@ -9,6 +9,16 @@
  * debug builds; the rest of the firmware stays at -Og for debuggability. */
 #pragma GCC optimize("O3")
 
+/* Placement of the hot compositor functions: (I-cached) FLASH, not .RamFunc.
+ * Measured +40% on TestRenderer (Min/Avg/Max 41/65/125 -> 58/92/166) once the
+ * instruction cache was enabled — running the code from flash keeps the per-pixel
+ * stores from contending with instruction fetch on the SRAM bus (in .RamFunc the
+ * two share it). This reverses the earlier prefetch-only measurement that put the
+ * compositors in .RamFunc (docu/renderer.md §7.7/§8). Kept as a named attribute
+ * so placement is a single switch if a future (e.g. very text-heavy) workload
+ * ever wants the hot code back in SRAM — e.g. (noinline, section(".RamFunc")). */
+#define RENDERER_HOT __attribute__((noinline))
+
 #define MAX_SPRITES_BG 350U
 #define MAX_SPRITES_FG 350U
 #define MAX_SPRITES_UI 350U
@@ -533,7 +543,7 @@ __attribute__((always_inline)) static inline void blitRowFlip(uint16_t *d, const
  * compositors that call it — they stay small and the hot blit loops keep their
  * registers. s_pair_pal doubles as the 2bpp cache key: a 4bpp sprite clears it, so a
  * following 2bpp sprite always rebuilds both tables. */
-__attribute__((noinline, section(".RamFunc"))) static void build2bppPalette(const uint16_t *pal)
+RENDERER_HOT static void build2bppPalette(const uint16_t *pal)
 {
     s_lut[0] = pal[0];
     s_lut[1] = pal[1];
@@ -563,9 +573,9 @@ __attribute__((always_inline)) static inline void load2bppPalette(const uint16_t
  * hot opaque case stays as lean as the original single compositor. Each keeps the row
  * walk in plain scalar locals (no address-taken struct) so they live in registers
  * across the row loop. */
-__attribute__((noinline, section(".RamFunc"))) static void composite2bppOpaque(uint16_t *chunk_buffer,
-                                                                               uint16_t start_y, uint16_t count,
-                                                                               const Sprite *sprite)
+RENDERER_HOT static void composite2bppOpaque(uint16_t *chunk_buffer,
+                                             uint16_t start_y, uint16_t count,
+                                             const Sprite *sprite)
 {
     SpriteClip clip;
     if (!clipSprite(sprite, start_y, count, &clip))
@@ -600,9 +610,9 @@ __attribute__((noinline, section(".RamFunc"))) static void composite2bppOpaque(u
     }
 }
 
-__attribute__((noinline, section(".RamFunc"))) static void composite2bppTransparent(uint16_t *chunk_buffer,
-                                                                                    uint16_t start_y, uint16_t count,
-                                                                                    const Sprite *sprite)
+RENDERER_HOT static void composite2bppTransparent(uint16_t *chunk_buffer,
+                                                  uint16_t start_y, uint16_t count,
+                                                  const Sprite *sprite)
 {
     SpriteClip clip;
     if (!clipSprite(sprite, start_y, count, &clip))
@@ -637,8 +647,8 @@ __attribute__((noinline, section(".RamFunc"))) static void composite2bppTranspar
     }
 }
 
-__attribute__((noinline, section(".RamFunc"))) static void composite4bpp(uint16_t *chunk_buffer, uint16_t start_y,
-                                                                         uint16_t count, const Sprite *sprite)
+RENDERER_HOT static void composite4bpp(uint16_t *chunk_buffer, uint16_t start_y,
+                                       uint16_t count, const Sprite *sprite)
 {
     SpriteClip clip;
     if (!clipSprite(sprite, start_y, count, &clip))
@@ -721,8 +731,8 @@ static void decodeTile(TileCacheSlot *slot, const uint16_t *pal, const uint8_t *
 /* Return a sprite's decoded RGB565 buffer, decoding it into a free slot on first
  * use. NULL means "not cacheable" (flipped, larger than the cap, or the cache is
  * full) — the caller then takes the normal compositor. */
-__attribute__((noinline, section(".RamFunc"))) static const uint16_t *tileCacheLookup(const Sprite *sprite,
-                                                                                      bool is_4bpp)
+RENDERER_HOT static const uint16_t *tileCacheLookup(const Sprite *sprite,
+                                                    bool is_4bpp)
 {
     if ((uint32_t)sprite->w * sprite->h > TILE_CACHE_MAX_PX)
     {
@@ -758,10 +768,10 @@ __attribute__((noinline, section(".RamFunc"))) static const uint16_t *tileCacheL
 /* Composite a cached (already-RGB565) opaque tile: a plain per-row copy, no unpack
  * or palette lookup. Only reached for unflipped tiles, so the source advances by a
  * positive row stride. */
-__attribute__((noinline, section(".RamFunc"))) static void compositeCachedOpaque(uint16_t *chunk_buffer,
-                                                                                 uint16_t start_y, uint16_t count,
-                                                                                 const Sprite *sprite,
-                                                                                 const uint16_t *rgb)
+RENDERER_HOT static void compositeCachedOpaque(uint16_t *chunk_buffer,
+                                               uint16_t start_y, uint16_t count,
+                                               const Sprite *sprite,
+                                               const uint16_t *rgb)
 {
     SpriteClip clip;
     if (!clipSprite(sprite, start_y, count, &clip))
@@ -815,7 +825,7 @@ __attribute__((noinline, section(".RamFunc"))) static void compositeCachedOpaque
  * (already in back-to-front draw order — BG low-z → BG high-z → FG → UI) into the
  * strip buffer. Opaque tiles that fit the decoded-tile cache blit by row copy; the
  * rest take the unpacking compositors. */
-__attribute__((noinline, section(".RamFunc"))) static void renderScanlineChunk(uint16_t *chunk_buffer, uint16_t start_y, uint16_t count)
+RENDERER_HOT static void renderScanlineChunk(uint16_t *chunk_buffer, uint16_t start_y, uint16_t count)
 {
     if (s_bg_enabled) /* paint the background; sprites composite over it */
     {

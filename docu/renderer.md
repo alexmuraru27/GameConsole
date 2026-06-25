@@ -550,13 +550,26 @@ Horizontal flip is the only case that cannot walk the source left-to-right by
 byte, so it stays a simple per-pixel loop (`blitRowFlip`). Flips are uncommon and
 not worth the code complexity of a reversed byte unpack.
 
-### 7.7 Where the code runs: `.RamFunc`
+### 7.7 Where the code runs: flash (I-cached), not `.RamFunc`
 
-The three compositor functions are placed in `.RamFunc` (linked into SRAM at
-`CONSOLE_RAM`) rather than executed from flash. We **measured both**: SRAM
-execution was faster (1.99 M vs 2.16 M cycles for the busy scene). Note this is
-*not* CCM — the Cortex-M4 cannot fetch instructions from CCM on the F4, and the
-scanline buffers must stay in DMA-reachable SRAM anyway.
+The hot compositors run from **flash**, leaning on the instruction cache. This
+reverses an earlier decision. We first measured `.RamFunc` (SRAM execution) as
+faster — 1.99 M vs 2.16 M cycles — and parked the compositors there. But that was
+measured with only the flash **prefetch buffer** on; the instruction cache
+(`ICEN`) was never enabled. Once the I-cache was turned on, flash placement won
+decisively: **+40% on the TestRenderer benchmark (Min/Avg/Max 41/65/125 →
+58/92/166)**, with the win attributable entirely to placement (I-cache on +
+compositors still in `.RamFunc` measured identical to baseline).
+
+The reason is **bus contention, not wait states**: in `.RamFunc`, every
+instruction fetch competes with the per-pixel stores on the same SRAM across the
+AHB bus matrix; running the code from flash moves fetch onto the I-bus/I-cache and
+hands the full SRAM bandwidth to the store-bound inner loop. A `RENDERER_HOT`
+macro names the placement so it is a one-line switch back to `.RamFunc` if a very
+text-heavy workload ever wants it (the transparent compositor is ~1 KB, ≈ the
+whole I-cache). Note this is still *not* CCM — the Cortex-M4 cannot fetch
+instructions from CCM on the F4, and the scanline buffers must stay in
+DMA-reachable SRAM regardless.
 
 ---
 
@@ -616,9 +629,11 @@ from ~40 cycles to ~12.
   pixel-pushing DMA hides completely behind it (~4 % difference with DMA off).
   The FSMC write timing (≈36 ns/pixel) gives a ~2.7 ms full-screen floor — far
   below the composite cost.
-- **Flash (with the ART cache) was *slower* than SRAM here.** Intuition says
-  "code in RAM avoids flash wait states," but we measured it both ways; SRAM
-  (`.RamFunc`) won, so the compositors stay there.
+- **Flash vs SRAM depends entirely on the instruction cache.** With only the
+  prefetch buffer on, SRAM (`.RamFunc`) won here (1.99 M vs 2.16 M) — the original
+  finding. But once `ICEN` was enabled, flash placement won by **~40%** (see
+  §7.7): I-cached flash fetch frees the SRAM bus from instruction fetch, leaving
+  the store-bound loop the full bandwidth. The compositors now run from flash.
 
 ---
 
