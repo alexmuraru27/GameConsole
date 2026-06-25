@@ -9,14 +9,20 @@
  */
 ENTRY(Reset_Handler)
 
-_estack = ORIGIN(RAM) + LENGTH(RAM); /* top of SRAM */
+_estack = ORIGIN(BOOTLOADER_RAM) + LENGTH(BOOTLOADER_RAM); /* top of SRAM */
 _Min_Heap_Size = 0x0;
 _Min_Stack_Size = 0x800;
 
+/* The bootloader owns its own, dedicated regions — it runs before the app, so it
+ * has the whole 128 KB SRAM to itself. These deliberately do NOT come from
+ * common.ld: BOOTLOADER_RAM spans the full SRAM, which the running console later
+ * partitions into CONSOLE_RAM + GAME_RAM (the same bytes, used at a different time),
+ * so they can't share one non-overlapping MEMORY map. Keep BOOTLOADER_FLASH in sync
+ * with BOOT_FLASH_* in Console/Inc/Flasher/flash_map.h. */
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 16K   /* sector 0 */
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+    BOOTLOADER_FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 16K   /* sector 0 */
+    BOOTLOADER_RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
 }
 
 SECTIONS
@@ -26,7 +32,7 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector))
     . = ALIGN(4);
-  } >FLASH
+  } >BOOTLOADER_FLASH
 
   .text :
   {
@@ -40,7 +46,7 @@ SECTIONS
     KEEP (*(.fini))
     . = ALIGN(4);
     _etext = .;
-  } >FLASH
+  } >BOOTLOADER_FLASH
 
   .rodata :
   {
@@ -48,7 +54,7 @@ SECTIONS
     *(.rodata)
     *(.rodata*)
     . = ALIGN(4);
-  } >FLASH
+  } >BOOTLOADER_FLASH
 
   _sidata = LOADADDR(.data);
 
@@ -65,7 +71,7 @@ SECTIONS
     *(.RamFunc*)
     . = ALIGN(4);
     _edata = .;
-  } >RAM AT> FLASH
+  } >BOOTLOADER_RAM AT> BOOTLOADER_FLASH
 
   . = ALIGN(4);
   .bss :
@@ -78,7 +84,7 @@ SECTIONS
     . = ALIGN(4);
     _ebss = .;
     __bss_end__ = _ebss;
-  } >RAM
+  } >BOOTLOADER_RAM
 
   ._user_heap_stack :
   {
@@ -88,7 +94,7 @@ SECTIONS
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
-  } >RAM
+  } >BOOTLOADER_RAM
 
   /DISCARD/ :
   {
