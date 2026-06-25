@@ -2,6 +2,7 @@
 #include "sysclock.h"
 #include "game_console.h"
 #include "main_menu.h"
+#include "watchdog.h"
 #include "logger.h"
 #include "flash_map.h"
 
@@ -23,6 +24,10 @@ int main(void)
 
     while (1)
     {
+        /* Feed the watchdog from the top of the idle/menu loop. gameLoaderLoadGame()
+         * blocks for a game's lifetime but the kernel loop kicks per frame, and the
+         * long flash/download paths kick from inside their own loops. */
+        watchdogKick();
         /* The menu owns the screen until a game is selected; gameLoaderLoadGame()
          * blocks for the game's lifetime and the menu re-inits when it returns. */
         mainMenuUpdate();

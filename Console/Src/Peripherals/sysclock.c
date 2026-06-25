@@ -1,4 +1,5 @@
 #include "sysclock.h"
+#include "scheduler.h"
 #include "stdbool.h"
 #include "stm32f407xx.h"
 
@@ -23,6 +24,8 @@ static volatile uint32_t s_system_time = 0U;
 void SysTick_Handler(void)
 {
     s_system_time++;
+    /* Enforce the running game callback's time budget (no-op outside a game). */
+    kernelGameDeadlineTick(s_system_time);
 }
 
 void delay(const uint32_t sys_time_delta)
@@ -98,9 +101,14 @@ static void sysTickClockConfig()
 
 static void flashMemoryLatencyConfig(void)
 {
-    FLASH->ACR |= FLASH_ACR_PRFTEN;
-    FLASH->ACR &= ~FLASH_ACR_LATENCY;
-    FLASH->ACR |= FLASH_ACR_LATENCY_5WS;
+    /* 5 wait states for 168 MHz at 2.7-3.6V (RM0090 Table), and turn on the full
+     * ART accelerator: prefetch + the instruction cache + the data cache. All
+     * flash-resident code (the renderer, FatFs, the menus) and its rodata reads
+     * are otherwise paying the 5-WS fetch penalty every miss. The caches are
+     * empty out of reset, so they can be enabled directly alongside the latency.
+     * Coherency after a flash *write* (the OS self-flash readback-verify) is
+     * handled by resetting the data cache in flashLlLock(). */
+    FLASH->ACR = FLASH_ACR_PRFTEN | FLASH_ACR_ICEN | FLASH_ACR_DCEN | FLASH_ACR_LATENCY_5WS;
 }
 
 static void busClockConfig(void)

@@ -16,19 +16,20 @@ top-level folder name:
 
 ```
 content/
-  games/    GameXO.bin, GameXO.pak, Tetris.bin, Tetris.pak, ...
-  wifi/     ESP01.bin                 (the ESP-01 firmware, see ../../Esp01s)
-  os/       GameConsole.bin           (console firmware image — future)
-  versions.csv                        (optional, see below)
+  games/      GameXO.bin, GameXO.pak, Tetris.bin, Tetris.pak, ...
+  Firmware/   Console.bin     (console OS image — Settings → Upgrade OS)
+              ESP01.bin       (the ESP-01 firmware, see ../../Esp01s)
+  versions.csv                (optional, see below)
 ```
 
-The console maps a category to an action: `games` → copy onto the SD card,
-`wifi` → flash the ESP (Settings → Upgrade WiFi module), `os` → console
-self-update (future).
+The console maps a category to a destination on its SD card: `games` → the
+`Games/` folder, `Firmware` → the `Firmware/` folder (the console OS image and the
+ESP-01 firmware share one category, told apart by filename — `Console.bin` for
+Settings → Upgrade OS, `ESP01.bin` for Upgrade WiFi module).
 
 The repo's build targets stage straight into this tree: `make deploy` writes
-`games/GameXO.bin` + `games/GameXO.pak` and (if it's been built with `make esp`)
-`wifi/ESP01.bin`. Drop other files in by hand as needed.
+`games/GameXO.bin` + `games/GameXO.pak`, `Firmware/Console.bin`, and (if it's been
+built with `make esp`) `Firmware/ESP01.bin`. Drop other files in by hand as needed.
 
 ## Endpoints
 
@@ -47,7 +48,8 @@ Plain CSV — chosen so the **console can parse it without a JSON/YAML parser**
 category,name,path,size,crc32,version
 games,GameXO.bin,games/GameXO.bin,7520,1a2b3c4d,1
 games,GameXO.pak,games/GameXO.pak,4096,99887766,1
-wifi,ESP01.bin,wifi/ESP01.bin,270416,deadbeef,3
+Firmware,Console.bin,Firmware/Console.bin,180224,c0ffee01,1
+Firmware,ESP01.bin,Firmware/ESP01.bin,270416,deadbeef,3
 ```
 
 - **`crc32`** is the zlib/IEEE CRC-32 — bit-for-bit what the console computes with
@@ -64,7 +66,7 @@ wifi,ESP01.bin,wifi/ESP01.bin,270416,deadbeef,3
 
 ```
 games/GameXO.bin,2
-wifi/ESP01.bin,3
+Firmware/ESP01.bin,3
 ```
 
 ## Usage

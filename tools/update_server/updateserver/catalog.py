@@ -3,9 +3,8 @@
 The content root holds one subfolder per category, e.g.::
 
     content/
-      games/   GameXO.bin, GameXO.pak, ...
-      wifi/    ESP01.bin
-      os/      GameConsole.bin
+      games/      GameXO.bin, GameXO.pak, ...
+      Firmware/   Console.bin (the console OS), ESP01.bin (the ESP-01 firmware)
 
 The category is simply the top-level folder name; everything under it (any depth)
 is enumerated. For each file the catalog records its size and zlib CRC-32 (the
@@ -34,7 +33,7 @@ _DEFAULT_CATEGORY = "misc"
 class ContentEntry:
     """One downloadable file in the catalog."""
 
-    category: str  #: top-level folder: games | wifi | os | ...
+    category: str  #: top-level folder: games | Firmware | ...
     name: str      #: file name, e.g. "GameXO.bin"
     path: str      #: POSIX path relative to the root, e.g. "games/GameXO.bin"
     size: int      #: size in bytes

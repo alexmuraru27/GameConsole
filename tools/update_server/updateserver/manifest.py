@@ -6,7 +6,7 @@ is a human-friendly header the console skips; ``crc32`` is lower-case hex.
 
     category,name,path,size,crc32,version
     games,GameXO.bin,games/GameXO.bin,7520,1a2b3c4d,1
-    wifi,ESP01.bin,wifi/ESP01.bin,270416,deadbeef,3
+    Firmware,ESP01.bin,Firmware/ESP01.bin,270416,deadbeef,3
 """
 from __future__ import annotations
 

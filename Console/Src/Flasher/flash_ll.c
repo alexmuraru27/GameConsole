@@ -29,6 +29,21 @@ RAMFUNC void flashLlUnlock(void)
 RAMFUNC void flashLlLock(void)
 {
     FLASH->CR |= FLASH_CR_LOCK;
+
+    /* Lock marks the end of a write session, which is exactly where a readback
+     * follows (every caller verifies what it just programmed). The ART data
+     * cache caches flash reads but is not updated by a flash program/erase, so a
+     * line cached before the write would return stale bytes. Reset it now —
+     * RM0090 requires the cache be disabled to reset it, so disable, pulse DCRST,
+     * re-enable. State-preserving: a no-op when DCEN is clear (e.g. the
+     * bootloader, which links this same .RamFunc but runs with caches off). */
+    if (FLASH->ACR & FLASH_ACR_DCEN)
+    {
+        FLASH->ACR &= ~FLASH_ACR_DCEN;
+        FLASH->ACR |= FLASH_ACR_DCRST;
+        FLASH->ACR &= ~FLASH_ACR_DCRST;
+        FLASH->ACR |= FLASH_ACR_DCEN;
+    }
 }
 
 RAMFUNC bool flashLlEraseSector(uint32_t sector)

@@ -93,14 +93,15 @@ static bool nameEndsWith(const char *name, const char *suffix)
 }
 
 /* Local SD directory for a manifest category: Games/ for games, Firmware/ for
- * wifi + os; unknown categories fall back to the card root. */
+ * firmware images (the console OS and the ESP-01, both served under the single
+ * "firmware" category); unknown categories fall back to the card root. */
 static const char *destDir(const char *category)
 {
     if (strcasecmp(category, "games") == 0)
     {
         return SD_DIR_GAMES;
     }
-    if (strcasecmp(category, "wifi") == 0 || strcasecmp(category, "os") == 0)
+    if (strcasecmp(category, "Firmware") == 0)
     {
         return SD_DIR_FIRMWARE;
     }

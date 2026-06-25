@@ -27,7 +27,7 @@ bool flashUiConfirmMismatch(const char *title, uint32_t have, uint32_t want);
 void flashUiWaitBack(const char *title, const char *line, const uint16_t *line_pal);
 
 /* CRC-32 recorded for a firmware file when it was last downloaded. The local
- * download manifest (downloaded.csv) keys on the remote path (e.g. "os/Console.bin"),
+ * download manifest (downloaded.csv) keys on the remote path (e.g. "Firmware/Console.bin"),
  * so match by `basename` against our SD filename. Returns true and sets *crc if a
  * record exists. */
 bool flashUiRecordedCrc(const char *basename, uint32_t *crc);

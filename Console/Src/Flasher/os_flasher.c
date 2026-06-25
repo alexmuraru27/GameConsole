@@ -3,6 +3,7 @@
 #include "flash_map.h"
 #include "crc.h"
 #include "game_console.h"
+#include "watchdog.h"
 #include "logger.h"
 #include "ff.h"
 #include <string.h>
@@ -93,6 +94,9 @@ OsFlashStatus osFlasherStage(const char *path, uint32_t *out_crc, uint32_t *out_
                     (unsigned long)STAGING_SECTOR_FIRST, (unsigned long)STAGING_SECTOR_LAST);
     for (uint32_t s = STAGING_SECTOR_FIRST; s <= STAGING_SECTOR_LAST; s++)
     {
+        /* A 128 KB sector erase runs with interrupts masked for up to ~4 s; kick
+         * right before so the watchdog's window starts fresh for each one. */
+        watchdogKick();
         if (!flashLlEraseSector(s))
         {
             LOGGER_LOG_ERROR(LOGGER_FLASHER, "staging sector %lu erase failed", (unsigned long)s);
@@ -112,6 +116,7 @@ OsFlashStatus osFlasherStage(const char *path, uint32_t *out_crc, uint32_t *out_
     uint32_t done = 0U;
     while (status == OS_FLASH_OK && done < total)
     {
+        watchdogKick(); /* per-chunk SD read + flash program: feed the watchdog */
         UINT got = 0U;
         if (f_read(&file, s_buf, STAGE_CHUNK, &got) != FR_OK)
         {

@@ -5,6 +5,7 @@
 #include "esp_flasher_port.h"
 #include "esp_loader.h"
 #include "ff.h"
+#include "watchdog.h"
 #include "logger.h"
 
 /* Block size handed to the bootloader per write. 1 KB is the upstream default
@@ -57,6 +58,9 @@ EspFlashStatus espFlasherFlashFile(const char *path, EspFlashProgressCb cb, void
         return ESP_FLASH_CONNECT_FAIL;
     }
 
+    /* The sync + RAM-stub upload handshake has no progress callback and can take
+     * a second or more of retries; kick before entering it. */
+    watchdogKick();
     esp_loader_connect_args_t connect_args = ESP_LOADER_CONNECT_DEFAULT();
     esp_loader_error_t err = esp_loader_connect_with_stub(&loader, &connect_args);
     if (err != ESP_LOADER_SUCCESS)
@@ -84,6 +88,7 @@ EspFlashStatus espFlasherFlashFile(const char *path, EspFlashProgressCb cb, void
     uint32_t written = 0U;
     while (written < image_size)
     {
+        watchdogKick(); /* per-block SD read + UART program: feed the watchdog */
         const uint32_t remaining = image_size - written;
         const uint32_t chunk = (remaining < FLASH_BLOCK_SIZE) ? remaining : FLASH_BLOCK_SIZE;
 

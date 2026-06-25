@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "sysclock.h"
 #include "scheduler.h"
+#include "watchdog.h"
 #include "mp_session.h"
 #include "sd_layout.h"
 #include <stm32f407xx.h> /* DWT->CYCCNT for the frame delta */
@@ -210,6 +211,11 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     bindGameSettings();
 
     LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
+
+    /* Reset the watchdog window before handing off: the image read above ran since
+     * the last menu kick, and the kernel's bootstrap + init run before its loop
+     * starts kicking per frame. */
+    watchdogKick();
 
     /* Hand over to the kernel: it programs the MPU confinement, runs the game's
      * bootstrap + init, then loops {collect; update; send; render} uncapped (the

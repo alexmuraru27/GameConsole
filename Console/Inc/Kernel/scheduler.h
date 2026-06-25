@@ -42,4 +42,10 @@ bool kernelGameActive(void);
  * (true). */
 void kernelRequestLeave(bool crashed);
 
+/* Liveness tick, called from SysTick (1 ms). If the game callback currently
+ * executing has run past its time budget, abandon it like a crash so a runaway
+ * game (e.g. an infinite loop, which faults never catch) can't wedge the console.
+ * No-op when no game callback is in flight. */
+void kernelGameDeadlineTick(uint32_t now_ms);
+
 #endif /* __KERNEL_SCHEDULER_H */

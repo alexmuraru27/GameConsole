@@ -47,8 +47,8 @@ extension. If `pio` isn't on PATH, override it: `make esp PIO=/path/to/pio`.)
 ## Deploy
 
 `make deploy` (from the repo root) stages the built firmware into the
-update-server content tree as `tools/update_server/content/wifi/ESP01.bin` (the
-name the flasher looks for), alongside the game files:
+update-server content tree as `tools/update_server/content/Firmware/ESP01.bin`
+(the name the flasher looks for), alongside the console OS image and the games:
 
 ```bash
 make esp      # build the firmware first

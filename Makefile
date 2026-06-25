@@ -27,8 +27,9 @@ flashswo: flash
 	./tools/scripts/swo.sh
 
 # Stage everything the console can pull into the update-server content tree: the
-# game (+ .pak), the console OS image (os/Console.bin), and the ESP-01S firmware
-# (if it's been built). The bootloader is never self-updated, so it is not staged.
+# game (+ .pak) under games/, and the console OS image (Firmware/Console.bin) plus
+# the ESP-01S firmware (Firmware/ESP01.bin, if built) under the shared Firmware/
+# category. The bootloader is never self-updated, so it is not staged.
 deploy: $(BUILD_DIR)
 	$(MAKE) -C Apps/GameXO deploy
 	$(MAKE) -C Apps/TestRenderer deploy

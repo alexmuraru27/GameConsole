@@ -1,6 +1,7 @@
 #include "usart.h"
 #include <stm32f407xx.h>
 #include "sysclock.h"
+#include "watchdog.h"
 #include "logger.h"
 
 /* USART1 lives on APB2; PCLK2 is SYSCLK/2 = 84 MHz (see systemClockConfig). */
@@ -254,6 +255,13 @@ int usartReadByte(uint32_t timeout_ms)
 
     while (s_rx_tail == usartRxHead())
     {
+        /* This is the single byte-wait every ESP exchange funnels through, and a
+         * sanctioned one can legitimately block for seconds (a WiFi connect waits
+         * up to ~16 s on the first reply byte). Feed the watchdog here so those
+         * long-but-bounded waits don't look like a wedge — the loop still exits at
+         * its own deadline, so a truly stuck console (which never reaches here) is
+         * still caught. */
+        watchdogKick();
         if (getSysTime() >= deadline)
         {
             return -1;

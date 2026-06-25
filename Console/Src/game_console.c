@@ -27,6 +27,7 @@
 #include "faults.h"
 #include "syscall.h"
 #include "mpu.h"
+#include "watchdog.h"
 #include "stdio.h"
 
 const uint16_t s_boot_notes[] = {
@@ -147,6 +148,7 @@ void gameConsoleInit()
     mpuInit(); /* arm MPU confinement before any game can run */
     beep_step(8);
     playBootSong();
+    watchdogInit(); /* arm the last-resort reset backstop now that bring-up is done */
     LOGGER_LOG_INFO(LOGGER_CORE, "console ready");
 }
 

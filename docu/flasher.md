@@ -304,7 +304,7 @@ start/finish, and every error path — but **never** inside the read/write loops
 
 1. Build the [`Esp01s/`](../Esp01s) PlatformIO project (`pio run`) — the full
    image, flashed from address 0.
-2. Stage it into the update-server tree as `content/wifi/ESP01.bin` via `make -C
+2. Stage it into the update-server tree as `content/Firmware/ESP01.bin` via `make -C
    Esp01s deploy` (or top-level `make deploy`); get it onto the card under
    `Firmware/` via **Poll Updates** (or hand-copy it there).
 3. `make flashswo` to flash the console and watch SWO.

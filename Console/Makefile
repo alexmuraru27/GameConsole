@@ -34,6 +34,7 @@ Src/Peripherals/timer.c \
 Src/Peripherals/adc.c \
 Src/Peripherals/sdio.c \
 Src/Peripherals/i2c.c \
+Src/Peripherals/watchdog.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
@@ -192,14 +193,15 @@ $(BUILD_DIR):
 flash: $(BUILD_DIR)/$(TARGET).elf
 	$(OPENOCD) $(OPENOCD_CFG) -c "program $(BUILD_DIR)/$(TARGET).elf verify reset exit"
 
-# Stage the OS image into the update-server tree as os/Console.bin, so the console
-# can pull it over WiFi (Poll Updates -> Firmware/Console.bin) and self-flash it
-# (Settings -> Firmware -> Upgrade OS). The on-server name is Console.bin
-# regardless of the build's TARGET.
+# Stage the OS image into the update-server tree as Firmware/Console.bin, so the
+# console can pull it over WiFi (Poll Updates -> Firmware/Console.bin) and
+# self-flash it (Settings -> Firmware -> Upgrade OS). The on-server name is
+# Console.bin regardless of the build's TARGET. The OS and the ESP-01 image share
+# one Firmware category folder (the console routes it to the SD Firmware/ dir).
 deploy: $(BUILD_DIR)/$(TARGET).bin
-	@mkdir -p $(UPDATE_SERVER_CONTENT)/os
-	cp -f $(BUILD_DIR)/$(TARGET).bin $(UPDATE_SERVER_CONTENT)/os/Console.bin
-	@echo "$(TARGET).bin -> update server $(UPDATE_SERVER_CONTENT)/os/Console.bin"
+	@mkdir -p $(UPDATE_SERVER_CONTENT)/Firmware
+	cp -f $(BUILD_DIR)/$(TARGET).bin $(UPDATE_SERVER_CONTENT)/Firmware/Console.bin
+	@echo "$(TARGET).bin -> update server $(UPDATE_SERVER_CONTENT)/Firmware/Console.bin"
 
 #######################################
 # clean up

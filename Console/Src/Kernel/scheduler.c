@@ -2,6 +2,8 @@
 #include "syscall.h"
 #include "syscall_numbers.h"
 #include "mpu.h"
+#include "sysclock.h"
+#include "watchdog.h"
 #include "logger.h"
 
 #include <stddef.h>
@@ -18,7 +20,23 @@ extern uint32_t __game_ram_start, __game_ram_size;
 static volatile bool s_game_active = false;
 static volatile bool s_game_crashed = false;
 static volatile bool s_leave_crashed = false;
+static volatile bool s_game_hung = false; /* abandoned by the callback deadline, not a fault */
 static uint32_t s_game_psp = 0U;
+
+/*
+ * Per-callback liveness guard. The MPU confines a game's *memory*; this confines
+ * its *CPU time*. A game callback (the bootstrap, init, update or render) that
+ * runs longer than this budget is treated as hung and abandoned through the same
+ * path as a crash, so a game that loses control — an infinite loop, a deadlock on
+ * its own state — cannot wedge the whole console. Games are cooperatively
+ * scheduled (each callback must return promptly; a game self-paces with short
+ * delay()s, not a multi-second block in one callback), so the budget is generous
+ * next to a real frame (<16 ms) or an asset-heavy init, yet still recovers in
+ * human time. The timed-out game returns to the menu as "crashed". Tune here.
+ */
+#define GAME_CALLBACK_BUDGET_MS 2000U
+static volatile bool s_callback_running = false;
+static volatile uint32_t s_callback_deadline_ms = 0U;
 /* Return address (LR) installed in every invoked callback's frame — the game-side
  * _game_return trampoline that traps back here when a callback returns. */
 static uint32_t s_game_frame_return = 0U;
@@ -71,8 +89,31 @@ static void kernelInvokeGame(uint32_t callback)
     frame[7] = 0x01000000U;         /* xPSR: T-bit set */
 
     s_game_psp = (uint32_t)frame;
+    /* Arm the liveness deadline for this callback, then enter it. SysTick
+     * (privileged, 1 ms, priority above the SVC trap) advances the clock and
+     * checks the deadline while the unprivileged callback runs. */
+    s_callback_deadline_ms = getSysTime() + GAME_CALLBACK_BUDGET_MS;
+    s_callback_running = true;
     kernelTriggerInvoke();
+    s_callback_running = false;
     /* --- resumes here once the callback returns or the game leaves --- */
+}
+
+/* Called from SysTick (privileged, every 1 ms). If the in-flight game callback
+ * has overrun its budget, abandon it exactly like a crash: pend the leave so
+ * PendSV tail-chains back to the parked console context. One-shot per overrun
+ * (clears the running flag so it pends PendSV once), and only ever acts while a
+ * game callback is actually executing. Silent — this runs in an ISR; the
+ * recovery is logged once back in kernelRunGame. */
+void kernelGameDeadlineTick(uint32_t now_ms)
+{
+    if (s_callback_running && s_game_active &&
+        (int32_t)(now_ms - s_callback_deadline_ms) >= 0)
+    {
+        s_callback_running = false;
+        s_game_hung = true;
+        kernelRequestLeave(true);
+    }
 }
 
 void kernelRunGame(const GameBinaryHeader *header,
@@ -80,6 +121,7 @@ void kernelRunGame(const GameBinaryHeader *header,
 {
     s_game_frame_return = header->frame_return; /* keep Thumb bit: it is used as LR */
     s_game_crashed = false;
+    s_game_hung = false;
     s_game_active = true;
 
     LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game: init=0x%08lX update=0x%08lX render=0x%08lX",
@@ -97,6 +139,11 @@ void kernelRunGame(const GameBinaryHeader *header,
      * (via PendSV) so we stop before rendering a game that is no longer there. */
     while (s_game_active)
     {
+        /* Kick the last-resort watchdog once per frame. A game that hangs is
+         * caught faster and gracefully by the per-callback deadline above; this
+         * keeps the IWDG fed during normal play (and after a deadline abandon,
+         * control returns to the menu loop, which keeps kicking). */
+        watchdogKick();
         if (collect != NULL)
         {
             collect();
@@ -112,7 +159,12 @@ void kernelRunGame(const GameBinaryHeader *header,
     /* Back in privileged thread context. Safe to log: the per-game lifecycle ends
      * here, not on a hot path. (The leave itself happens in PendSV, which stays
      * silent.) */
-    if (s_game_crashed)
+    if (s_game_hung)
+    {
+        LOGGER_LOG_ERROR(LOGGER_KERNEL, "game hung (callback overran %u ms); recovered to console",
+                         (unsigned)GAME_CALLBACK_BUDGET_MS);
+    }
+    else if (s_game_crashed)
     {
         LOGGER_LOG_ERROR(LOGGER_KERNEL, "game crashed; recovered to console");
     }

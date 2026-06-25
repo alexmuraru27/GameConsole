@@ -15,13 +15,14 @@ all: build
 build:
 	$(PIO) run
 
-# Copy the built ESP firmware into the update server as wifi/ESP01.bin. Skips
-# quietly if the firmware hasn't been built, so it never breaks `make deploy`.
+# Copy the built ESP firmware into the update server as Firmware/ESP01.bin (the
+# same category folder as the console OS image). Skips quietly if the firmware
+# hasn't been built, so it never breaks `make deploy`.
 deploy:
 	@if [ -f $(FIRMWARE) ]; then \
-		mkdir -p $(UPDATE_SERVER_CONTENT)/wifi && \
-		cp -f $(FIRMWARE) $(UPDATE_SERVER_CONTENT)/wifi/ESP01.bin && \
-		echo "ESP01.bin -> update server $(UPDATE_SERVER_CONTENT)/wifi"; \
+		mkdir -p $(UPDATE_SERVER_CONTENT)/Firmware && \
+		cp -f $(FIRMWARE) $(UPDATE_SERVER_CONTENT)/Firmware/ESP01.bin && \
+		echo "ESP01.bin -> update server $(UPDATE_SERVER_CONTENT)/Firmware"; \
 	else \
 		echo "skip ESP01.bin: $(FIRMWARE) not built (run 'pio run' in Esp01s/ first)"; \
 	fi

@@ -8,6 +8,7 @@
 #include "network_protocol.h"
 #include "crc.h"
 #include "sysclock.h"
+#include "watchdog.h"
 #include "logger.h"
 #include "sd_layout.h"
 #include "ff.h"
@@ -285,6 +286,7 @@ DownloadStatus downloaderFetchFile(const RemoteEntry *entry, const char *sd_path
 
     for (;;)
     {
+        watchdogKick(); /* long transfer: feed the watchdog each chunk */
         const int n = networkHttpRead(s_chunk, CHUNK_MAX);
         if (n < 0)
         {
@@ -373,6 +375,7 @@ uint32_t downloaderLocalCrc(const char *sd_path, bool *exists)
     UINT n = 0U;
     while (f_read(&f, s_chunk, sizeof(s_chunk), &n) == FR_OK && n > 0U)
     {
+        watchdogKick(); /* hashing a multi-hundred-KB image: feed the watchdog each chunk */
         crc = crc32_update(crc, s_chunk, (uint32_t)n);
     }
     f_close(&f);

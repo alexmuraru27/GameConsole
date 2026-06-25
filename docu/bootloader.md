@@ -176,7 +176,7 @@ Because the op code lives in RAM, the stall costs only the program/erase time â€
 make -C Bootloader all     # the bootloader (sector 0)
 make -C Console all         # the app (sectors 1-5, links at 0x08004000)
 make flash                  # SWD-flash BOTH stages (bootloader then app)
-make deploy                 # stage the app image as content/os/Console.bin for OTA
+make deploy                 # stage the app image as content/Firmware/Console.bin for OTA
 ```
 
 The bootloader is a minimal separate target: it reuses the console's `startup.s` (unused peripheral ISRs stay weak-aliased to the default handler) and shares `crc.c` and `flash_ll.c`, with its own `linker/bootloader.ld`. Flash it once over SWD; thereafter the OS updates itself over WiFi + SD.
