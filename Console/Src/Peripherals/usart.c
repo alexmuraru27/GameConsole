@@ -15,8 +15,11 @@
  *     if an ISR (buzzer 1 ms / joystick 50 ms) stalls the consumer for several
  *     byte-times, the hardware keeps depositing bytes, so nothing overruns the
  *     single DR register the way a polled reader would.
- *   - TX: a per-transfer DMA (Stream 7, channel 4) streams a frame out, then we
- *     wait for the shift register to empty (USART TC) before returning.
+ *   - TX: a per-transfer DMA (Stream 7, channel 4) streams a frame out. The
+ *     blocking usartWriteBytes() waits for the shift register to empty (USART TC)
+ *     before returning; usartWriteBytesStart()/usartTxWait() split that wait so a
+ *     caller can overlap the drain with other work (the per-frame ESP-NOW poll
+ *     arms the send, runs the game's render, then collects the reply).
  * The byte-oriented API is unchanged, so network.c and the ESP flasher are
  * agnostic to the DMA backing.
  */
@@ -99,15 +102,13 @@ void usartInit(void)
     LOGGER_LOG_INFO(LOGGER_USART, "USART1 up @ %u baud, DMA rx(S2)/tx(S7)", (unsigned)USART1_DEFAULT_BAUD);
 }
 
-bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
-{
-    if (len == 0U)
-    {
-        return true;
-    }
-    const uint32_t deadline = getSysTime() + timeout_ms;
+/* True between a usartWriteBytesStart() and the drain that completes it. */
+static volatile bool s_tx_in_flight;
 
-    /* Arm the TX stream for this buffer. */
+/* Arm + enable the TX DMA stream for `data`/`len`. Returns false if a previous
+ * transfer left the stream stuck enabled past `deadline`. */
+static bool txArmStream(const uint8_t *data, uint16_t len, uint32_t deadline)
+{
     DMA2_Stream7->CR &= ~DMA_SxCR_EN;
     while (DMA2_Stream7->CR & DMA_SxCR_EN)
     {
@@ -128,17 +129,23 @@ bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
                        DMA_SxCR_MINC |              /* increment through the buffer   */
                        DMA_SxCR_PL_1;               /* high priority                 */
 
-    /* Clear TC so the post-transfer wait sees this frame's completion, not a stale one. */
+    /* Clear TC so the drain sees this frame's completion, not a stale one. */
     USART1->SR &= ~USART_SR_TC;
     DMA2_Stream7->CR |= DMA_SxCR_EN;
+    return true;
+}
 
-    /* Wait until DMA has handed every byte to the USART (or it errors / times out). */
+/* Block until the armed transfer has fully drained: DMA has handed every byte to
+ * the USART, then the shift register has emptied (TC) — so a following reset/boot
+ * pin toggle doesn't truncate the frame. False on DMA error or timeout. */
+static bool txDrain(uint32_t deadline)
+{
     while ((DMA2->HISR & (DMA_HISR_TCIF7 | DMA_HISR_TEIF7)) == 0U)
     {
         if (getSysTime() >= deadline)
         {
-            LOGGER_LOG_ERROR(LOGGER_USART, "tx DMA timeout: %u of %u byte(s) unsent",
-                             (unsigned)(DMA2_Stream7->NDTR & 0xFFFFU), (unsigned)len);
+            LOGGER_LOG_ERROR(LOGGER_USART, "tx DMA timeout: %u byte(s) unsent",
+                             (unsigned)(DMA2_Stream7->NDTR & 0xFFFFU));
             DMA2_Stream7->CR &= ~DMA_SxCR_EN;
             return false;
         }
@@ -151,8 +158,6 @@ bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
     }
     DMA2_Stream7->CR &= ~DMA_SxCR_EN;
 
-    /* Then wait for the last byte to leave the shift register so a following
-     * reset/boot pin toggle doesn't truncate the frame. */
     while ((USART1->SR & USART_SR_TC) == 0U)
     {
         if (getSysTime() >= deadline)
@@ -162,6 +167,57 @@ bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
         }
     }
     return true;
+}
+
+bool usartWriteBytesStart(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
+{
+    if (len == 0U)
+    {
+        return true;
+    }
+    const uint32_t deadline = getSysTime() + timeout_ms;
+
+    /* Drain any still-in-flight prior transfer before reprogramming the stream:
+     * this is where the async pattern actually blocks — and only if the previous
+     * frame somehow hasn't finished draining yet (normally it has, overlapped with
+     * the caller's work), so it protects the prior buffer at effectively no cost. */
+    if (s_tx_in_flight)
+    {
+        if (!txDrain(deadline))
+        {
+            s_tx_in_flight = false;
+            return false;
+        }
+        s_tx_in_flight = false;
+    }
+
+    if (!txArmStream(data, len, deadline))
+    {
+        return false;
+    }
+    s_tx_in_flight = true;
+    return true;
+}
+
+bool usartTxWait(uint32_t timeout_ms)
+{
+    if (!s_tx_in_flight)
+    {
+        return true;
+    }
+    const bool ok = txDrain(getSysTime() + timeout_ms);
+    s_tx_in_flight = false;
+    return ok;
+}
+
+bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms)
+{
+    /* Blocking = arm the transfer then wait it out. */
+    if (!usartWriteBytesStart(data, len, timeout_ms))
+    {
+        return false;
+    }
+    return usartTxWait(timeout_ms);
 }
 
 void usartFlushRx(void)

@@ -20,11 +20,15 @@
  * abandoned: PendSV tail-chains before the faulting instruction is retried.
  */
 
-/* Run a loaded game, OS-driven: bootstrap + init, then loop {service; update;
- * render} until it exits or crashes. `service` (may be NULL) runs privileged
- * between frames for console background work and frame pacing. Programs/releases
- * the MPU around the session; returns once the game is gone. */
-void kernelRunGame(const GameBinaryHeader *header, void (*service)(void));
+/* Run a loaded game, OS-driven: bootstrap + init, then loop
+ * {collect; update; send; render} until it exits or crashes. `collect` and `send`
+ * (either may be NULL) run privileged around update() for console background work:
+ * `collect` ingests inbound state before the game steps, `send` emits outbound
+ * after it — split so an async round-trip (the ESP-NOW poll) overlaps render()
+ * rather than blocking the loop. Programs/releases the MPU around the session;
+ * returns once the game is gone. */
+void kernelRunGame(const GameBinaryHeader *header,
+                   void (*collect)(void), void (*send)(void));
 
 /* Whether the most recent kernelRunGame() ended in a crash. */
 bool kernelGameCrashed(void);

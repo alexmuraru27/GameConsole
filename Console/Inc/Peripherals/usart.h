@@ -22,8 +22,24 @@ void usartInit(void);
 void usartSetBaud(uint32_t baud);
 
 /* Send len bytes, blocking until the line drains or timeout_ms elapses.
- * Returns true on success, false on timeout. */
+ * Returns true on success, false on timeout. Used by paths that must not return
+ * until the line is idle — the ESP flasher (pin toggles) and baud switches. */
 bool usartWriteBytes(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
+
+/* Async TX: arm the DMA for `data`/`len` and return immediately, WITHOUT waiting
+ * for the bytes to drain — so the caller can do useful work while the frame goes
+ * out (the per-frame ESP-NOW poll overlaps it with the game's render). `data` must
+ * stay valid until the transfer completes; the next Start (or a usartTxWait)
+ * drains the prior transfer first, so a single reused buffer is safe as long as it
+ * is not rewritten before then. A still-in-flight prior transfer is drained first
+ * (bounded by timeout_ms). Returns false on timeout/DMA error. Pairs with
+ * usartTxWait; usartWriteBytes is just Start + Wait. */
+bool usartWriteBytesStart(const uint8_t *data, uint16_t len, uint32_t timeout_ms);
+
+/* Block until the in-flight async TX has fully drained (DMA done + shift register
+ * empty), bounded by timeout_ms. Returns true if drained (or none was pending).
+ * Normally returns at once — the request drains during the overlapped work. */
+bool usartTxWait(uint32_t timeout_ms);
 
 /* Discard any buffered (unread) received bytes — used when switching baud. */
 void usartFlushRx(void);

@@ -19,7 +19,7 @@ extern uint32_t __game_ram_start, __game_ram_size;
 
 /* Frame delta — the wall-clock time between successive update() calls, exposed to
  * games as getDeltaTimeUs() for frame-rate-independent movement/animation. It is
- * measured in gameRuntimeService (run once per frame, just before update) from
+ * measured in gameRuntimeCollect (run once per frame, just before update) from
  * DWT->CYCCNT, the free-running 168 MHz cycle counter enabled in swoInit: ~6 ns
  * resolution at zero interrupt cost. The first frame of a session reports 0 (no
  * prior frame), and the delta is clamped so a one-off stall (a long SD access,
@@ -35,14 +35,15 @@ uint32_t gameLoaderGetDeltaUs(void)
     return s_frame_delta_us;
 }
 
-/* Run between every frame, privileged, from inside kernelRunGame's loop. Measures
- * the frame delta (above) and is the seam where the OS does its own work while a
- * game is loaded. The OS does NOT cap the frame rate — a game runs uncapped and
- * paces itself with delay() if it wants a fixed rate (the renderer test runs flat
- * out to measure raw throughput; GameXO sleeps out each frame to hold ~60 FPS).
- * The WiFi RX is a continuous DMA ring so nothing must be polled today, but this is
- * the seam for inter-frame USART/network work as it lands. */
-static void gameRuntimeService(void)
+/* Frame-START seam (before update), privileged, from inside kernelRunGame's loop.
+ * Measures the frame delta (above) and, while a multiplayer session is up, ingests
+ * the reply to the PREVIOUS frame's ESP-NOW request — which streamed into the RX
+ * DMA ring during the last render(), so this rarely waits. The game's update()
+ * then reads the freshly-filled inbox via the non-blocking mp* syscalls. The OS
+ * does NOT cap the frame rate — a game runs uncapped and paces itself with delay()
+ * if it wants a fixed rate (the renderer test runs flat out to measure raw
+ * throughput; GameXO sleeps out each frame to hold ~60 FPS). */
+static void gameRuntimeCollect(void)
 {
     const uint32_t now = DWT->CYCCNT;
     if (!s_frame_timing_started)
@@ -57,13 +58,22 @@ static void gameRuntimeService(void)
     }
     s_prev_frame_cyc = now;
 
-    /* No frame pacing here by design — see above. This is the seam for inter-frame
-     * console work: while a multiplayer session is up, exchange one ESP-NOW batch
-     * with the ESP (send due beacons/heartbeats + queued messages, drain inbound)
-     * so the game's mp* syscalls stay non-blocking mailbox ops. */
     if (mpSessionActive())
     {
-        mpSessionService(getSysTime());
+        mpSessionCollect(getSysTime());
+    }
+}
+
+/* Frame-END seam (after update, before render), privileged. While a session is up,
+ * assemble this frame's outbound batch (the messages update() just queued, plus
+ * due beacons/heartbeats) and arm it over the async TX — the round-trip then
+ * overlaps render() instead of busy-waiting the CPU, which is the whole point of
+ * the split. No frame pacing here by design; the game self-paces with delay(). */
+static void gameRuntimeFlush(void)
+{
+    if (mpSessionActive())
+    {
+        mpSessionFlush(getSysTime());
     }
 }
 
@@ -202,11 +212,11 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
 
     /* Hand over to the kernel: it programs the MPU confinement, runs the game's
-     * bootstrap + init, then loops update/render uncapped (servicing the console
-     * between frames via gameRuntimeService — the game paces itself). Returns only
-     * when the game exits cleanly or crashes — either way the console resumes
-     * privileged on the MSP. */
-    kernelRunGame(&s_game_header, gameRuntimeService);
+     * bootstrap + init, then loops {collect; update; send; render} uncapped (the
+     * game paces itself). collect ingests inbound before update, send arms outbound
+     * after it so the ESP-NOW round-trip overlaps render. Returns only when the game
+     * exits cleanly or crashes — either way the console resumes privileged on the MSP. */
+    kernelRunGame(&s_game_header, gameRuntimeCollect, gameRuntimeFlush);
 
     /* A game may have opened a multiplayer session; tear it down unconditionally so
      * a clean exit OR a crash can never leave the ESP-NOW link or a peer session up

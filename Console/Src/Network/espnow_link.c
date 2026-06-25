@@ -60,8 +60,7 @@ void espnowLinkEnd(void)
     LOGGER_LOG_INFO(LOGGER_NETWORK, "esp-now end");
 }
 
-uint8_t espnowLinkService(const EspNowPacket *out, uint8_t n_out,
-                          EspNowPacket *in, uint8_t max_in)
+bool espnowLinkSend(const EspNowPacket *out, uint8_t n_out)
 {
     /* Assemble the outbound batch: {n, n x {dst mac[6], len:u8, bytes}}. Clamp to
      * the frame budget; any packet that does not fit is dropped this frame (the
@@ -84,10 +83,18 @@ uint8_t espnowLinkService(const EspNowPacket *out, uint8_t n_out,
     }
     s_cmd[0] = n_sent;
 
+    /* Async TX: the command is fully copied out of s_cmd (into the framing layer's
+     * buffer) before this returns, so the caller may immediately reuse its packet
+     * array for inbound — the reply streams in on its own until espnowLinkCollect. */
+    return networkTransactSend(NP_CMD_MP_SERVICE, s_cmd, w);
+}
+
+uint8_t espnowLinkCollect(EspNowPacket *in, uint8_t max_in)
+{
     uint8_t rsp_type = 0U;
     uint16_t rsp_len = 0U;
     const uint8_t *rp = NULL;
-    if (!networkTransact(NP_CMD_MP_SERVICE, s_cmd, w, &rsp_type, &rsp_len, &rp, ESPNOW_TIMEOUT_SERVICE))
+    if (!networkTransactCollect(&rsp_type, &rsp_len, &rp, ESPNOW_TIMEOUT_SERVICE))
     {
         return 0U; /* transport failure — caller treats as "no inbound this frame" */
     }
@@ -126,4 +133,16 @@ uint8_t espnowLinkService(const EspNowPacket *out, uint8_t n_out,
         got++;
     }
     return got;
+}
+
+uint8_t espnowLinkService(const EspNowPacket *out, uint8_t n_out,
+                          EspNowPacket *in, uint8_t max_in)
+{
+    /* Blocking one-shot = Send then immediately Collect (the Collect waits out the
+     * TX drain + reply). Used off the per-frame path, e.g. the BYE on session stop. */
+    if (!espnowLinkSend(out, n_out))
+    {
+        return 0U;
+    }
+    return espnowLinkCollect(in, max_in);
 }

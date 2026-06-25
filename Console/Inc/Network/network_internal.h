@@ -29,4 +29,19 @@ bool networkTransact(uint8_t cmd, const uint8_t *payload, uint16_t len,
                      uint8_t *rsp_type, uint16_t *rsp_len, const uint8_t **rsp_payload,
                      uint32_t timeout_ms);
 
+/*
+ * The same transaction split into two halves so the caller can overlap the
+ * round-trip (TX drain + ESP turnaround + reply) with unrelated work instead of
+ * busy-waiting on it. networkTransactSend arms the command over the async TX and
+ * returns immediately; the reply streams into the RX DMA ring on its own. A later
+ * networkTransactCollect reads exactly that one reply (waiting only if it has not
+ * fully arrived yet). Strictly one Send is outstanding at a time — still one
+ * command, one reply, in order. The per-frame ESP-NOW poll uses these: Send after
+ * the game's update(), Collect at the start of the next frame, with render() in
+ * between. WiFi/HTTP and the flasher keep using the blocking networkTransact.
+ */
+bool networkTransactSend(uint8_t cmd, const uint8_t *payload, uint16_t len);
+bool networkTransactCollect(uint8_t *rsp_type, uint16_t *rsp_len,
+                            const uint8_t **rsp_payload, uint32_t timeout_ms);
+
 #endif /* __NETWORK_INTERNAL_H */

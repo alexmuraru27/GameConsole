@@ -14,20 +14,28 @@
  * outbound app-message mailboxes a game reads through the mp* syscalls.
  *
  * It is driven by the game (which owns the lobby UI) through the kernel syscall
- * dispatcher (syscall.c), and serviced once per frame from the inter-frame seam
- * in game_loader.c's gameRuntimeService(). A host advertises the *running* game
+ * dispatcher (syscall.c), and serviced each frame from the inter-frame seams in
+ * game_loader.c (collect before update(), flush after). A host advertises the *running* game
  * (its .bin identity, taken from the loader) so a joiner only discovers hosts of
  * the same game. See docu/espnow.md for the full protocol and diagrams.
  */
 
-/* True while a session OR a join-mode scan is in progress — i.e. while
- * mpSessionService() must run each frame. False means zero overhead. */
+/* True while a session OR a join-mode scan is in progress — i.e. while the
+ * per-frame collect/send must run. False means zero overhead. */
 bool mpSessionActive(void);
 
-/* Per-frame service: exchange one MP_SERVICE batch with the ESP (send due
- * beacons/heartbeats + queued messages, receive inbound), process the session
- * protocol, and sweep peer liveness. `now_ms` is getSysTime(). */
-void mpSessionService(uint32_t now_ms);
+/* Per-frame service, pipelined across the frame so the ESP round-trip overlaps
+ * render() instead of busy-waiting:
+ *   mpSessionCollect — BEFORE update(): ingest the reply to last frame's request
+ *                      (peer liveness, SYS protocol, app inbox).
+ *   mpSessionFlush   — AFTER update(): assemble due beacons/heartbeats + queued
+ *                      messages and arm the batch over the async TX, then sweep
+ *                      peer liveness. The reply returns during render(). (Named
+ *                      "flush", not "send", to avoid clashing with the mpSend
+ *                      syscall backend mpSessionSend below.)
+ * `now_ms` is getSysTime(). See the seam in game_loader.c. */
+void mpSessionCollect(uint32_t now_ms);
+void mpSessionFlush(uint32_t now_ms);
 
 /* ---- backends for the mp* syscalls (see console_syscalls.h for semantics) ---- */
 MpRole mpSessionGetRole(void);

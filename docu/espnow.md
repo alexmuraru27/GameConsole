@@ -54,10 +54,10 @@ a dumb byte mover; all session intelligence lives on the console.**
    │  │   discovery beacons · join handshake · roster          │  │
    │  │   heartbeat liveness · in/out app mailboxes            │  │
    │  └───────────────┬────────────────────────────────────────┘  │
-   │   serviced once per frame from gameRuntimeService()           │
+   │   collect (pre-update) / flush (post-update) each frame        │
    │  ┌───────────────▼────────────────────────────────────────┐  │
    │  │ **espnow_link.c** — typed UART wrappers                │  │
-   │  │   (reuses network.c's framing via networkTransact)     │  │
+   │  │   (network.c framing; async send + collect per frame)  │  │
    │  └───────────────┬────────────────────────────────────────┘  │
    └──────────────────┼───────────────────────────────────────────┘
                       │  framed UART @ 923 kbaud (network_protocol.h)
@@ -96,9 +96,13 @@ push frames to the console. Instead:
   the ESP a batch of outbound packets *and* drains the ESP's inbound ring in the
   response.
 
-So there is still exactly one command → one response. The 2 KB DMA RX ring in
-`usart.c` comfortably covers the gap between polls, and at 60 FPS the inbound
-latency is ≤ 16 ms — far below what a turn-based game notices.
+So there is still exactly one command → one response. That round-trip is
+**pipelined across the frame** (see §10): the console *arms* the command over the
+async TX after `update()` and reads the reply at the start of the next frame, so
+the whole exchange overlaps `render()` instead of busy-waiting the CPU. The 2 KB
+DMA RX ring in `usart.c` holds the reply meanwhile, and the inbound packets a game
+sees are one frame old — ≤ 16 ms at 60 FPS, far below what a turn-based game
+notices.
 
 ---
 
@@ -281,18 +285,33 @@ STM32-UID-derived `Console-XXXX` when unset.
 
 ## 10. Inter-frame servicing
 
-The OS owns the game loop (`scheduler.c`); between a game's `update` and the next
-frame it runs `gameRuntimeService()` (`game_loader.c`). While a session is active
-this calls `mpSessionService(getSysTime())`, which performs exactly one
-`MP_SERVICE` exchange: emit any due beacon/heartbeat, flush queued outbound + SYS
-replies, drain inbound, then sweep liveness.
+The OS owns the game loop (`scheduler.c`), and the `MP_SERVICE` round-trip is
+**pipelined across one frame** so it overlaps the game's `render()` instead of
+busy-waiting the CPU. The single exchange is split into two seams in
+`game_loader.c`:
+
+- **`gameRuntimeCollect()`** runs *before* `update()` and calls
+  `mpSessionCollect(now)` — it ingests the reply to the **previous** frame's
+  request (refresh peer liveness, run the SYS protocol, push app payloads into the
+  inbox). That reply streamed into the RX DMA ring during the last `render()`, so
+  this almost never blocks.
+- **`gameRuntimeFlush()`** runs *after* `update()` and calls `mpSessionFlush(now)`
+  — it emits any due beacon/heartbeat, flushes queued outbound + SYS replies, and
+  **arms** the batch over the async TX (`espnowLinkSend` → `networkTransactSend`),
+  returning at once. The reply then comes back during `render()`.
 
 ```
   for each frame:
-     gameRuntimeService()  ──►  if (mpSessionActive()) mpSessionService(now)
+     gameRuntimeCollect()  ──►  mpSessionCollect(now): read LAST frame's reply  (ring already full)
      game update()         ──►  mpSend()/mpReceive() are instant mailbox ops
-     game render()
+     gameRuntimeFlush()    ──►  mpSessionFlush(now): arm THIS frame's batch (async TX, returns)
+     game render()         ──►  the round-trip (TX drain + ESP + reply) overlaps here, no CPU wait
 ```
+
+Inbound is therefore one frame old (~16 ms at 60 FPS) — fine for the
+host-authoritative netcode — and exactly one request is outstanding at a time, so
+the one-command/one-reply master/slave invariant still holds. The split is purely
+OS-internal: `mpSend`/`mpReceive` and the whole game API are unchanged.
 
 When the game exits or crashes, `game_loader.c` calls `mpSessionStop()`
 unconditionally, so a session can never leak into the next game.
@@ -334,9 +353,12 @@ the synced board (no AI in multiplayer — the opponent is the remote human).
   (peer/host tables, app mailboxes, a single shared service-staging buffer). The
   outbound batch is fully serialized before the inbound is parsed, so one buffer
   serves both directions.
-- **Per-frame cost.** `mpSessionService` blocks the frame for one UART round-trip
-  (~1 ms at 923 kbaud for small batches). Negligible for turn-based games; a future
-  fast-action game would want this profiled.
+- **Per-frame cost.** The UART round-trip (~1 ms at 923 kbaud for small batches,
+  plus the ESP turnaround) no longer blocks the frame: it is armed over the async
+  TX after `update()` and overlaps `render()` (§10), so the CPU isn't spent
+  busy-waiting on it. The residual cost is a near-instant ring read at the next
+  frame's `collect` — it only stalls if `render()` finished before the reply
+  arrived, which is rare. Inbound is one frame old in exchange.
 - **Channel.** Both peers must share **channel 1** (pinned in `MP_BEGIN`, inside the
   ESP firmware's FCC 1–11 range). There is no AP to negotiate one.
 - **Security.** v1 is **unencrypted** ESP-NOW on an open channel — the same LAN-toy

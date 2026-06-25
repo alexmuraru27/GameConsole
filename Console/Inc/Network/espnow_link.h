@@ -37,13 +37,25 @@ bool espnowLinkBegin(uint8_t channel, uint8_t self_mac_out[NP_MP_MAC_LEN]);
 /* Leave ESP-NOW mode (the ESP returns to idle station mode). */
 void espnowLinkEnd(void);
 
-/* The per-frame exchange: send `n_out` outbound packets and receive up to
- * `max_in` inbound ones into `in`. Returns the number of inbound packets received
- * (0 on a transport failure or an empty inbound queue).
+/* The per-frame exchange, split so the round-trip overlaps the game's render():
  *
- * `out` is fully serialized before any byte of `in` is written, so the caller may
- * pass the SAME array for both (the inbound packets overwrite the consumed
- * outbound ones) — mp_session.c does this to share one staging buffer. */
+ *   espnowLinkSend    — serialize `n_out` outbound packets and arm the send over
+ *                       the async TX, returning at once. `out` is fully consumed
+ *                       before returning, so the caller may reuse the same array
+ *                       for the inbound collect. Returns false on a TX failure.
+ *   espnowLinkCollect — read the reply to the in-flight send (filled into the RX
+ *                       ring meanwhile) into `in`, up to `max_in`. Returns the
+ *                       number of inbound packets (0 on transport failure / empty).
+ *
+ * Exactly one Send is outstanding at a time (one command, one reply, in order):
+ * mp_session.c calls Send after the game's update() and Collect at the start of
+ * the next frame. */
+bool espnowLinkSend(const EspNowPacket *out, uint8_t n_out);
+uint8_t espnowLinkCollect(EspNowPacket *in, uint8_t max_in);
+
+/* Blocking convenience = Send then Collect (waits the round-trip out). The SAME
+ * array may back `out` and `in`. Used off the per-frame path (e.g. the BYE on
+ * session stop), not where overlap matters. */
 uint8_t espnowLinkService(const EspNowPacket *out, uint8_t n_out,
                           EspNowPacket *in, uint8_t max_in);
 

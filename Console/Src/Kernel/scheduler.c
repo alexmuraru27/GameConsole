@@ -75,7 +75,8 @@ static void kernelInvokeGame(uint32_t callback)
     /* --- resumes here once the callback returns or the game leaves --- */
 }
 
-void kernelRunGame(const GameBinaryHeader *header, void (*service)(void))
+void kernelRunGame(const GameBinaryHeader *header,
+                   void (*collect)(void), void (*send)(void))
 {
     s_game_frame_return = header->frame_return; /* keep Thumb bit: it is used as LR */
     s_game_crashed = false;
@@ -90,16 +91,21 @@ void kernelRunGame(const GameBinaryHeader *header, void (*service)(void))
     kernelInvokeGame(header->entry_point);
     kernelInvokeGame(header->init);
 
-    /* The OS owns the loop: service console background work + pace the frame, then
-     * step the game. A clean gameExit() or a crash inside update clears s_game_active
+    /* The OS owns the loop: collect inbound console work, step update(), emit
+     * outbound, then render() (during which an async round-trip armed by send()
+     * completes). A clean gameExit() or a crash inside update clears s_game_active
      * (via PendSV) so we stop before rendering a game that is no longer there. */
     while (s_game_active)
     {
-        if (service != NULL)
+        if (collect != NULL)
         {
-            service();
+            collect();
         }
         kernelInvokeGame(header->update);
+        if (s_game_active && send != NULL)
+        {
+            send();
+        }
         kernelInvokeGame(header->render);
     }
 

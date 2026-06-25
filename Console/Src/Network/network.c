@@ -62,11 +62,13 @@ static void npBegin(void)
     npDrainRx(3U, 40U);
 }
 
-static bool npSendFrame(uint8_t type, const uint8_t *payload, uint16_t len)
+/* Build a command frame into s_tx; returns the total wire length, or 0 if the
+ * payload is too big. */
+static uint16_t npBuildFrame(uint8_t type, const uint8_t *payload, uint16_t len)
 {
     if (len > NP_MAX_PAYLOAD)
     {
-        return false;
+        return 0U;
     }
 
     s_tx[0] = NP_SYNC0;
@@ -82,7 +84,23 @@ static bool npSendFrame(uint8_t type, const uint8_t *payload, uint16_t len)
     s_tx[NP_HEADER_SIZE + len] = (uint8_t)(crc & 0xFFU);
     s_tx[NP_HEADER_SIZE + len + 1U] = (uint8_t)(crc >> 8U);
 
-    return usartWriteBytes(s_tx, (uint16_t)(NP_FRAME_OVERHEAD + len), NP_TX_TIMEOUT);
+    return (uint16_t)(NP_FRAME_OVERHEAD + len);
+}
+
+static bool npSendFrame(uint8_t type, const uint8_t *payload, uint16_t len)
+{
+    const uint16_t total = npBuildFrame(type, payload, len);
+    return (total != 0U) && usartWriteBytes(s_tx, total, NP_TX_TIMEOUT);
+}
+
+/* Async variant: arm the TX DMA and return immediately, leaving the frame to
+ * drain on its own. s_tx must not be rebuilt until the transfer completes — the
+ * next send drains it first (usartWriteBytesStart), and the per-frame poll rebuilds
+ * it only once per frame, after the prior reply has been collected. */
+static bool npSendFrameAsync(uint8_t type, const uint8_t *payload, uint16_t len)
+{
+    const uint16_t total = npBuildFrame(type, payload, len);
+    return (total != 0U) && usartWriteBytesStart(s_tx, total, NP_TX_TIMEOUT);
 }
 
 /* Read `n` bytes into `dst` before `deadline`. */
@@ -271,6 +289,43 @@ bool networkTransact(uint8_t cmd, const uint8_t *payload, uint16_t len,
     if (rsp_payload != NULL)
     {
         *rsp_payload = &s_rx[3]; /* payload sits after [type, len_lo, len_hi] */
+    }
+    return true;
+}
+
+/* Internal seam: the SEND half of a transaction (network_internal.h). Flushes any
+ * stale RX, then arms the command frame over the async TX and returns at once —
+ * the reply lands in the RX ring on its own while the caller does other work. The
+ * line is idle at this boundary (the previous reply was already collected), so the
+ * flush only drops strays, never the upcoming reply. Pair with networkTransactCollect.
+ */
+bool networkTransactSend(uint8_t cmd, const uint8_t *payload, uint16_t len)
+{
+    usartSetBaud(NETWORK_UART_BAUD);
+    usartFlushRx(); /* drop stale bytes instantly; the line is idle at a boundary */
+    return npSendFrameAsync(cmd, payload, len);
+}
+
+/* Internal seam: the COLLECT half (network_internal.h). Ensures the request has
+ * fully left (a reply cannot exist until it has — normally already drained during
+ * the overlapped work, so this returns at once), then reads exactly one response
+ * frame from the RX ring. On success points `rsp_payload` at the payload inside
+ * the RX buffer (valid until the next transaction). False on TX drain / timeout /
+ * framing / CRC error. */
+bool networkTransactCollect(uint8_t *rsp_type, uint16_t *rsp_len,
+                            const uint8_t **rsp_payload, uint32_t timeout_ms)
+{
+    if (!usartTxWait(NP_TX_TIMEOUT))
+    {
+        return false;
+    }
+    if (!npRecvFrame(rsp_type, rsp_len, timeout_ms))
+    {
+        return false;
+    }
+    if (rsp_payload != NULL)
+    {
+        *rsp_payload = &s_rx[3];
     }
     return true;
 }

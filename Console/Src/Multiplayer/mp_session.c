@@ -132,10 +132,16 @@ static uint8_t s_inbox_head, s_inbox_tail;
 static MpAppMsg s_outbox[MP_OUTBOX_SLOTS];
 static uint8_t s_outbox_head, s_outbox_tail;
 
-/* Per-service packet staging — ONE buffer for both directions. espnowLinkService
- * fully serializes the outbound packets before writing any inbound, so the sent
- * batch and the received batch can share storage (see espnow_link.h). */
+/* Per-service packet staging — ONE buffer for both directions. The outbound batch
+ * is fully serialized (mpSessionFlush) before any inbound is written into it
+ * (mpSessionCollect of the next frame), so the sent and received batches share
+ * storage (see espnow_link.h). */
 static EspNowPacket s_svc[MP_SVC];
+
+/* True between an mpSessionFlush (request armed over the async TX) and the
+ * mpSessionCollect that consumes its reply. Guards the first frame (nothing sent
+ * yet) and keeps the one-command/one-reply invariant across the split. */
+static bool s_request_pending;
 
 /* ---- small helpers ---- */
 
@@ -254,6 +260,7 @@ static void clearSessionTables(void)
     s_join_pending = false;
     s_last_beacon_ms = 0U;
     s_last_heartbeat_ms = 0U;
+    s_request_pending = false;
 }
 
 /* ---- ring pushes ---- */
@@ -700,9 +707,35 @@ static void sweep(uint32_t now)
     }
 }
 
-/* ---- per-frame service ---- */
+/* ---- per-frame service (split: collect at frame start, send at frame end) ---- *
+ * The exchange is pipelined across one frame so the UART round-trip overlaps the
+ * game's render() instead of busy-waiting the CPU. mpSessionCollect() (before
+ * update) ingests the reply to the PREVIOUS frame's request — already streamed
+ * into the RX ring during the last render(), so it rarely blocks. update() then
+ * reads the inbox and queues outbound. mpSessionFlush() (after update) emits this
+ * frame's batch over the async TX and returns; render() runs while the reply comes
+ * back. Inbound is therefore one frame old (~16 ms @ 60 FPS) — fine for the
+ * host-authoritative netcode. */
 
-void mpSessionService(uint32_t now_ms)
+void mpSessionCollect(uint32_t now_ms)
+{
+    if (!s_active || !s_request_pending)
+    {
+        return; /* nothing in flight (first frame, or session just started) */
+    }
+    s_request_pending = false;
+
+    /* Ingest the reply to last frame's request: peer liveness refresh, SYS protocol
+     * (which may queue replies into the outbox, sent in this same frame's send),
+     * and app payloads into the inbox the game drains via mpReceive. */
+    const uint8_t n_in = espnowLinkCollect(s_svc, MP_SVC);
+    for (uint8_t i = 0U; i < n_in; i++)
+    {
+        processInbound(s_svc[i].mac, s_svc[i].data, s_svc[i].len, now_ms);
+    }
+}
+
+void mpSessionFlush(uint32_t now_ms)
 {
     if (!s_active)
     {
@@ -786,12 +819,12 @@ void mpSessionService(uint32_t now_ms)
         s_outbox_tail = (uint8_t)((s_outbox_tail + 1U) % MP_OUTBOX_SLOTS);
     }
 
-    /* 6. one UART round-trip: send the batch, receive inbound (shared buffer:
-     * the outbound packets are consumed before inbound overwrites them) */
-    const uint8_t n_in = espnowLinkService(s_svc, n_out, s_svc, MP_SVC);
-    for (uint8_t i = 0U; i < n_in; i++)
+    /* 6. arm the batch over the async TX and return — the reply lands in the RX
+     * ring during render() and is picked up by next frame's mpSessionCollect().
+     * Always sent (even with n_out == 0) so we keep polling inbound every frame. */
+    if (espnowLinkSend(s_svc, n_out))
     {
-        processInbound(s_svc[i].mac, s_svc[i].data, s_svc[i].len, now_ms);
+        s_request_pending = true;
     }
 
     /* 7. drop silent peers / stale hosts */

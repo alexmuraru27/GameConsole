@@ -140,13 +140,14 @@ The **OS owns the game loop**. A game is not a `main()` that runs forever — th
 **Narrative:** `SYS_INVOKE` takes us **into** one callback and parks the console; `SYS_FRAME_DONE` brings us **back out** when the callback returns — leaving the MPU and the game session up so the next callback can run. Only `gameExit()` or a crash ends the session, and those route through PendSV (which tears the session down). So per frame there are two cheap excursions (update, render); the MPU is programmed once per session, not once per call.
 
 ```
-  kernelRunGame(header, service):
+  kernelRunGame(header, collect, send):
     mpuConfigureForGame()                 ← wall goes up once
     invoke(entry_point)   ── bootstrap: zero .bss, run ctors
     invoke(init)          ── game one-time setup
     while (game active):
-        service()         ── console: inter-frame background work (privileged; no pacing — games self-pace)
+        collect()         ── console: ingest inbound before the game steps (privileged)
         invoke(update)    ── game logic        ┐ two excursions
+        send()            ── console: emit outbound; an async round-trip overlaps render (privileged; no pacing)
         invoke(render)    ── game draw          ┘ per frame
     (session ended by gameExit/crash → PendSV released the wall)
 ```
@@ -306,7 +307,7 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
     │  copy the whole .bin to GAME_RAM (flat image, sections land in place)
     │  bind .pak + settings slot
     ▼
-  kernelRunGame(header, service)
+  kernelRunGame(header, collect, send)
     │  mpuConfigureForGame()                     ← wall goes up (once)
     │  ┌─ for each callback: kernelInvokeGame(fn) ─────────────────────────┐
     │  │   build fresh PSP frame at top of GAME_RAM (PC=fn, LR=_game_return)│
@@ -317,7 +318,7 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
     │  │   return → _game_return → svc SYS_FRAME_DONE                       │
     │  │ ▲ ── re-privilege, EXC_RETURN s_console_exc_return → MSP (no PendSV)│
     │  └────────────────────────────────────────────────────────────────────┘
-    │  sequence:  entry_point (bss+ctors) · init · loop{ service · update · render }
+    │  sequence:  entry_point (bss+ctors) · init · loop{ collect · update · send · render }
     │
     ├─ clean: update calls gameExit() → svc SYS_EXIT → pend PendSV
     └─ crash: illegal access → MemManage/Bus/Usage fault → decode → pend PendSV
