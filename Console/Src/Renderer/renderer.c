@@ -259,20 +259,33 @@ __attribute__((always_inline)) static inline bool clipSprite(const Sprite *sprit
     uint16_t sprite_h = sprite->h;
     uint16_t end_y = start_y + count;
 
-    /* Vertical clip to the chunk. */
-    uint16_t row_top = (sprite_y > (int16_t)start_y) ? (uint16_t)sprite_y : start_y;
+    /* Vertical clip to the chunk. A sprite entirely above the screen has a
+     * non-positive bottom; bail before the cast below would wrap it to a huge
+     * uint16 (binning already culls these, but keep clip self-contained). */
     int16_t bottom = sprite_y + (int16_t)sprite_h; /* exclusive */
+    if (bottom <= 0)
+    {
+        return false;
+    }
+    uint16_t row_top = (sprite_y > (int16_t)start_y) ? (uint16_t)sprite_y : start_y;
     uint16_t row_bot = (bottom < (int16_t)end_y) ? (uint16_t)bottom : end_y;
     if (row_bot <= row_top)
     {
         return false;
     }
 
-    /* Horizontal clip (independent of y). */
+    /* Horizontal clip (independent of y). A sprite entirely off the LEFT edge has
+     * a non-positive right edge — bail before (uint16_t)right wraps it huge and
+     * makes `span` a ~65k out-of-bounds blit. (Off the right is handled by the
+     * RENDERER_WIDTH clamp; binning does not cull horizontally, so this must.) */
     int16_t sprite_x = sprite->x;
     uint16_t sprite_w = sprite->w;
-    uint16_t x_start = (sprite_x > 0) ? (uint16_t)sprite_x : 0U;
     int16_t right = sprite_x + (int16_t)sprite_w;
+    if (right <= 0)
+    {
+        return false;
+    }
+    uint16_t x_start = (sprite_x > 0) ? (uint16_t)sprite_x : 0U;
     uint16_t x_end = (right < (int16_t)RENDERER_WIDTH) ? (uint16_t)right : RENDERER_WIDTH;
     if (x_end <= x_start)
     {

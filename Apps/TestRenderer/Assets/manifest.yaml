@@ -1,33 +1,201 @@
 # TestRenderer asset pack manifest.
 #
-# The tile .bin assets are GfxAsset (GFX1) files generated from ASCII art by
-# gen_tiles.py (run it after editing a tile; the .bin files are committed). The
-# Makefile runs the packer (tools/packer/packer.py) over this manifest to produce
-# TestRenderer.pak + TestRendererAssetEnum.h. Text is drawn with the console fonts
-# exposed through the ConsoleAPI, so no glyphs are packed here.
+# 64 GfxAsset (GFX1) sprites generated from gen_tiles.py (run it after editing;
+# the .bin files are committed). The Makefile runs the packer over this manifest
+# to produce TestRenderer.pak + TestRendererAssetEnum.h. Deliberately varied
+# (32 opaque / 32 transparent, 8x8..64x32, 2bpp + 4bpp) to exercise the whole
+# compositor and overflow the 8-slot decoded-tile cache. Text uses console fonts.
 version: 1
 assets:
   - id: 1
-    name: TESTRENDERER_GFX_BRICK
-    path: Graphics/brick.bin
+    name: TESTRENDERER_GFX_GRASS
+    path: Graphics/grass.bin
   - id: 2
+    name: TESTRENDERER_GFX_DIRT
+    path: Graphics/dirt.bin
+  - id: 3
+    name: TESTRENDERER_GFX_DIRT_DARK
+    path: Graphics/dirt_dark.bin
+  - id: 4
     name: TESTRENDERER_GFX_STONE
     path: Graphics/stone.bin
-  - id: 3
-    name: TESTRENDERER_GFX_GROUND
-    path: Graphics/ground.bin
-  - id: 4
-    name: TESTRENDERER_GFX_TORCH
-    path: Graphics/torch.bin
   - id: 5
+    name: TESTRENDERER_GFX_MOSSY
+    path: Graphics/mossy.bin
+  - id: 6
+    name: TESTRENDERER_GFX_SAND
+    path: Graphics/sand.bin
+  - id: 7
+    name: TESTRENDERER_GFX_COBBLE
+    path: Graphics/cobble.bin
+  - id: 8
+    name: TESTRENDERER_GFX_PATH
+    path: Graphics/path.bin
+  - id: 9
+    name: TESTRENDERER_GFX_WATER
+    path: Graphics/water.bin
+  - id: 10
+    name: TESTRENDERER_GFX_SNOW
+    path: Graphics/snow.bin
+  - id: 11
+    name: TESTRENDERER_GFX_LAVA
+    path: Graphics/lava.bin
+  - id: 12
+    name: TESTRENDERER_GFX_ICE
+    path: Graphics/ice.bin
+  - id: 13
+    name: TESTRENDERER_GFX_BRICK
+    path: Graphics/brick.bin
+  - id: 14
+    name: TESTRENDERER_GFX_BRICK_DARK
+    path: Graphics/brick_dark.bin
+  - id: 15
+    name: TESTRENDERER_GFX_WOOD_H
+    path: Graphics/wood_h.bin
+  - id: 16
+    name: TESTRENDERER_GFX_WOOD_V
+    path: Graphics/wood_v.bin
+  - id: 17
+    name: TESTRENDERER_GFX_PLASTER
+    path: Graphics/plaster.bin
+  - id: 18
+    name: TESTRENDERER_GFX_FLOOR
+    path: Graphics/floor.bin
+  - id: 19
+    name: TESTRENDERER_GFX_ROOF_RED
+    path: Graphics/roof_red.bin
+  - id: 20
+    name: TESTRENDERER_GFX_ROOF_BLUE
+    path: Graphics/roof_blue.bin
+  - id: 21
+    name: TESTRENDERER_GFX_WINDOW
+    path: Graphics/window.bin
+  - id: 22
+    name: TESTRENDERER_GFX_SKY_DAY
+    path: Graphics/sky_day.bin
+  - id: 23
+    name: TESTRENDERER_GFX_SKY_DUSK
+    path: Graphics/sky_dusk.bin
+  - id: 24
+    name: TESTRENDERER_GFX_STARS
+    path: Graphics/stars.bin
+  - id: 25
+    name: TESTRENDERER_GFX_MARBLE
+    path: Graphics/marble.bin
+  - id: 26
+    name: TESTRENDERER_GFX_MOUNTAIN
+    path: Graphics/mountain.bin
+  - id: 27
+    name: TESTRENDERER_GFX_HILLS
+    path: Graphics/hills.bin
+  - id: 28
+    name: TESTRENDERER_GFX_CLOUDBANK
+    path: Graphics/cloudbank.bin
+  - id: 29
+    name: TESTRENDERER_GFX_STONEWALL
+    path: Graphics/stonewall.bin
+  - id: 30
+    name: TESTRENDERER_GFX_TOWER
+    path: Graphics/tower.bin
+  - id: 31
+    name: TESTRENDERER_GFX_BOULDER
+    path: Graphics/boulder.bin
+  - id: 32
+    name: TESTRENDERER_GFX_ARCHWAY
+    path: Graphics/archway.bin
+  - id: 33
     name: TESTRENDERER_GFX_COIN
     path: Graphics/coin.bin
-  - id: 6
+  - id: 34
+    name: TESTRENDERER_GFX_GEM
+    path: Graphics/gem.bin
+  - id: 35
     name: TESTRENDERER_GFX_HEART
     path: Graphics/heart.bin
-  - id: 7
+  - id: 36
+    name: TESTRENDERER_GFX_KEY
+    path: Graphics/key.bin
+  - id: 37
+    name: TESTRENDERER_GFX_STAR
+    path: Graphics/star.bin
+  - id: 38
+    name: TESTRENDERER_GFX_FLOWER_R
+    path: Graphics/flower_r.bin
+  - id: 39
+    name: TESTRENDERER_GFX_FLOWER_B
+    path: Graphics/flower_b.bin
+  - id: 40
+    name: TESTRENDERER_GFX_BUTTERFLY
+    path: Graphics/butterfly.bin
+  - id: 41
+    name: TESTRENDERER_GFX_POTION
+    path: Graphics/potion.bin
+  - id: 42
+    name: TESTRENDERER_GFX_RING
+    path: Graphics/ring.bin
+  - id: 43
+    name: TESTRENDERER_GFX_APPLE
+    path: Graphics/apple.bin
+  - id: 44
+    name: TESTRENDERER_GFX_BUSH
+    path: Graphics/bush.bin
+  - id: 45
+    name: TESTRENDERER_GFX_MUSHROOM
+    path: Graphics/mushroom.bin
+  - id: 46
+    name: TESTRENDERER_GFX_SAPLING
+    path: Graphics/sapling.bin
+  - id: 47
+    name: TESTRENDERER_GFX_TORCH
+    path: Graphics/torch.bin
+  - id: 48
+    name: TESTRENDERER_GFX_LANTERN
+    path: Graphics/lantern.bin
+  - id: 49
+    name: TESTRENDERER_GFX_BARREL
+    path: Graphics/barrel.bin
+  - id: 50
+    name: TESTRENDERER_GFX_CRATE
+    path: Graphics/crate.bin
+  - id: 51
+    name: TESTRENDERER_GFX_SIGN
+    path: Graphics/sign.bin
+  - id: 52
+    name: TESTRENDERER_GFX_TREE
+    path: Graphics/tree.bin
+  - id: 53
+    name: TESTRENDERER_GFX_CHEST
+    path: Graphics/chest.bin
+  - id: 54
+    name: TESTRENDERER_GFX_FENCE
+    path: Graphics/fence.bin
+  - id: 55
+    name: TESTRENDERER_GFX_WELL
+    path: Graphics/well.bin
+  - id: 56
+    name: TESTRENDERER_GFX_CLOUD
+    path: Graphics/cloud.bin
+  - id: 57
+    name: TESTRENDERER_GFX_BANNER
+    path: Graphics/banner.bin
+  - id: 58
     name: TESTRENDERER_GFX_HERO
     path: Graphics/hero.bin
-  - id: 8
+  - id: 59
     name: TESTRENDERER_GFX_SLIME
     path: Graphics/slime.bin
+  - id: 60
+    name: TESTRENDERER_GFX_BAT
+    path: Graphics/bat.bin
+  - id: 61
+    name: TESTRENDERER_GFX_BIRD
+    path: Graphics/bird.bin
+  - id: 62
+    name: TESTRENDERER_GFX_FISH
+    path: Graphics/fish.bin
+  - id: 63
+    name: TESTRENDERER_GFX_SKELETON
+    path: Graphics/skeleton.bin
+  - id: 64
+    name: TESTRENDERER_GFX_BOSS
+    path: Graphics/boss.bin
