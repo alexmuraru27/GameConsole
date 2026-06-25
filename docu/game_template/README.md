@@ -244,8 +244,13 @@ advertises the *running* game, so a joiner only discovers hosts of the same game
 `mpSend`/`mpReceive` are non-blocking — the OS exchanges them with the ESP once per
 frame, so your update loop never stalls on the radio. The player's display name is
 a console-wide setting (Settings → Player Name). Types live in
-`multiplayer_interface.h`; the full protocol, diagrams and the host-authoritative
-pattern are in [`../espnow.md`](../espnow.md).
+`multiplayer_interface.h`.
+
+**Building a networked game?** [`multiplayer.md`](multiplayer.md) is the dedicated
+how-to: the philosophy, the lobby→gameplay flow, the exact call sequence, how to
+interleave the radio with your `update()` loop, and the capability/throughput
+limits. The stack internals (wire protocol, discovery, join handshake, heartbeat)
+are in [`../espnow.md`](../espnow.md).
 
 ### Logging & lifecycle
 ```c

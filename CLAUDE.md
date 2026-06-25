@@ -108,6 +108,7 @@ Deep-dive docs live in `docu/`:
 - `docu/bootloader.md` — power-fail-safe console OS self-flashing, ground-up: why a bootloader is needed, the flash partition, the stage→commit→apply flow, the readback-CRC verification, and the interruption-recovery guarantees
 - `docu/HW.md` — Hardware schematics and full pinout
 - `docu/game_template/README.md` — guide for creating new games + the full game-facing API reference, with a copyable `startup.s` template
+- `docu/game_template/multiplayer.md` — guide for creating **multiplayer** games: the design philosophy (host-authoritative, best-effort idempotent state), the lobby→gameplay flow, the exact `mp*` call sequence, the per-frame network-flow timing diagrams (calls/waits, the async-TX-armed round-trip overlapping `render()`, end-to-end latency), the capability/throughput limits, and a dedicated **real-time / continuous-streaming** section (Bomberman/racer: decoupled network tick, tight state packing, client-side interpolation + prediction)
 
 ## Subsystems
 

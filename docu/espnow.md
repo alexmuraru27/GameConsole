@@ -9,6 +9,11 @@ This document builds the stack from the wire up: why ESP-NOW, why the console
 console (discovery, the join handshake, the heartbeat "ping-pong", the roster),
 the game-facing kernel API, and how GameXO uses it.
 
+> This is the **stack internals**. If you just want to *write* a multiplayer game,
+> start with [`game_template/multiplayer.md`](game_template/multiplayer.md) — the
+> game-author how-to (philosophy, flow, call sequence, limits) — and come back here
+> for the why.
+>
 > See also: `kernel.md` (the SVC syscall ABI these calls ride on), `flasher.md` /
 > the Network section of `../CLAUDE.md` (the ESP-01 link this reuses), and
 > `../Shared/Esp01s/network_protocol.h` (the wire contract).
