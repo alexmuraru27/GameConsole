@@ -19,9 +19,11 @@
  * ever wants the hot code back in SRAM — e.g. (noinline, section(".RamFunc")). */
 #define RENDERER_HOT __attribute__((noinline))
 
-#define MAX_SPRITES_BG 350U
-#define MAX_SPRITES_FG 350U
-#define MAX_SPRITES_UI 350U
+/* One sprite budget shared by the three layers: a frame may split it across
+ * BG/FG/UI any way it likes (a single layer can spend all of it) — only the
+ * frame's total is capped. Replaces the old fixed 350-per-layer split at the
+ * same RAM cost (the z-sort pool below is 4 bytes per slot either way). */
+#define MAX_SPRITES_TOTAL 1050U
 
 #define RENDERER_SCANLINES 16U
 #define RENDERER_SCANLINE_BUF_SIZE (RENDERER_SCANLINES * RENDERER_WIDTH)
@@ -34,13 +36,17 @@ static uint16_t s_scanline_buffer[2U][RENDERER_SCANLINE_BUF_SIZE] __attribute__(
  * stay valid until rendererRender() returns. */
 static const Sprite *s_layer_sprites[LAYER_COUNT];
 static uint16_t s_active_sprites[LAYER_COUNT];
-static const uint16_t s_max_sprites_per_layer[LAYER_COUNT] = {
-    MAX_SPRITES_BG, MAX_SPRITES_FG, MAX_SPRITES_UI};
 
-static const Sprite *s_sorted[LAYER_COUNT][MAX_SPRITES_BG];
-static uint16_t s_sorted_count[LAYER_COUNT];
+/* Flat z-sort pool, shared by the three layers. sortSpritesByZ() lays each
+ * layer's z-ascending run back-to-back in layer order, so afterwards
+ * s_sorted[0..s_sorted_total) reads as the frame's complete painter order
+ * (BG low→high z, then FG, then UI) and binning walks it linearly. Submission
+ * keeps the summed layer counts within MAX_SPRITES_TOTAL, so the runs always
+ * fit. */
+static const Sprite *s_sorted[MAX_SPRITES_TOTAL];
+static uint16_t s_sorted_total;
 
-/* Per-chunk sprite bins, rebuilt each frame from the z-sorted lists. This replaces
+/* Per-chunk sprite bins, rebuilt each frame from the z-sorted pool. This replaces
  * the old per-chunk reject scan: every sprite is appended once to each chunk it
  * spans (in painter order — BG, then FG, then UI, z-ascending within each), so a
  * chunk composites only the sprites that actually touch it instead of testing all of
@@ -48,11 +54,13 @@ static uint16_t s_sorted_count[LAYER_COUNT];
  * extra sprites (the cap sits far above any realistic per-chunk count). Unlike the
  * flat pool removed earlier, this is sized by sprite *count*, not sprite *height* — a
  * tall sprite simply appears in more chunks' bins, never overflowing a height-based
- * bound. 15 chunks * 200 * 4 B = 12000 B. */
+ * bound. Entries are z-sort-pool indices, not pointers: half the RAM of a Sprite*
+ * bin for one extra s_sorted[] load per sprite per chunk in renderScanlineChunk().
+ * 15 chunks * 200 * 2 B = 6000 B. */
 #define RENDERER_MAX_CHUNKS ((RENDERER_HEIGHT + RENDERER_SCANLINES - 1U) / RENDERER_SCANLINES)
 #define CHUNK_BIN_CAP 200U
 
-static const Sprite *s_chunk_bin[RENDERER_MAX_CHUNKS][CHUNK_BIN_CAP];
+static uint16_t s_chunk_bin[RENDERER_MAX_CHUNKS][CHUNK_BIN_CAP];
 static uint16_t s_chunk_bin_count[RENDERER_MAX_CHUNKS];
 
 /* Scratch palette copied out of (slow) flash once per sprite. Held at a fixed
@@ -121,7 +129,7 @@ void rendererInit(void)
         s_byte_full_2bpp[b] = full2 ? 1U : 0U;
     }
     /* Init only — the per-frame render path is never logged (hot loop). */
-    LOGGER_LOG_INFO(LOGGER_RENDERER, "init: %ux%u RGB565, 3 layers", (unsigned)rendererGetWidthPixels(), (unsigned)rendererGetHeightPixels());
+    LOGGER_LOG_INFO(LOGGER_RENDERER, "init: %ux%u RGB565, 3 layers, %u shared sprite budget", (unsigned)rendererGetWidthPixels(), (unsigned)rendererGetHeightPixels(), (unsigned)MAX_SPRITES_TOTAL);
 }
 
 /* Start a new frame: drop every layer. Only the counts need clearing — a layer
@@ -141,30 +149,44 @@ void rendererSetBackground(uint16_t color)
     s_bg_enabled = true;
 }
 
-/* Borrow a layer's whole sprite array (game-owned, kept alive until render). */
+/* Borrow a layer's whole sprite array (game-owned, kept alive until render).
+ * The count is clamped to what the shared budget has left after the other
+ * layers' submissions — resubmitting a layer releases its previous share first,
+ * so the summed counts never exceed MAX_SPRITES_TOTAL (the sort pool's size). */
 void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count)
 {
     if (layer >= LAYER_COUNT)
     {
         return;
     }
-    if (count > s_max_sprites_per_layer[layer])
+    uint16_t other_layers = 0U;
+    for (uint8_t l = 0U; l < LAYER_COUNT; l++)
     {
-        count = s_max_sprites_per_layer[layer];
+        if (l != (uint8_t)layer)
+        {
+            other_layers += s_active_sprites[l];
+        }
+    }
+    uint16_t avail = (uint16_t)(MAX_SPRITES_TOTAL - other_layers);
+    if (count > avail)
+    {
+        count = avail;
     }
     s_layer_sprites[layer] = sprites;
     s_active_sprites[layer] = count;
 }
 
-/* Counting sort: sprites ordered by z ascending within each layer */
+/* Counting sort each layer by z ascending, scattering straight into the flat
+ * pool with each layer's run starting where the previous layer's ended. After
+ * all three, s_sorted[0..s_sorted_total) is the frame's painter order. */
 static void sortSpritesByZ(void)
 {
+    uint16_t total = 0U;
     for (uint8_t layer = 0U; layer < LAYER_COUNT; layer++)
     {
         uint16_t count = s_active_sprites[layer];
         if (count == 0U)
         {
-            s_sorted_count[layer] = 0U;
             continue;
         }
 
@@ -176,26 +198,28 @@ static void sortSpritesByZ(void)
             z_count[sprites[i].z]++;
         }
 
-        uint16_t total = 0U;
+        /* Exclusive prefix sum, based at this layer's run start in the pool. */
+        uint16_t offset = total;
         for (uint16_t z = 0U; z < 256U; z++)
         {
             uint16_t c = z_count[z];
-            z_count[z] = total;
-            total += c;
+            z_count[z] = offset;
+            offset += c;
         }
         for (uint16_t i = 0U; i < count; i++)
         {
-            s_sorted[layer][z_count[sprites[i].z]++] = &sprites[i];
+            s_sorted[z_count[sprites[i].z]++] = &sprites[i];
         }
-        s_sorted_count[layer] = count;
+        total = offset;
     }
+    s_sorted_total = total;
 }
 
-/* Distribute the z-sorted sprites into per-chunk bins. Walking layers in painter
- * order and, within each, sprites in z-ascending order (as the sort left them),
- * means each bin ends up in the exact order a chunk must draw: lower layers first,
- * lower z first. A chunk then iterates only its bin — no vertical reject, no walking
- * sprites that miss the strip. */
+/* Distribute the z-sorted sprites into per-chunk bins. The sort left the pool
+ * in the exact order a chunk must draw — lower layers first, lower z first — so
+ * one linear walk appends every sprite to the chunks it spans in draw order.
+ * A chunk then iterates only its bin — no vertical reject, no walking sprites
+ * that miss the strip. */
 static void binSpritesIntoChunks(void)
 {
     uint16_t num_chunks = RENDERER_MAX_CHUNKS;
@@ -204,37 +228,33 @@ static void binSpritesIntoChunks(void)
         s_chunk_bin_count[c] = 0U;
     }
 
-    for (uint8_t layer = 0U; layer < LAYER_COUNT; layer++)
+    uint16_t sprite_count = s_sorted_total;
+    for (uint16_t i = 0U; i < sprite_count; i++)
     {
-        const Sprite *const *sorted = s_sorted[layer];
-        uint16_t sprite_count = s_sorted_count[layer];
-        for (uint16_t i = 0U; i < sprite_count; i++)
+        const Sprite *sprite = s_sorted[i];
+        int top = (int)sprite->y;
+        int bottom = top + (int)sprite->h; /* exclusive */
+        if (bottom <= 0 || top >= (int)RENDERER_HEIGHT)
         {
-            const Sprite *sprite = sorted[i];
-            int top = (int)sprite->y;
-            int bottom = top + (int)sprite->h; /* exclusive */
-            if (bottom <= 0 || top >= (int)RENDERER_HEIGHT)
+            continue; /* sprite is entirely above or below the screen */
+        }
+        if (top < 0)
+        {
+            top = 0;
+        }
+        uint16_t first = (uint16_t)top / RENDERER_SCANLINES;
+        uint16_t last = (uint16_t)(bottom - 1) / RENDERER_SCANLINES;
+        if (last >= num_chunks)
+        {
+            last = num_chunks - 1U;
+        }
+        for (uint16_t c = first; c <= last; c++)
+        {
+            uint16_t n = s_chunk_bin_count[c];
+            if (n < CHUNK_BIN_CAP) /* drop beyond the cap (far above realistic) */
             {
-                continue; /* sprite is entirely above or below the screen */
-            }
-            if (top < 0)
-            {
-                top = 0;
-            }
-            uint16_t first = (uint16_t)top / RENDERER_SCANLINES;
-            uint16_t last = (uint16_t)(bottom - 1) / RENDERER_SCANLINES;
-            if (last >= num_chunks)
-            {
-                last = num_chunks - 1U;
-            }
-            for (uint16_t c = first; c <= last; c++)
-            {
-                uint16_t n = s_chunk_bin_count[c];
-                if (n < CHUNK_BIN_CAP) /* drop beyond the cap (far above realistic) */
-                {
-                    s_chunk_bin[c][n] = sprite;
-                    s_chunk_bin_count[c] = n + 1U;
-                }
+                s_chunk_bin[c][n] = i; /* the sprite's z-sort-pool index */
+                s_chunk_bin_count[c] = n + 1U;
             }
         }
     }
@@ -864,11 +884,11 @@ RENDERER_HOT static void renderScanlineChunk(uint16_t *chunk_buffer, uint16_t st
      * just composite them. No vertical reject and no scanning sprites that miss the
      * strip (binSpritesIntoChunks did that once per frame). */
     uint16_t chunk_idx = start_y / RENDERER_SCANLINES;
-    const Sprite *const *bin = s_chunk_bin[chunk_idx];
+    const uint16_t *bin = s_chunk_bin[chunk_idx];
     uint16_t bin_count = s_chunk_bin_count[chunk_idx];
     for (uint16_t i = 0U; i < bin_count; i++)
     {
-        const Sprite *sprite = bin[i];
+        const Sprite *sprite = s_sorted[bin[i]];
         uint8_t flags = sprite->flags;
         if (flags & SPRITE_OPAQUE)
         {

@@ -232,18 +232,23 @@ layer's sprite array pointer + count. All the work is in `render`.
 ### 6.1 Submit
 
 ```c
-void rendererSubmit(Layer layer, const Sprite *sprite) {
+void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count) {
     if (layer >= LAYER_COUNT) return;
-    uint16_t count = s_active_sprites[layer];
-    if (count >= s_max_sprites_per_layer[layer]) return; // silently drop on overflow
-    s_sprites[layer][count] = *sprite;                   // copy by value
-    s_active_sprites[layer] = count + 1U;
+    uint16_t avail = MAX_SPRITES_TOTAL - (the other layers' active counts);
+    if (count > avail) count = avail;   // silently clamp on overflow
+    s_layer_sprites[layer] = sprites;   // borrow the game-owned array
+    s_active_sprites[layer] = count;
 }
 ```
 
-There are three fixed-capacity arrays (`MAX_SPRITES_BG = 320`, `FG = 256`,
-`UI = 256`). Overflow is dropped rather than asserted — a missing sprite is a
-gentler failure than a crash on an embedded console.
+A layer arrives as one game-owned array, borrowed (pointer + count) until
+`rendererRender()` returns — nothing is copied. The three layers share a single
+**`MAX_SPRITES_TOTAL` = 1050** sprite budget instead of fixed per-layer
+capacities: a frame may split it any way it likes (1050 background sprites and
+nothing else is fine); only the total is capped. A submission that would push
+the total past the budget is clamped to what is left — resubmitting a layer
+releases its previous share first. Overflow is dropped rather than asserted — a
+missing sprite is a gentler failure than a crash on an embedded console.
 
 ### 6.2 Counting sort by `z`
 
@@ -256,10 +261,13 @@ uint16_t z_count[256];
 memset(z_count, 0, sizeof(z_count));
 for (i) z_count[sprite[i].z]++;          // 1) histogram
 prefix-sum z_count into start offsets;   // 2) exclusive prefix sum
-for (i) s_sorted[layer][z_count[z]++] = &sprite[i]; // 3) scatter (stable)
+for (i) s_sorted[z_count[z]++] = &sprite[i]; // 3) scatter (stable)
 ```
 
-It produces `s_sorted[layer][]` = pointers to sprites in ascending `z`. The sort
+The three layers scatter into one **flat pool**, each layer's run starting where
+the previous layer's ended (the prefix sum is based at the run's start offset).
+After the last layer, `s_sorted[0..total)` is the frame's complete painter
+order: ascending `z` within each layer, layers in `BG → FG → UI` order. The sort
 is **stable**, so sprites with equal `z` keep submission order.
 
 ### 6.3 Selecting a chunk's sprites: per-chunk bins
@@ -269,13 +277,12 @@ into one list per chunk — appending each sprite to every chunk its vertical
 extent covers:
 
 ```c
-for (layer in BG, FG, UI)                  // back-to-front layer order
-    for (sprite in s_sorted[layer])        // ascending z within the layer
-        first = clamp(sprite->y)            / RENDERER_SCANLINES;
-        last  = (sprite->y + sprite->h - 1) / RENDERER_SCANLINES;
-        for (c = first; c <= last; c++)
-            if (s_chunk_bin_count[c] < CHUNK_BIN_CAP)
-                s_chunk_bin[c][s_chunk_bin_count[c]++] = sprite;  // append
+for (i, sprite in s_sorted[0 .. total])    // the pool is already in draw order
+    first = clamp(sprite->y)            / RENDERER_SCANLINES;
+    last  = (sprite->y + sprite->h - 1) / RENDERER_SCANLINES;
+    for (c = first; c <= last; c++)
+        if (s_chunk_bin_count[c] < CHUNK_BIN_CAP)
+            s_chunk_bin[c][s_chunk_bin_count[c]++] = i;  // append the pool index
 ```
 
 Because the bins are filled **in draw order** — layers `BG → FG → UI`, ascending
@@ -285,9 +292,9 @@ in the order it must paint them (`BG(low z) → BG(high z) → FG → UI`).
 no sprites that miss the strip**:
 
 ```c
-const Sprite *const *bin = s_chunk_bin[start_y / RENDERER_SCANLINES];
+const uint16_t *bin = s_chunk_bin[start_y / RENDERER_SCANLINES];  // pool indices
 for (i in 0 .. s_chunk_bin_count[chunk])
-    composite bin[i] into this strip;      // guaranteed to overlap
+    composite s_sorted[bin[i]] into this strip;   // guaranteed to overlap
 ```
 
 This replaced an earlier **scan**, where every chunk walked *all* sorted sprites
@@ -706,7 +713,8 @@ Rules of thumb:
   transparent pixel will be drawn as `palette[0]` instead of showing through.
 - Use `z` to order within a layer; use layers for coarse front/back grouping
   (UI always on top of FG, FG always on top of BG).
-- Submitting more than a layer's capacity silently drops the extras.
+- The three layers share one `MAX_SPRITES_TOTAL` (1050) sprite budget;
+  submitting past what the other layers left of it silently clamps the extras.
 
 ---
 
@@ -716,7 +724,7 @@ Rules of thumb:
 
 - **No clipping rectangle / no rotation / no scaling.** Sprites are axis-aligned,
   1:1, full-screen-clipped only. This is intentional simplicity.
-- **Capacity is fixed at compile time** (`MAX_SPRITES_*`, `CHUNK_BIN_CAP`).
+- **Capacity is fixed at compile time** (`MAX_SPRITES_TOTAL`, `CHUNK_BIN_CAP`).
   Overflow drops sprites.
 - **`s_lut` / `s_pair` / the per-chunk bins are shared scratch** — correct only
   because rendering is single-threaded and non-reentrant. Do not call the renderer
@@ -730,8 +738,9 @@ expected gain, and risk so the trade-off is on record.
 
 1. **Per-chunk binning — _implemented_ (see §6.3).** Replaced the per-chunk
    reject scan with pre-built per-chunk bins, removing ~17 % of the frame (the
-   reject) for **+3 to +5 FPS across every mode**. **RAM: 12 KB**
-   (`15 chunks × 200 × 4 B`); sized by sprite count, capped per chunk. This is a
+   reject) for **+3 to +5 FPS across every mode**. **RAM: 6 KB**
+   (`15 chunks × 200 × 2 B` — entries are `uint16_t` z-sort-pool indices, not
+   pointers); sized by sprite count, capped per chunk. This is a
    pure, content-independent win — it does not depend on tile reuse or scene
    layering.
 
@@ -772,7 +781,7 @@ expected gain, and risk so the trade-off is on record.
 | **`s_lut`** | Fixed-address SRAM copy of the active palette (fast per-pixel lookup). |
 | **`s_pair`** | 16-entry table packing two adjacent pixels into one 32-bit word. |
 | **`s_byte_full_2bpp`** | 256-entry table: is a 2bpp source byte fully opaque (no index-0 pixel)? Lets the transparent blit fast-path covered interior bytes. |
-| **Per-chunk bin** | `s_chunk_bin[chunk][]` — the sprites that touch a chunk, in draw order, built once per frame (replaces the per-chunk reject). |
+| **Per-chunk bin** | `s_chunk_bin[chunk][]` — z-sort-pool indices of the sprites that touch a chunk, in draw order, built once per frame (replaces the per-chunk reject). |
 | **Tile cache** | `s_tile_cache[]` — opaque tiles decoded to RGB565 once per frame, keyed by `(pixels, palette, size)`; instances blit by row copy. |
 | **`.RamFunc`** | Linker section placing hot functions in SRAM for execution. |
 | **Painter's algorithm** | Draw back-to-front; later sprites overwrite earlier ones. |
@@ -781,11 +790,12 @@ expected gain, and risk so the trade-off is on record.
 | -------- | ----- | ----- |
 | `RENDERER_WIDTH` × `RENDERER_HEIGHT` | 320 × 240 | `renderer.h` |
 | `RENDERER_SCANLINES` | 16 (chunk height; 15 strips/frame) | `renderer.c` |
-| `MAX_SPRITES_BG / FG / UI` | 350 / 350 / 350 | `renderer.c` |
+| `MAX_SPRITES_TOTAL` | 1050 (one budget shared by the three layers) | `renderer.c` |
 | `CHUNK_BIN_CAP` | 200 (per-chunk sprite cap) | `renderer.c` |
 | `TILE_CACHE_SLOTS` | 8 (decoded opaque tiles, ≤16×16) | `renderer.c` |
 | Scanline buffers | 2 × 16 × 320 × 2 B = 20,480 B | `renderer.c` |
-| Per-chunk bins | 15 × 200 × 4 B = 12,000 B | `renderer.c` |
+| Per-chunk bins | 15 × 200 × 2 B = 6,000 B | `renderer.c` |
+| Z-sort pool | 1050 × 4 B = 4,200 B | `renderer.c` |
 | Tile cache | 8 × (12 + 512) B ≈ 5,376 B | `renderer.c` |
 
 ---
