@@ -6,6 +6,7 @@
 #include "joystick.h"
 #include "renderer.h"
 #include "buzzer.h"
+#include "backlight.h"
 #include "gpio.h"
 #include "dma.h"
 #include "ILI9341.h"
@@ -87,7 +88,8 @@ static void coreInit()
     gpioInit();
     timerInit();
     buzzerInit();
-    LOGGER_LOG_INFO(LOGGER_CORE, "core up: trace/faults/syscall/gpio/timers/buzzer");
+    backlightInit(); /* PA3 PWM up (default brightness) before the panel comes up */
+    LOGGER_LOG_INFO(LOGGER_CORE, "core up: trace/faults/syscall/gpio/timers/buzzer/backlight");
 }
 
 /* The I2C storage stack (EEPROM + settings). Brought up on its own, before any
@@ -110,6 +112,7 @@ static void applyConsoleSettings(void)
     ConsoleSettings cs;
     consoleSettingsLoad(&cs); /* fills defaults on miss/corrupt */
     buzzerSetMute(!cs.audio_enabled);
+    backlightSetBrightness(cs.brightness);
 }
 
 static void peripheralsInit()

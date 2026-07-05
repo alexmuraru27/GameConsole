@@ -239,6 +239,8 @@ static void peripheralsClockEnable(void)
     RCC->APB2ENR |= RCC_APB2ENR_SDIOEN;
     // usart1 (ESP-01 link)
     RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
+    // tim9 (PA3 backlight PWM)
+    RCC->APB2ENR |= RCC_APB2ENR_TIM9EN;
 }
 
 void enableFPU(void)

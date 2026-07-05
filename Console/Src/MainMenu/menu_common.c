@@ -81,6 +81,27 @@ uint16_t menuDrawBar(uint16_t idx, int16_t x, int16_t y, uint16_t width, const u
     return idx;
 }
 
+uint16_t menuGaugeWidth(uint8_t total)
+{
+    if (total == 0U)
+    {
+        return 0U;
+    }
+    return (uint16_t)((int)total * (MENU_GAUGE_CELL_W + MENU_GAUGE_CELL_GAP) - MENU_GAUGE_CELL_GAP);
+}
+
+uint16_t menuDrawGauge(uint16_t idx, int16_t x, int16_t y, uint8_t total, uint8_t filled)
+{
+    for (uint8_t i = 0U; i < total && idx < MENU_MAX_SPRITES; i++)
+    {
+        const int16_t cx = (int16_t)(x + (int)i * (MENU_GAUGE_CELL_W + MENU_GAUGE_CELL_GAP));
+        const uint16_t *pal = (i < filled) ? g_menu_pal_accent : g_menu_pal_footer;
+        g_menu_ui[idx++] = (Sprite){.x = cx, .y = y, .w = MENU_GAUGE_CELL_W, .h = BAR_SEG_H, .z = 0U,
+                                    .flags = SPRITE_OPAQUE, .pixels = s_bar_tile, .palette = pal};
+    }
+    return idx;
+}
+
 uint16_t menuDrawTitle(uint16_t idx, const char *text)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
@@ -111,7 +132,10 @@ MenuNav menuPollNav(void)
 {
     static bool s_up_stick_prev = false;
     static bool s_down_stick_prev = false;
-    static uint32_t s_repeat_at = 0U;
+    static bool s_left_stick_prev = false;
+    static bool s_right_stick_prev = false;
+    static uint32_t s_repeat_at_v = 0U; /* up/down repeat deadline */
+    static uint32_t s_repeat_at_h = 0U; /* left/right repeat deadline */
     const uint32_t now = getSysTime();
 
     joystickPollFrame();
@@ -121,8 +145,12 @@ MenuNav menuPollNav(void)
     /* Directional intent (held) for auto-repeat: either d-pad or the right stick. */
     const bool up_stick = in.right_y > NAV_STICK_THRESHOLD;
     const bool down_stick = in.right_y < -NAV_STICK_THRESHOLD;
+    const bool left_stick = in.right_x < -NAV_STICK_THRESHOLD;
+    const bool right_stick = in.right_x > NAV_STICK_THRESHOLD;
     const bool up_held = in.l_up.held || in.r_up.held || up_stick;
     const bool down_held = in.l_down.held || in.r_down.held || down_stick;
+    const bool left_held = in.l_left.held || in.r_left.held || left_stick;
+    const bool right_held = in.l_right.held || in.r_right.held || right_stick;
 
     /* Fresh press edges. Button edges come from the per-button pressed flags, which
      * are latched every frame (including while a game runs), so a button still held
@@ -130,24 +158,43 @@ MenuNav menuPollNav(void)
      * so a simple local threshold-crossing is enough and carries no stale press. */
     bool up = in.l_up.pressed || in.r_up.pressed || (up_stick && !s_up_stick_prev);
     bool down = in.l_down.pressed || in.r_down.pressed || (down_stick && !s_down_stick_prev);
+    bool left = in.l_left.pressed || in.r_left.pressed || (left_stick && !s_left_stick_prev);
+    bool right = in.l_right.pressed || in.r_right.pressed || (right_stick && !s_right_stick_prev);
     const bool enter = in.special1.pressed;
     const bool back = in.special2.pressed;
     s_up_stick_prev = up_stick;
     s_down_stick_prev = down_stick;
+    s_left_stick_prev = left_stick;
+    s_right_stick_prev = right_stick;
 
-    /* Up/down auto-repeat while held; enter/back stay edge-only. */
+    /* Up/down and left/right auto-repeat while held (separate deadlines so one axis'
+     * repeat never resets the other); enter/back stay edge-only. */
     if (up || down)
     {
-        s_repeat_at = now + NAV_REPEAT_DELAY_MS;
+        s_repeat_at_v = now + NAV_REPEAT_DELAY_MS;
     }
-    else if ((up_held || down_held) && (int32_t)(now - s_repeat_at) >= 0)
+    else if ((up_held || down_held) && (int32_t)(now - s_repeat_at_v) >= 0)
     {
         up = up_held;
         down = down_held;
-        s_repeat_at = now + NAV_REPEAT_RATE_MS;
+        s_repeat_at_v = now + NAV_REPEAT_RATE_MS;
     }
 
-    /* One action per poll; vertical motion takes precedence over enter/back. */
+    if (left || right)
+    {
+        s_repeat_at_h = now + NAV_REPEAT_DELAY_MS;
+    }
+    else if ((left_held || right_held) && (int32_t)(now - s_repeat_at_h) >= 0)
+    {
+        left = left_held;
+        right = right_held;
+        s_repeat_at_h = now + NAV_REPEAT_RATE_MS;
+    }
+
+    /* One action per poll. Vertical motion and enter/back keep the exact precedence
+     * they had before left/right existed; the slider's left/right sit last, so they
+     * only fire on a frame with no up/down/enter/back — screens that ignore them are
+     * unaffected. */
     MenuNav nav = {0};
     if (up)
     {
@@ -164,6 +211,14 @@ MenuNav menuPollNav(void)
     else if (back)
     {
         nav.back = true;
+    }
+    else if (left)
+    {
+        nav.left = true;
+    }
+    else if (right)
+    {
+        nav.right = true;
     }
     return nav;
 }

@@ -39,6 +39,7 @@ Src/Peripherals/watchdog.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
+Src/Devices/backlight.c \
 Src/Devices/external_eeprom.c \
 Src/FatFs/diskio.c \
 Src/FatFs/diskio_integration.c \

@@ -61,7 +61,7 @@ Hardware design resources  `projectRoot/docu/HW/`
 19. PD7 (FSMC_NE1 / LCD_CS - AF12)
 20. PD11 (FSMC_A16 / LCD_DC - AF12)
 21. PC7 (LCD_RST - Normal GPIO)
-22. PA3  (LCD_BL - TIM5_CH4 - AF2)
+22. PA3  (LCD_BL - TIM9_CH2 PWM / backlight brightness - AF3)
 
 ### ADC1 (Analog Joysticks)
 1. PC0 (ADC123_IN10 - Left Joystick X axis)

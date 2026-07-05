@@ -83,7 +83,7 @@ static void initGpioFsmc(void)
     //          PE11(D8) PE12(D9) PE13(D10) PE14(D11) PE15(D12) PD8(D13) PD9(D14) PD10(D15)
     // Control: PD4(NOE/RD) PD5(NWE/WR) PD7(NE1/CS) PD11(A16/DC)  — all AF12
     // RST:     PC7 — GPIO output
-    // BL:      PA3 — GPIO output (high = on)
+    // BL:      PA3 — TIM9_CH2 PWM (AF3), duty = brightness (see backlight.c)
 
     // ---- Port D: PD0,1,4,5,7,8,9,10,11,14,15 -> AF12 ----
     GPIOD->MODER &= ~(GPIO_MODER_MODE0_Msk | GPIO_MODER_MODE1_Msk |
@@ -151,13 +151,14 @@ static void initGpioFsmc(void)
     GPIOC->PUPDR &= ~GPIO_PUPDR_PUPD7;
     GPIOC->BSRR = GPIO_BSRR_BS7;
 
-    // ---- PA3: BL -> push-pull output, high (backlight on) ----
+    // ---- PA3: BL -> TIM9_CH2 PWM (AF3), push-pull. backlightInit() drives it ----
     GPIOA->MODER &= ~GPIO_MODER_MODE3_Msk;
-    GPIOA->MODER |= (1U << GPIO_MODER_MODE3_Pos);
+    GPIOA->MODER |= (2U << GPIO_MODER_MODE3_Pos); // alternate function
     GPIOA->OTYPER &= ~GPIO_OTYPER_OT3;
     GPIOA->OSPEEDR |= (3U << GPIO_OSPEEDR_OSPEED3_Pos);
     GPIOA->PUPDR &= ~GPIO_PUPDR_PUPD3;
-    GPIOA->BSRR = GPIO_BSRR_BS3;
+    GPIOA->AFR[0] &= ~GPIO_AFRL_AFSEL3_Msk;
+    GPIOA->AFR[0] |= (3U << GPIO_AFRL_AFSEL3_Pos); // AF3 = TIM9_CH2
 }
 
 static void initGpioAdc1()

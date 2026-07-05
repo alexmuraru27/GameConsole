@@ -89,10 +89,24 @@ typedef struct
 {
     bool up;
     bool down;
+    bool left;  /* decrement a slider / numeric setting */
+    bool right; /* increment a slider / numeric setting */
     bool enter; /* Special Button 1: select / confirm / toggle */
     bool back;  /* Special Button 2: step back a level */
 } MenuNav;
 
 MenuNav menuPollNav(void);
+
+/* ------------------------------------------------------------------ *
+ *  A segmented level gauge (e.g. a brightness slider): `total` cells
+ *  drawn left-to-right at (x,y), the first `filled` in the accent ink
+ *  and the rest dim. Returns the next free g_menu_ui index.
+ * ------------------------------------------------------------------ */
+#define MENU_GAUGE_CELL_W 5
+#define MENU_GAUGE_CELL_GAP 1
+
+/* Pixel width of a `total`-cell gauge (for right-aligning it on a row). */
+uint16_t menuGaugeWidth(uint8_t total);
+uint16_t menuDrawGauge(uint16_t idx, int16_t x, int16_t y, uint8_t total, uint8_t filled);
 
 #endif /* __MENU_COMMON_H */

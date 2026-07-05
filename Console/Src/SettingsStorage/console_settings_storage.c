@@ -1,5 +1,6 @@
 #include "console_settings_storage.h"
 #include "settings_storage.h"
+#include "backlight.h"
 #include "logger.h"
 #include <stddef.h>
 #include <string.h>
@@ -11,8 +12,9 @@ void consoleSettingsResetDefaults(ConsoleSettings *const settings)
         return;
     }
     memset(settings, 0, sizeof(*settings));
-    settings->audio_enabled = 1U; /* audio on by default */
-    settings->wifi_valid = 0U;    /* no WiFi credentials yet */
+    settings->audio_enabled = 1U;                        /* audio on by default */
+    settings->wifi_valid = 0U;                           /* no WiFi credentials yet */
+    settings->brightness = BACKLIGHT_DEFAULT_PERCENT;    /* full brightness by default */
 }
 
 SettingsStorageStatus consoleSettingsLoad(ConsoleSettings *const settings)

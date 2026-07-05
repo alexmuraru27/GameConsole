@@ -11,8 +11,8 @@
  * so the rest of the firmware reads/writes settings by field, not by raw bytes.
  */
 
-/* v3 added player_name (the multiplayer display name). */
-#define CONSOLE_SETTINGS_VERSION 3U
+/* v3 added player_name (the multiplayer display name); v4 added brightness. */
+#define CONSOLE_SETTINGS_VERSION 4U
 
 /* WiFi credential field sizes (+1 for the NUL). Mirror NP_SSID_MAX/NP_PASS_MAX. */
 #define CONSOLE_WIFI_SSID_SIZE 33U
@@ -28,6 +28,7 @@ typedef struct
     char wifi_ssid[CONSOLE_WIFI_SSID_SIZE]; /* NUL-terminated */
     char wifi_pass[CONSOLE_WIFI_PASS_SIZE]; /* NUL-terminated */
     char player_name[CONSOLE_PLAYER_NAME_SIZE]; /* empty => UID-derived default */
+    uint8_t brightness;                         /* display backlight %, 10..100 (see backlight.h) */
 } __attribute__((packed)) ConsoleSettings;
 
 /* Fill `settings` with the factory defaults (audio on, no WiFi creds). */

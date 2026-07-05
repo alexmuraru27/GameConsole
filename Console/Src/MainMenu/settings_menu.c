@@ -1,6 +1,7 @@
 #include "settings_menu.h"
 #include "renderer.h"
 #include "buzzer.h"
+#include "backlight.h"
 #include "console_settings_storage.h"
 #include "sysclock.h"
 #include "fonts.h"
@@ -11,6 +12,7 @@
 #include "remote_update.h"
 #include "keyboard.h"
 #include <string.h>
+#include <stdio.h>
 
 /* ------------------------------------------------------------------ *
  *  Tree-like settings. The screen renders one level of a static
@@ -25,16 +27,22 @@ typedef enum
     SETTING_CATEGORY, /* a node with children; entering descends into it */
     SETTING_TOGGLE,   /* a bool leaf; entering flips it */
     SETTING_ACTION,   /* a leaf that runs a blocking action when entered */
-    /* future: SETTING_TEXT, SETTING_NUMBER */
+    SETTING_NUMBER,   /* a numeric leaf; left/right step it within [min,max] */
+    /* future: SETTING_TEXT */
 } SettingKind;
 
 typedef struct SettingNode
 {
     const char *label;
     SettingKind kind;
-    bool (*get)(void);       /* TOGGLE: read the current value */
-    void (*set)(bool value); /* TOGGLE: apply + persist the new value */
-    void (*action)(void);    /* ACTION: run when entered */
+    bool (*get)(void);            /* TOGGLE: read the current value */
+    void (*set)(bool value);      /* TOGGLE: apply + persist the new value */
+    void (*action)(void);         /* ACTION: run when entered */
+    uint8_t (*num_get)(void);     /* NUMBER: read the current value */
+    void (*num_set)(uint8_t val); /* NUMBER: apply + persist the new value */
+    uint8_t num_min;              /* NUMBER: inclusive lower bound */
+    uint8_t num_max;              /* NUMBER: inclusive upper bound */
+    uint8_t num_step;             /* NUMBER: left/right increment */
     const struct SettingNode *children;
     uint8_t child_count; /* CATEGORY: number of children */
 } SettingNode;
@@ -55,6 +63,21 @@ static void buzzerSoundSet(bool on)
     consoleSettingsSave(&s_console_settings);
     buzzerSetMute(!on);
     LOGGER_LOG_INFO(LOGGER_SETTINGS, "buzzer sound %s", on ? "on" : "off");
+}
+
+/* ---- Brightness leaf (brightness, persisted in ConsoleSettings) ---- */
+
+static uint8_t brightnessGet(void)
+{
+    return s_console_settings.brightness;
+}
+
+static void brightnessSet(uint8_t percent)
+{
+    backlightSetBrightness(percent);                             /* clamp/snap + apply */
+    s_console_settings.brightness = backlightGetBrightness();    /* store the normalized value */
+    consoleSettingsSave(&s_console_settings);
+    LOGGER_LOG_INFO(LOGGER_SETTINGS, "brightness %u%%", (unsigned)s_console_settings.brightness);
 }
 
 /* ---- Player Name leaf (player_name, the multiplayer display name) ---- */
@@ -79,6 +102,12 @@ static void playerNameRun(void)
 
 /* ---- The tree ---- */
 
+/* Display settings (today just the backlight brightness slider). */
+static const SettingNode s_display_children[] = {
+    {.label = "Brightness", .kind = SETTING_NUMBER, .num_get = brightnessGet, .num_set = brightnessSet,
+     .num_min = BACKLIGHT_MIN_PERCENT, .num_max = BACKLIGHT_MAX_PERCENT, .num_step = BACKLIGHT_STEP_PERCENT},
+};
+
 /* WiFi connectivity settings live under one "WiFi" category. */
 static const SettingNode s_wifi_children[] = {
     {.label = "Networks", .kind = SETTING_ACTION, .action = wifiMenuRun},
@@ -95,6 +124,8 @@ static const SettingNode s_firmware_children[] = {
 static const SettingNode s_root_children[] = {
     {.label = "Buzzer Sound", .kind = SETTING_TOGGLE, .get = buzzerSoundGet, .set = buzzerSoundSet},
     {.label = "Player Name", .kind = SETTING_ACTION, .action = playerNameRun},
+    {.label = "Display", .kind = SETTING_CATEGORY, .children = s_display_children,
+     .child_count = (uint8_t)(sizeof(s_display_children) / sizeof(s_display_children[0]))},
     {.label = "WiFi", .kind = SETTING_CATEGORY, .children = s_wifi_children,
      .child_count = (uint8_t)(sizeof(s_wifi_children) / sizeof(s_wifi_children[0]))},
     {.label = "Firmware", .kind = SETTING_CATEGORY, .children = s_firmware_children,
@@ -128,6 +159,27 @@ static uint8_t s_depth; /* current frame index: s_stack[s_depth] */
 
 static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 static const uint16_t s_toggle_notes[] = {NOTE_E5, 40U, NOTE_A5, 60U};
+
+/* Step a SETTING_NUMBER by +/- its step, clamped to [min,max]. Applies + persists
+ * only on an actual change, so holding against a limit doesn't re-write EEPROM. */
+static void numberStep(const SettingNode *item, int dir)
+{
+    const uint8_t cur = item->num_get();
+    int next = (int)cur + dir * (int)item->num_step;
+    if (next < (int)item->num_min)
+    {
+        next = (int)item->num_min;
+    }
+    else if (next > (int)item->num_max)
+    {
+        next = (int)item->num_max;
+    }
+    if ((uint8_t)next != cur)
+    {
+        item->num_set((uint8_t)next);
+        buzzerPlay(0U, false, s_move_notes, 1U);
+    }
+}
 
 void settingsMenuEnter(void)
 {
@@ -174,6 +226,14 @@ MenuTransition settingsMenuUpdate(void)
         buzzerPlay(0U, false, s_move_notes, 1U);
         LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: highlight '%s'", category->children[frame->selected].label);
     }
+    else if (nav.left && category->children[frame->selected].kind == SETTING_NUMBER)
+    {
+        numberStep(&category->children[frame->selected], -1);
+    }
+    else if (nav.right && category->children[frame->selected].kind == SETTING_NUMBER)
+    {
+        numberStep(&category->children[frame->selected], +1);
+    }
     else if (nav.enter)
     {
         const SettingNode *const item = &category->children[frame->selected];
@@ -203,7 +263,11 @@ MenuTransition settingsMenuUpdate(void)
     return MENU_STAY;
 }
 
-/* Draw one settings row: cursor, label, and (for a toggle) its right-aligned value. */
+/* Gap between a slider's gauge and its right-aligned percentage value. */
+#define ROW_GAUGE_GAP 8
+
+/* Draw one settings row: cursor, label, and its right-aligned value — a [ON]/[OFF]
+ * toggle, a slider gauge + percentage, or a ">" chevron for a category/action. */
 static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool selected, bool cursor_on)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
@@ -221,6 +285,20 @@ static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool sel
         const char *value = on ? "[ON]" : "[OFF]";
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, value));
         n = menuDrawText(n, &font8x8, vx, y, on ? g_menu_pal_accent : g_menu_pal_footer, value);
+    }
+    else if (item->kind == SETTING_NUMBER)
+    {
+        const uint8_t val = item->num_get();
+        char value[8];
+        snprintf(value, sizeof(value), "%u%%", (unsigned)val);
+        const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, value));
+        n = menuDrawText(n, &font8x8, vx, y, g_menu_pal_accent, value);
+
+        /* Segmented gauge: one cell per step, the first `filled` lit. */
+        const uint8_t total = (uint8_t)((item->num_max - item->num_min) / item->num_step + 1U);
+        const uint8_t filled = (uint8_t)((val - item->num_min) / item->num_step + 1U);
+        const int16_t gx = (int16_t)(vx - ROW_GAUGE_GAP - (int16_t)menuGaugeWidth(total));
+        n = menuDrawGauge(n, gx, (int16_t)(y + 2), total, filled);
     }
     else if (item->kind == SETTING_CATEGORY || item->kind == SETTING_ACTION)
     {
@@ -246,7 +324,11 @@ void settingsMenuRender(void)
         n = drawRow(n, &category->children[i], y, (i == frame->selected), cursor_on);
     }
 
-    n = menuDrawFooter(n, "UP/DOWN move   A select   B back");
+    /* A slider takes left/right; everything else takes A to enter/toggle. */
+    const bool number_selected = (category->child_count > 0U) &&
+                                 (category->children[frame->selected].kind == SETTING_NUMBER);
+    n = menuDrawFooter(n, number_selected ? "UP/DOWN move   LEFT/RIGHT adjust   B back"
+                                          : "UP/DOWN move   A select   B back");
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();
