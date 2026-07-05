@@ -57,7 +57,6 @@ bool buzzerPause(uint8_t track) { return (bool)svcCall(SYS_BUZZER_PAUSE, track, 
 bool buzzerResume(uint8_t track) { return (bool)svcCall(SYS_BUZZER_RESUME, track, 0, 0, 0); }
 bool buzzerStop(uint8_t track) { return (bool)svcCall(SYS_BUZZER_STOP, track, 0, 0, 0); }
 void buzzerStopAll(void) { (void)svcCall(SYS_BUZZER_STOP_ALL, 0, 0, 0, 0); }
-bool buzzerSetTimbre(uint8_t track, uint8_t duty_percent) { return (bool)svcCall(SYS_BUZZER_SET_TIMBRE, track, duty_percent, 0, 0); }
 
 /* ---- input ---- */
 void inputGetState(InputState *out) { (void)svcCall(SYS_INPUT_GET_STATE, (uint32_t)out, 0, 0, 0); }

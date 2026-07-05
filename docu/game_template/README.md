@@ -163,7 +163,6 @@ bool    buzzerPause(uint8_t track);
 bool    buzzerResume(uint8_t track);
 bool    buzzerStop(uint8_t track);
 void    buzzerStopAll(void);
-bool    buzzerSetTimbre(uint8_t track, uint8_t duty_percent); // 10..90; 50=square, lower=reedier
 ```
 > Keep note data alive while it plays — the buzzer reads it from your RAM each tick.
 > Call `buzzerStopAll()` before returning so nothing reads freed game memory.

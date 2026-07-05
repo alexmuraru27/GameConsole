@@ -8,7 +8,6 @@
 #include "asset_interface.h"
 #include "settings_interface.h"
 #include "joystick_interface.h"
-#include "buzzer_interface.h"
 #include "multiplayer_interface.h"
 
 /*
@@ -44,10 +43,6 @@ bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
 void buzzerStopAll(void);
-/* Set a track's timbre = pulse duty percent, 10..90; e.g. 50 = square, 25 = reedier
- * pulse. Returns false if the track or duty is out of range. Sticky across plays;
- * default square. See buzzer_interface.h for the BUZZER_TIMBRE_* presets. */
-bool buzzerSetTimbre(uint8_t track_number, uint8_t duty_percent);
 
 /* ---- input ---- */
 /* Read the whole pad in one trap. *out gets each button's held / pressed /

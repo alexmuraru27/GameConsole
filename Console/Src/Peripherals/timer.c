@@ -36,7 +36,7 @@ void timer3Disable(void)
     TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | TIM_CCMR1_OC2M_2;
 }
 
-void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
+void timer3Trigger(uint32_t frequency_hz)
 {
     // calculate PWM period for frequency: cycles = (84000000U / frequency_hz )
     // cycles per period
@@ -55,7 +55,7 @@ void timer3Trigger(uint32_t frequency_hz, uint8_t duty)
 
     TIM3->PSC = psc;
     TIM3->ARR = arr - 1U;
-    TIM3->CCR2 = (arr * duty) / 100U;
+    TIM3->CCR2 = arr / 2U; // 50% duty (square wave)
     // Restore PWM mode 1 (timer3Disable forces the output to inactive/low when idle)
     TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1);
     TIM3->CR1 |= TIM_CR1_CEN;

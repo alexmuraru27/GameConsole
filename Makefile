@@ -11,6 +11,7 @@ all: $(BUILD_DIR)
 #   temporary disabled until reworking the memory management and the renderer/assets
 	$(MAKE) -C Apps/GameXO all
 	$(MAKE) -C Apps/TestRenderer all
+	$(MAKE) -C Apps/TestBuzzer all
 	$(MAKE) -C Bootloader all
 	$(MAKE) -C Console all
 	$(MAKE) -C Shared all
@@ -33,6 +34,7 @@ flashswo: flash
 deploy: $(BUILD_DIR)
 	$(MAKE) -C Apps/GameXO deploy
 	$(MAKE) -C Apps/TestRenderer deploy
+	$(MAKE) -C Apps/TestBuzzer deploy
 	$(MAKE) -C Console deploy
 	$(MAKE) -C Esp01s deploy
 
@@ -50,6 +52,7 @@ clean:
 # 	$(MAKE) -C Console clean
 	$(MAKE) -C Apps/GameXO clean
 	$(MAKE) -C Apps/TestRenderer clean
+	$(MAKE) -C Apps/TestBuzzer clean
 	$(MAKE) -C Shared clean
 	-rm -fR $(BUILD_DIR)
 

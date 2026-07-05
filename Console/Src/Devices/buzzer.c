@@ -16,7 +16,6 @@ typedef struct
     bool *on_done_flag;         // Set to true by the ISR when the track finishes
     uint32_t note_idx;          // Index of current note being played
     uint32_t ms_counter;        // Counts milliseconds for current note
-    uint8_t duty;               // PWM duty % (timbre); sticky across plays, default square
 } TrackData;
 
 static TrackData s_track_data_queue[SOUND_TRACKS];
@@ -38,7 +37,6 @@ void buzzerInit(void)
         s_track_data_queue[track_id].on_done_flag = NULL;
         s_track_data_queue[track_id].note_idx = 0U;
         s_track_data_queue[track_id].ms_counter = 0U;
-        s_track_data_queue[track_id].duty = (uint8_t)BUZZER_TIMBRE_SQUARE;
     }
     LOGGER_LOG_INFO(LOGGER_BUZZER, "init: %u tracks", (unsigned)SOUND_TRACKS);
 }
@@ -75,8 +73,8 @@ static void signalDone(uint8_t track_number)
  * that is paused, stopped, or sitting on a rest (freq 0) is skipped so the channel
  * falls through to a lower track that has something to sound, instead of going
  * silent. Muted, or nothing to play -> output off. Every state change (note
- * advance, pause/resume, stop, mute, timbre) routes through here, so arbitration
- * lives in exactly one place. */
+ * advance, pause/resume, stop, mute) routes through here, so arbitration lives in
+ * exactly one place. */
 static void buzzerRefreshOutput(void)
 {
     if (!s_muted)
@@ -89,7 +87,7 @@ static void buzzerRefreshOutput(void)
                 const uint16_t frequency_hz = t->notes_data[t->note_idx * 2U];
                 if (frequency_hz != 0U)
                 {
-                    timer3Trigger(frequency_hz, t->duty);
+                    timer3Trigger(frequency_hz);
                     return;
                 }
             }
@@ -166,22 +164,6 @@ bool buzzerResume(uint8_t track_number)
         return true;
     }
     return false;
-}
-
-bool buzzerSetTimbre(uint8_t track_number, uint8_t duty_percent)
-{
-    if (track_number >= SOUND_TRACKS ||
-        duty_percent < BUZZER_DUTY_MIN || duty_percent > BUZZER_DUTY_MAX)
-    {
-        LOGGER_LOG_WARN(LOGGER_BUZZER, "timbre rejected: track=%u duty=%u%% (want %u..%u)",
-                        (unsigned)track_number, (unsigned)duty_percent,
-                        (unsigned)BUZZER_DUTY_MIN, (unsigned)BUZZER_DUTY_MAX);
-        return false;
-    }
-    s_track_data_queue[track_number].duty = duty_percent;
-    buzzerRefreshOutput(); /* apply live if this track owns the channel */
-    LOGGER_LOG_DEBUG(LOGGER_BUZZER, "timbre track %u -> %u%% duty", (unsigned)track_number, (unsigned)duty_percent);
-    return true;
 }
 
 void buzzerInterruptHandler(void)

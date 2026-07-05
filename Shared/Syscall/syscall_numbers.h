@@ -29,9 +29,13 @@
  *     modal blocks for as long as the user types, so it exempts the calling
  *     callback from the liveness deadline for its duration (see the kernel's
  *     kernelSuspend/ResumeCallbackDeadline).
+ * v7: removed SYS_BUZZER_SET_TIMBRE and the pulse-duty "timbre" feature — on the
+ *     passive buzzer the duty barely altered the tone, so it wasn't worth the API
+ *     surface; the buzzer is a fixed 50% square again, and buzzer_interface.h
+ *     (which held only the timbre presets/range) was deleted.
  */
 
-#define CONSOLE_ABI_VERSION 6
+#define CONSOLE_ABI_VERSION 7
 
 #ifndef __ASSEMBLER__
 
@@ -52,7 +56,6 @@ typedef enum
     SYS_BUZZER_RESUME,
     SYS_BUZZER_STOP,
     SYS_BUZZER_STOP_ALL,
-    SYS_BUZZER_SET_TIMBRE, /* per-track PWM duty (instrument timbre) */
 
     SYS_INPUT_GET_STATE, /* fill an InputState: held/pressed/released + analog axes, one trap */
 

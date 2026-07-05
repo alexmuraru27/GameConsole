@@ -189,8 +189,6 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_BUZZER_STOP_ALL:
         buzzerStopAll();
         return 0;
-    case SYS_BUZZER_SET_TIMBRE:
-        return buzzerSetTimbre((uint8_t)a[0], (uint8_t)a[1]);
 
     /* ---- input ---- */
     case SYS_INPUT_GET_STATE:
