@@ -30,10 +30,6 @@ Sprite g_menu_ui[MENU_MAX_SPRITES];
 #define BAR_SEG_H 4
 static uint8_t s_bar_tile[(BAR_SEG_W * BAR_SEG_H * 2) / 8];
 
-/* Scaled-title glyph pool: a 16-char title * 64 B (16x16 @ 2bpp) fits in 1 KB. */
-#define TITLE_POOL_SIZE 1024U
-static uint8_t s_title_pool[TITLE_POOL_SIZE];
-
 void menuCommonInit(void)
 {
     memset(s_bar_tile, 0x55, sizeof(s_bar_tile)); /* 0x55 = four index-1 pixels per byte */
@@ -55,52 +51,22 @@ uint16_t menuTextWidth(FontSize size, const char *text)
     return (n == 0U) ? 0U : (uint16_t)(n * glyphAdvance(size) - 1U);
 }
 
+/* Text is drawn straight through the renderer's console-side text path (glyph
+ * expansion + scaled-glyph caching live there); only the bars below still build
+ * sprites into g_menu_ui. Menu text sits at z=1 so it composites over the z=0 bars
+ * on LAYER_UI. `idx` is returned unchanged — no g_menu_ui slot is consumed. The
+ * single-tint colour is palette index 1 (the theme palettes are {0, c, c, c}). */
 uint16_t menuDrawText(uint16_t idx, const Font *font, int16_t x, int16_t y,
                       const uint16_t *palette, const char *text)
 {
-    const FontSize size = font->size;
-    const uint16_t gw = fontGlyphW(size);
-    const uint16_t gh = fontGlyphH(size);
-
-    for (const char *scan = text; *scan != '\0' && idx < MENU_MAX_SPRITES; scan++)
-    {
-        const uint8_t ascii = (uint8_t)*scan;
-        if (ascii >= 0x20U && ascii <= 0x7EU)
-        {
-            const uint8_t *pixels;
-            fontGet(ascii, size, &pixels);
-            g_menu_ui[idx++] = (Sprite){.x = x, .y = y, .w = gw, .h = gh, .z = 1U,
-                                        .flags = 0U, .pixels = pixels, .palette = palette};
-        }
-        x = (int16_t)(x + glyphAdvance(size));
-    }
+    rendererDrawText(LAYER_UI, x, y, 1U, font->size, 1U, palette[1], text);
     return idx;
 }
 
-/* Nearest-neighbour scaled text; glyph pixels are baked into the title pool. */
 static uint16_t drawTextScaled(uint16_t idx, const Font *font, int16_t x, int16_t y,
                                uint8_t factor, const uint16_t *palette, const char *text)
 {
-    const FontSize size = font->size;
-    const uint8_t sw = (uint8_t)(fontGlyphW(size) * factor);
-    const uint8_t sh = (uint8_t)(fontGlyphH(size) * factor);
-    const uint16_t slot = fontSize(size, factor);
-    uint8_t *cursor = s_title_pool;
-    uint16_t remaining = TITLE_POOL_SIZE;
-
-    for (const char *scan = text; *scan != '\0' && idx < MENU_MAX_SPRITES; scan++)
-    {
-        const uint8_t ascii = (uint8_t)*scan;
-        if (ascii >= 0x20U && ascii <= 0x7EU && remaining >= slot)
-        {
-            fontScale(ascii, size, factor, cursor);
-            g_menu_ui[idx++] = (Sprite){.x = x, .y = y, .w = sw, .h = sh, .z = 1U,
-                                        .flags = 0U, .pixels = cursor, .palette = palette};
-            cursor += slot;
-            remaining = (uint16_t)(remaining - slot);
-        }
-        x = (int16_t)(x + sw + factor);
-    }
+    rendererDrawText(LAYER_UI, x, y, 1U, font->size, factor, palette[1], text);
     return idx;
 }
 

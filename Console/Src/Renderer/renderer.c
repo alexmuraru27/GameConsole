@@ -4,6 +4,7 @@
 #include "sysclock.h"
 #include "stdio.h"
 #include "logger.h"
+#include "font_utils.h" /* fontGlyphW/H, fontGet, fontScale, fontSize (rendererDrawText) */
 
 /* The renderer is the per-frame hot path, so it is compiled optimised even in
  * debug builds; the rest of the firmware stays at -Og for debuggability. */
@@ -25,6 +26,14 @@
  * same RAM cost (the z-sort pool below is 4 bytes per slot either way). */
 #define MAX_SPRITES_TOTAL 1050U
 
+/* Console-side text (rendererDrawText): the renderer expands a string into one
+ * glyph Sprite per printable character, drawn from its own pool rather than a
+ * game-managed array, so a game submits text with a single syscall and keeps no
+ * glyph storage of its own. These glyph sprites join the per-layer z-sort below
+ * alongside the game's submitted sprites. TEXT_SPRITE_CAP bounds the on-screen
+ * glyph count per frame (across all layers). */
+#define TEXT_SPRITE_CAP 256U
+
 #define RENDERER_SCANLINES 16U
 #define RENDERER_SCANLINE_BUF_SIZE (RENDERER_SCANLINES * RENDERER_WIDTH)
 
@@ -43,7 +52,7 @@ static uint16_t s_active_sprites[LAYER_COUNT];
  * (BG low→high z, then FG, then UI) and binning walks it linearly. Submission
  * keeps the summed layer counts within MAX_SPRITES_TOTAL, so the runs always
  * fit. */
-static const Sprite *s_sorted[MAX_SPRITES_TOTAL];
+static const Sprite *s_sorted[MAX_SPRITES_TOTAL + TEXT_SPRITE_CAP];
 static uint16_t s_sorted_total;
 
 /* Per-chunk sprite bins, rebuilt each frame from the z-sorted pool. This replaces
@@ -116,6 +125,42 @@ typedef struct
 static TileCacheSlot s_tile_cache[TILE_CACHE_SLOTS];
 static uint8_t s_tile_cache_count;
 
+/* ---- Console-side text drawing (rendererDrawText) ----
+ * A frame's text glyphs live here, one Sprite each, tagged with their layer; the
+ * z-sort folds them into the matching layer's run. Rebuilt every frame (reset in
+ * rendererClear/rendererRender), so a game re-issues its text like its sprites. */
+static Sprite s_text_sprites[TEXT_SPRITE_CAP];
+static uint8_t s_text_layer[TEXT_SPRITE_CAP]; /* Layer of each glyph in s_text_sprites */
+static uint16_t s_text_count;
+
+/* Text is single-tint, so each drawText call needs a {transparent, ink, ink, ink}
+ * palette. They are pooled and de-duplicated by colour within a frame (a HUD uses
+ * only a few colours), and each must outlive compositing — hence console-owned. */
+#define TEXT_PALETTE_CAP 16U
+static uint16_t s_text_palettes[TEXT_PALETTE_CAP][4];
+static uint16_t s_text_palette_count;
+
+/* Scaled-glyph cache: a glyph at scale > 1 is unpacked/re-packed by fontScale into
+ * a slot here once and reused across frames (the expensive part of scaled text).
+ * Keyed by (char, font, scale); the slot is sized for the largest supported glyph
+ * (FONT_8x8 at RENDERER_TEXT_MAX_SCALE = 32x32 2bpp = 256 B). A slot touched in the
+ * current frame is never evicted, so pointers handed out this frame stay valid
+ * until rendererRender composites them. Scale 1 is not cached — fontGet returns the
+ * glyph straight out of flash. */
+#define GLYPH_CACHE_SLOTS 10U
+#define GLYPH_CACHE_SLOT_BYTES 256U
+typedef struct
+{
+    uint8_t bits[GLYPH_CACHE_SLOT_BYTES];
+    uint32_t used_frame; /* frame counter when last drawn (eviction guard + LRU) */
+    uint8_t ch;
+    uint8_t font;
+    uint8_t scale;
+    bool valid;
+} GlyphCacheSlot;
+static GlyphCacheSlot s_glyph_cache[GLYPH_CACHE_SLOTS];
+static uint32_t s_frame_counter; /* bumped once per rendererRender */
+
 void rendererInit(void)
 {
     memset(&s_scanline_buffer[0U], 0U, sizeof(s_scanline_buffer));
@@ -139,6 +184,8 @@ void rendererInit(void)
 void rendererClear(void)
 {
     memset(s_active_sprites, 0U, sizeof(s_active_sprites));
+    s_text_count = 0U;
+    s_text_palette_count = 0U;
 }
 
 /* Reset the per-game renderer state at launch (console-side, not a game syscall):
@@ -149,7 +196,11 @@ void rendererClear(void)
 void rendererResetState(void)
 {
     memset(s_active_sprites, 0U, sizeof(s_active_sprites));
+    s_text_count = 0U;
+    s_text_palette_count = 0U;
     s_bg_enabled = false;
+    /* The glyph cache is font data (game-independent), so it is kept warm across
+     * game launches; only the per-frame text state is cleared here. */
 }
 
 /* Set the color painted where no sprite draws (enables per-chunk background
@@ -203,6 +254,125 @@ void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count)
     s_active_sprites[layer] = count;
 }
 
+/* Find (or add) the single-tint palette {transparent, color, color, color} for a
+ * drawText call, de-duplicated by colour within the frame. If the small pool is
+ * full (many distinct text colours in one frame), reuse the last entry. */
+static const uint16_t *textPalette(uint16_t color)
+{
+    for (uint16_t i = 0U; i < s_text_palette_count; i++)
+    {
+        if (s_text_palettes[i][1] == color)
+        {
+            return s_text_palettes[i];
+        }
+    }
+    uint16_t slot = (s_text_palette_count < TEXT_PALETTE_CAP) ? s_text_palette_count++ : (TEXT_PALETTE_CAP - 1U);
+    s_text_palettes[slot][0] = 0U; /* index 0 is transparent */
+    s_text_palettes[slot][1] = color;
+    s_text_palettes[slot][2] = color;
+    s_text_palettes[slot][3] = color;
+    return s_text_palettes[slot];
+}
+
+/* Return a scaled glyph's 2bpp bitmap, unpacking it into a cache slot on first use
+ * and reusing it thereafter. NULL only if every slot is already in use this frame
+ * (pathological: > GLYPH_CACHE_SLOTS distinct scaled glyphs in one frame) — the
+ * caller then skips that glyph. Only called for scale > 1. */
+static const uint8_t *glyphCacheGet(uint8_t ch, FontSize font, uint8_t scale)
+{
+    for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
+    {
+        GlyphCacheSlot *s = &s_glyph_cache[i];
+        if (s->valid && s->ch == ch && s->font == (uint8_t)font && s->scale == scale)
+        {
+            s->used_frame = s_frame_counter;
+            return s->bits;
+        }
+    }
+    /* Miss: take a free slot, else the least-recently-used slot not touched this
+     * frame (evicting an in-use slot would dangle a pointer already handed out). */
+    GlyphCacheSlot *victim = NULL;
+    for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
+    {
+        if (!s_glyph_cache[i].valid)
+        {
+            victim = &s_glyph_cache[i];
+            break;
+        }
+    }
+    if (victim == NULL)
+    {
+        uint32_t oldest = 0xFFFFFFFFU;
+        for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
+        {
+            GlyphCacheSlot *s = &s_glyph_cache[i];
+            if (s->used_frame != s_frame_counter && s->used_frame <= oldest)
+            {
+                oldest = s->used_frame;
+                victim = s;
+            }
+        }
+    }
+    if (victim == NULL || fontSize(font, scale) > GLYPH_CACHE_SLOT_BYTES)
+    {
+        return NULL;
+    }
+    fontScale(ch, font, scale, victim->bits);
+    victim->ch = ch;
+    victim->font = (uint8_t)font;
+    victim->scale = scale;
+    victim->valid = true;
+    victim->used_frame = s_frame_counter;
+    return victim->bits;
+}
+
+void rendererDrawText(Layer layer, int16_t x, int16_t y, uint8_t z, FontSize font,
+                      uint8_t scale, uint16_t color, const char *text)
+{
+    if (layer >= LAYER_COUNT || text == NULL || (unsigned)font > (unsigned)FONT_8x8)
+    {
+        return; /* font bound guards the fontGlyphW/fontGet table lookups */
+    }
+    if (scale == 0U)
+    {
+        scale = 1U;
+    }
+    if (scale > RENDERER_TEXT_MAX_SCALE)
+    {
+        scale = RENDERER_TEXT_MAX_SCALE;
+    }
+    const uint16_t glyph_w = (uint16_t)(fontGlyphW(font) * scale);
+    const uint16_t glyph_h = (uint16_t)(fontGlyphH(font) * scale);
+    const int16_t advance = (int16_t)((fontGlyphW(font) + 1U) * scale);
+    const uint16_t *pal = textPalette(color);
+
+    for (const char *s = text; *s != '\0'; s++, x = (int16_t)(x + advance))
+    {
+        const uint8_t ch = (uint8_t)*s;
+        if (ch <= 0x20U || ch > 0x7EU) /* skip space (and non-printables): draws nothing */
+        {
+            continue;
+        }
+        if (s_text_count >= TEXT_SPRITE_CAP)
+        {
+            break; /* pool full: drop the rest (bounded) */
+        }
+        const uint8_t *pixels;
+        if (scale == 1U)
+        {
+            fontGet(ch, font, &pixels); /* straight from flash — no cache needed */
+        }
+        else if ((pixels = glyphCacheGet(ch, font, scale)) == NULL)
+        {
+            continue; /* cache exhausted this frame */
+        }
+        s_text_layer[s_text_count] = (uint8_t)layer;
+        s_text_sprites[s_text_count] = (Sprite){.x = x, .y = y, .w = glyph_w, .h = glyph_h,
+                                                .z = z, .flags = 0U, .pixels = pixels, .palette = pal};
+        s_text_count++;
+    }
+}
+
 /* Counting sort each layer by z ascending, scattering straight into the flat
  * pool with each layer's run starting where the previous layer's ended. After
  * all three, s_sorted[0..s_sorted_total) is the frame's painter order. */
@@ -212,7 +382,9 @@ static void sortSpritesByZ(void)
     for (uint8_t layer = 0U; layer < LAYER_COUNT; layer++)
     {
         uint16_t count = s_active_sprites[layer];
-        if (count == 0U)
+        /* Skip an empty layer only when no console text exists at all; otherwise the
+         * layer may still carry drawText glyphs, so it must be processed. */
+        if (count == 0U && s_text_count == 0U)
         {
             continue;
         }
@@ -223,6 +395,14 @@ static void sortSpritesByZ(void)
         for (uint16_t i = 0U; i < count; i++)
         {
             z_count[sprites[i].z]++;
+        }
+        /* Console-drawn text glyphs tagged to this layer share its z-run. */
+        for (uint16_t i = 0U; i < s_text_count; i++)
+        {
+            if (s_text_layer[i] == layer)
+            {
+                z_count[s_text_sprites[i].z]++;
+            }
         }
 
         /* Exclusive prefix sum, based at this layer's run start in the pool. */
@@ -236,6 +416,14 @@ static void sortSpritesByZ(void)
         for (uint16_t i = 0U; i < count; i++)
         {
             s_sorted[z_count[sprites[i].z]++] = &sprites[i];
+        }
+        /* Text after the game sprites: same-z glyphs land on top of game sprites. */
+        for (uint16_t i = 0U; i < s_text_count; i++)
+        {
+            if (s_text_layer[i] == layer)
+            {
+                s_sorted[z_count[s_text_sprites[i].z]++] = &s_text_sprites[i];
+            }
         }
         total = offset;
     }
@@ -964,6 +1152,13 @@ void rendererRender(void)
         ili9341DrawScanlines((uint8_t)chunk_lines, scanline_y, chunk_lines * RENDERER_WIDTH, s_scanline_buffer[buffer_index]);
         scanline_y += chunk_lines;
     }
+
+    /* Text is re-issued per frame like sprites: drop this frame's glyphs and advance
+     * the frame counter (the glyph cache uses it for eviction/LRU). The scaled-glyph
+     * bitmaps themselves stay cached across frames. */
+    s_text_count = 0U;
+    s_text_palette_count = 0U;
+    s_frame_counter++;
 }
 
 uint16_t rendererGetWidthPixels(void)

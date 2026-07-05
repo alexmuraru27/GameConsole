@@ -60,6 +60,17 @@ uint16_t rendererGetWidthPixels(void);
 uint16_t rendererGetHeightPixels(void);
 uint16_t rendererSystemColor(uint8_t system_index);
 
+/* Draw built-in-font text in one syscall — the console expands the whole string
+ * into glyph sprites on its own scratch pool (no game-side sprite array, no
+ * per-glyph fontGet/fontScale trap), on `layer` at (x,y) with draw order `z`,
+ * tinted `color` (RGB565), using `font` at integer `scale` (1 = native; scaled
+ * glyphs are cached console-side, clamped to a small max). It composites with the
+ * layer's submitted sprites by z. Re-issue it every frame, like submitting sprites.
+ * For centre/right alignment, measure the width yourself: the pen advances
+ * (fontGlyphW(font) + 1) * scale per character. */
+void rendererDrawText(Layer layer, int16_t x, int16_t y, uint8_t z, FontSize font,
+                      uint8_t scale, uint16_t color, const char *text);
+
 /* ---- assets ---- */
 uint8_t assetLoaderGetAssetMetadata(uint32_t asset_id, AssetMetaData *asset_metadata_out);
 uint8_t assetLoaderGetAssetData(uint32_t asset_id, uint8_t *buffer, uint32_t buffer_size_bytes);

@@ -75,16 +75,10 @@ static uint8_t s_vline[GRID_T * BOARD_W / 4]; /* 4 wide x 168 tall */
 static uint8_t s_hline[BOARD_W * GRID_T / 4]; /* 168 wide x 4 tall */
 static const uint16_t s_pal_grid[4] = {0, COL_GRID, COL_GRID, COL_GRID};
 
-/* Font palettes (2bpp: slot 0 transparent, ink in 1-3). */
-static const uint16_t s_pal_title[4] = {0, COL_TITLE, COL_TITLE, COL_TITLE};
-static const uint16_t s_pal_text[4] = {0, COL_TEXT, COL_TEXT, COL_TEXT};
-static const uint16_t s_pal_win[4] = {0, COL_WIN, COL_WIN, COL_WIN}; /* "your turn" / "joined" */
-
-/* Per-frame sprite scratch + scaled-text pool. */
-#define UI_MAX 96U
+/* Per-frame sprite scratch for the board/marks (FG layer). All text now goes
+ * straight to the console via rendererDrawText (UI layer), so this game keeps no
+ * text sprite array or scaled-glyph pool of its own. */
 static Sprite s_fg[32];
-static Sprite s_ui[UI_MAX];
-static uint8_t s_text_pool[2048];
 
 
 static Sprite placed(Sprite tmpl, int16_t x, int16_t y, uint8_t z)
@@ -181,11 +175,11 @@ static uint16_t buildMarks(uint16_t n)
     return n;
 }
 
-/* Centered single-line text helper for the lobby screens. */
-static uint16_t drawCentered(uint16_t n, FontSize font, int16_t y, const uint16_t *pal, const char *s)
+/* Draw a horizontally-centred single line of UI text through the console. */
+static void drawCentered(FontSize font, int16_t y, uint16_t color, const char *s)
 {
     const int16_t x = (int16_t)((320 - gameAssetsTextWidth(font, s)) / 2);
-    return n + gameAssetsDrawText(s_ui + n, UI_MAX - n, font, x, y, 0U, pal, s);
+    rendererDrawText(LAYER_UI, x, y, 0U, font, 1U, color, s);
 }
 
 /* ---- multiplayer helpers --------------------------------------------- */
@@ -318,10 +312,8 @@ static void updateModeSelect(void)
 
 static void renderModeSelect(void)
 {
-    uint16_t nu = 0U;
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - 11 * 18) / 2), 28, 0U, 2U,
-                                   s_pal_title, "TIC TAC TOE", s_text_pool, sizeof(s_text_pool));
+    rendererClear();
+    rendererDrawText(LAYER_UI, (int16_t)((320 - 11 * 18) / 2), 28, 0U, FONT_8x8, 2U, COL_TITLE, "TIC TAC TOE");
 
     for (uint8_t i = 0U; i < MODE_COUNT; i++)
     {
@@ -330,15 +322,13 @@ static void renderModeSelect(void)
         if (sel)
         {
             const int16_t cx = (int16_t)((320 - gameAssetsTextWidth(FONT_8x8, s_mode_labels[i])) / 2 - 20);
-            nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_8x8, cx, y, 0U, s_pal_title, ">");
+            rendererDrawText(LAYER_UI, cx, y, 0U, FONT_8x8, 1U, COL_TITLE, ">");
         }
-        nu = drawCentered(nu, FONT_8x8, y, sel ? s_pal_title : s_pal_text, s_mode_labels[i]);
+        drawCentered(FONT_8x8, y, sel ? COL_TITLE : COL_TEXT, s_mode_labels[i]);
     }
 
-    nu = drawCentered(nu, FONT_5x5, 222, s_pal_text, "UP/DOWN choose    A select    SP2 quit");
+    drawCentered(FONT_5x5, 222, COL_TEXT, "UP/DOWN choose    A select    SP2 quit");
 
-    rendererClear();
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 
@@ -356,16 +346,14 @@ static void updateHostLobby(void)
 
 static void renderHostLobby(void)
 {
-    uint16_t nu = 0U;
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - 7 * 18) / 2), 24, 0U, 2U,
-                                   s_pal_title, "HOSTING", s_text_pool, sizeof(s_text_pool));
+    rendererClear();
+    rendererDrawText(LAYER_UI, (int16_t)((320 - 7 * 18) / 2), 24, 0U, FONT_8x8, 2U, COL_TITLE, "HOSTING");
 
     char line[40];
     char self_name[MP_NAME_MAX + 1];
     mpGetSelfName(self_name, sizeof(self_name));
     (void)snprintf(line, sizeof(line), "You: %s", self_name);
-    nu = drawCentered(nu, FONT_8x8, 96, s_pal_text, line);
+    drawCentered(FONT_8x8, 96, COL_TEXT, line);
 
     const bool ready = (mpGetPlayerCount() >= 2U);
     if (ready)
@@ -373,21 +361,19 @@ static void renderHostLobby(void)
         char opp[MP_NAME_MAX + 1];
         mpGetName(findOpponent(), opp, sizeof(opp));
         (void)snprintf(line, sizeof(line), "%s joined!", opp);
-        nu = drawCentered(nu, FONT_8x8, 130, s_pal_win, line);
-        nu = drawCentered(nu, FONT_5x5, 222, s_pal_text, "A start    SP2 cancel");
+        drawCentered(FONT_8x8, 130, COL_WIN, line);
+        drawCentered(FONT_5x5, 222, COL_TEXT, "A start    SP2 cancel");
     }
     else
     {
         const bool blink = ((getSysTime() / 400U) & 1U) == 0U;
         if (blink)
         {
-            nu = drawCentered(nu, FONT_8x8, 130, s_pal_text, "Waiting for opponent...");
+            drawCentered(FONT_8x8, 130, COL_TEXT, "Waiting for opponent...");
         }
-        nu = drawCentered(nu, FONT_5x5, 222, s_pal_text, "SP2 cancel");
+        drawCentered(FONT_5x5, 222, COL_TEXT, "SP2 cancel");
     }
 
-    rendererClear();
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 
@@ -445,21 +431,19 @@ static void updateJoinBrowse(void)
 
 static void renderJoinBrowse(void)
 {
-    uint16_t nu = 0U;
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - 9 * 18) / 2), 24, 0U, 2U,
-                                   s_pal_title, "JOIN GAME", s_text_pool, sizeof(s_text_pool));
+    rendererClear();
+    rendererDrawText(LAYER_UI, (int16_t)((320 - 9 * 18) / 2), 24, 0U, FONT_8x8, 2U, COL_TITLE, "JOIN GAME");
 
     if (s_joining)
     {
-        nu = drawCentered(nu, FONT_8x8, 110, s_pal_text, "Connecting...");
+        drawCentered(FONT_8x8, 110, COL_TEXT, "Connecting...");
     }
     else if (s_host_count == 0)
     {
         const bool blink = ((getSysTime() / 400U) & 1U) == 0U;
         if (blink)
         {
-            nu = drawCentered(nu, FONT_8x8, 110, s_pal_text, "Searching for hosts...");
+            drawCentered(FONT_8x8, 110, COL_TEXT, "Searching for hosts...");
         }
     }
     else
@@ -473,17 +457,15 @@ static void renderJoinBrowse(void)
             if (sel)
             {
                 const int16_t cx = (int16_t)((320 - gameAssetsTextWidth(FONT_8x8, line)) / 2 - 20);
-                nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_8x8, cx, y, 0U, s_pal_title, ">");
+                rendererDrawText(LAYER_UI, cx, y, 0U, FONT_8x8, 1U, COL_TITLE, ">");
             }
-            nu = drawCentered(nu, FONT_8x8, y, sel ? s_pal_title : s_pal_text, line);
+            drawCentered(FONT_8x8, y, sel ? COL_TITLE : COL_TEXT, line);
         }
     }
 
-    nu = drawCentered(nu, FONT_5x5, 222, s_pal_text,
-                      s_joining ? "SP2 cancel" : "UP/DOWN pick    A join    SP2 back");
+    drawCentered(FONT_5x5, 222, COL_TEXT,
+                 s_joining ? "SP2 cancel" : "UP/DOWN pick    A join    SP2 back");
 
-    rendererClear();
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 
@@ -492,34 +474,32 @@ static void renderJoinBrowse(void)
 static void renderChoose(void)
 {
     const int16_t left_x = 100, right_x = 172, mark_y = 120;
-    uint16_t nf = 0U, nu = 0U;
+    uint16_t nf = 0U;
+
+    rendererClear();
 
     const int16_t sel_x = s_player_is_x ? left_x : right_x;
     s_fg[nf++] = placed(s_spr_cursor, (int16_t)(sel_x - MARK_OFF), (int16_t)(mark_y - MARK_OFF), 1U);
     s_fg[nf++] = placed(s_spr_x, left_x, mark_y, 2U);
     s_fg[nf++] = placed(s_spr_o, right_x, mark_y, 2U);
 
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - 11 * 18) / 2), 12, 0U, 2U,
-                                   s_pal_title, "TIC TAC TOE", s_text_pool, sizeof(s_text_pool));
+    rendererDrawText(LAYER_UI, (int16_t)((320 - 11 * 18) / 2), 12, 0U, FONT_8x8, 2U, COL_TITLE, "TIC TAC TOE");
     const char *prompt = "PICK YOUR MARK";
-    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                             (int16_t)((320 - gameAssetsTextWidth(FONT_8x8, prompt)) / 2), 78, 0U,
-                             s_pal_text, prompt);
+    rendererDrawText(LAYER_UI, (int16_t)((320 - gameAssetsTextWidth(FONT_8x8, prompt)) / 2), 78, 0U,
+                     FONT_8x8, 1U, COL_TEXT, prompt);
     const char *hint = "LEFT / RIGHT  choose      A  start";
-    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
-                             (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 210, 0U,
-                             s_pal_text, hint);
+    rendererDrawText(LAYER_UI, (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 210, 0U,
+                     FONT_5x5, 1U, COL_TEXT, hint);
 
-    rendererClear();
     rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 
 static void renderPlaying(void)
 {
-    uint16_t nf = 0U, nu = 0U;
+    uint16_t nf = 0U;
+
+    rendererClear();
 
     nf = buildGrid(nf);
     nf = buildMarks(nf);
@@ -527,78 +507,68 @@ static void renderPlaying(void)
                         (int16_t)(BOARD_X + s_cursor_x * CELL),
                         (int16_t)(BOARD_Y + s_cursor_y * CELL), 3U);
 
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - 11 * 18) / 2), 12, 0U, 2U,
-                                   s_pal_title, "TIC TAC TOE", s_text_pool, sizeof(s_text_pool));
+    rendererDrawText(LAYER_UI, (int16_t)((320 - 11 * 18) / 2), 12, 0U, FONT_8x8, 2U, COL_TITLE, "TIC TAC TOE");
 
     if (s_is_mp)
     {
         const bool my_turn = (s_turn == s_self_index);
         const char *turn = my_turn ? "YOUR TURN" : "OPPONENT'S TURN";
-        nu = drawCentered(nu, FONT_8x8, 40, my_turn ? s_pal_win : s_pal_text, turn);
+        drawCentered(FONT_8x8, 40, my_turn ? COL_WIN : COL_TEXT, turn);
         char names[56]; /* two names (<=16) + " X   vs   " + marks */
         (void)snprintf(names, sizeof(names), "%s %c   vs   %s %c",
                        s_self_name, s_self_is_host ? 'X' : 'O',
                        s_opp_name, s_self_is_host ? 'O' : 'X');
-        nu = drawCentered(nu, FONT_5x5, 226, s_pal_text, names);
+        drawCentered(FONT_5x5, 226, COL_TEXT, names);
     }
     else
     {
         const char *hint = "D-PAD move      A  place      SP2  quit";
-        nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
-                                 (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
-                                 s_pal_text, hint);
+        rendererDrawText(LAYER_UI, (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
+                         FONT_5x5, 1U, COL_TEXT, hint);
     }
 
-    rendererClear();
     rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 
 static void renderEnd(void)
 {
-    uint16_t nf = 0U, nu = 0U;
+    uint16_t nf = 0U;
+
+    rendererClear();
 
     nf = buildGrid(nf);
     nf = buildMarks(nf);
 
     const char *banner;
-    const uint16_t *banner_pal;
-    static const uint16_t pal_win[4] = {0, COL_WIN, COL_WIN, COL_WIN};
-    static const uint16_t pal_lose[4] = {0, COL_LOSE, COL_LOSE, COL_LOSE};
-    static const uint16_t pal_draw[4] = {0, COL_DRAW, COL_DRAW, COL_DRAW};
+    uint16_t banner_color;
 
     if (s_opp_left)
     {
         banner = "OPPONENT LEFT";
-        banner_pal = pal_draw;
+        banner_color = COL_DRAW;
     }
     else if (s_result == TIC_TAC_TOE_GAME_STATE_DRAW)
     {
         banner = "DRAW";
-        banner_pal = pal_draw;
+        banner_color = COL_DRAW;
     }
     else
     {
         const bool player_won = (s_result == TIC_TAC_TOE_GAME_STATE_WIN_X) == s_player_is_x;
         banner = player_won ? "YOU WIN" : "YOU LOSE";
-        banner_pal = player_won ? pal_win : pal_lose;
+        banner_color = player_won ? COL_WIN : COL_LOSE;
     }
 
-    /* A scaled banner across the middle of the board (z above the marks). */
+    /* A scaled banner across the middle of the board (the UI layer draws over the
+     * FG marks, so it reads on top regardless of z). */
     const int16_t banner_w = (int16_t)(strlen(banner) * (8 * 3 + 3));
-    nu += gameAssetsDrawTextScaled(s_ui + nu, UI_MAX - nu, FONT_8x8,
-                                   (int16_t)((320 - banner_w) / 2), 118, 0U, 3U,
-                                   banner_pal, banner, s_text_pool, sizeof(s_text_pool));
+    rendererDrawText(LAYER_UI, (int16_t)((320 - banner_w) / 2), 118, 0U, FONT_8x8, 3U, banner_color, banner);
     const char *hint = s_is_mp ? "A  menu        SP2  quit" : "A  play again        SP2  quit";
-    nu += gameAssetsDrawText(s_ui + nu, UI_MAX - nu, FONT_5x5,
-                             (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
-                             s_pal_text, hint);
+    rendererDrawText(LAYER_UI, (int16_t)((320 - gameAssetsTextWidth(FONT_5x5, hint)) / 2), 226, 0U,
+                     FONT_5x5, 1U, COL_TEXT, hint);
 
-    rendererClear();
     rendererSubmitLayer(LAYER_FG, s_fg, nf);
-    rendererSubmitLayer(LAYER_UI, s_ui, nu);
     rendererRender();
 }
 

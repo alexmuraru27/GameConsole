@@ -75,6 +75,22 @@ uint16_t rendererGetWidthPixels(void) { return (uint16_t)svcCall(SYS_RENDERER_WI
 uint16_t rendererGetHeightPixels(void) { return (uint16_t)svcCall(SYS_RENDERER_HEIGHT, 0, 0, 0, 0); }
 uint16_t rendererSystemColor(uint8_t idx) { return (uint16_t)svcCall(SYS_RENDERER_SYSTEM_COLOR, idx, 0, 0, 0); }
 
+void rendererDrawText(Layer layer, int16_t x, int16_t y, uint8_t z, FontSize font,
+                      uint8_t scale, uint16_t color, const char *text)
+{
+    /* >4 register args: bundle them in game RAM and pass one validated pointer. */
+    const SyscallDrawTextArgs args = {
+        .text = text,
+        .x = x,
+        .y = y,
+        .color = color,
+        .layer = (uint8_t)layer,
+        .font = (uint8_t)font,
+        .z = z,
+        .scale = scale};
+    (void)svcCall(SYS_RENDERER_DRAW_TEXT, (uint32_t)&args, 0, 0, 0);
+}
+
 /* ---- assets ---- */
 uint8_t assetLoaderGetAssetMetadata(uint32_t id, AssetMetaData *out)
 {

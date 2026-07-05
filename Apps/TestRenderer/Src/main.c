@@ -68,11 +68,11 @@
 #define READOUT_W 96
 #define READOUT_H 60
 
-/* ---- Font-colour palettes (slot 0 transparent, 1-3 the ink). ---- */
-static const uint16_t s_pal_white[4] = {0x0000, 0xFFFF, 0xFFFF, 0xFFFF};
-static const uint16_t s_pal_green[4] = {0x0000, 0x07E0, 0x07E0, 0x07E0};
-static const uint16_t s_pal_amber[4] = {0x0000, 0xFD20, 0xFD20, 0xFD20};
-static const uint16_t s_pal_cyan[4] = {0x0000, 0x07FF, 0x07FF, 0x07FF};
+/* ---- Text ink colours (RGB565). ---- */
+#define COL_WHITE 0xFFFFU
+#define COL_GREEN 0x07E0U
+#define COL_AMBER 0xFD20U
+#define COL_CYAN 0x07FFU
 
 /* One loaded sprite: a pointer into its decoded GfxAsset blob, the RGB565 palette
  * (system indices resolved through rendererSystemColor), its size, and the sprite
@@ -129,26 +129,6 @@ static int bob(uint32_t phase_ms, uint32_t period_ms, int amp)
     uint32_t t = (s_anim_ms + phase_ms) % (period_ms * 2U);
     uint32_t v = (t < period_ms) ? t : (period_ms * 2U - t);
     return (int)((uint32_t)amp * v / period_ms);
-}
-
-/* Render a C string into consecutive UI sprites (glyph pixels point at console
- * flash via fontGet, so no pool is needed). Returns the next free index. */
-static uint16_t draw_text(Sprite *ui, uint16_t idx, FontSize size, int16_t x, int16_t y,
-                          uint8_t z, const uint16_t *palette, const char *text)
-{
-    uint16_t gw = fontGlyphW(size), gh = fontGlyphH(size);
-    for (const char *s = text; *s && idx < LAYER_CAP; s++)
-    {
-        uint8_t c = (uint8_t)*s;
-        if (c >= 0x20U && c <= 0x7EU)
-        {
-            const uint8_t *px;
-            fontGet(c, size, &px);
-            ui[idx++] = (Sprite){.x = x, .y = y, .w = gw, .h = gh, .z = z, .flags = 0U, .pixels = px, .palette = palette};
-        }
-        x = (int16_t)(x + gw + 1U);
-    }
-    return idx;
 }
 
 /* Stream one tile asset from the bound .pak into *cursor (bump-allocated, 4-aligned,
@@ -481,17 +461,18 @@ static uint16_t buildOverlay(void)
     s_ui[n++] = spr(222, 25, 55U, REF(TESTRENDERER_GFX_RING), 0U);
     s_ui[n++] = spr(238, 24, 55U, REF(TESTRENDERER_GFX_STAR), 0U);
 
+    /* Readouts via the console text path — no glyph sprites in this game's arrays. */
     snprintf(line, sizeof(line), "FPS %u", (unsigned)s_fps_cur);
-    n = draw_text(s_ui, n, FONT_8x8, 4, 4, 60U, s_pal_amber, line);
+    rendererDrawText(LAYER_UI, 4, 4, 60U, FONT_8x8, 1U, COL_AMBER, line);
     snprintf(line, sizeof(line), "MIN %u", (unsigned)s_fps_min);
-    n = draw_text(s_ui, n, FONT_8x8, 4, 14, 60U, s_pal_green, line);
+    rendererDrawText(LAYER_UI, 4, 14, 60U, FONT_8x8, 1U, COL_AMBER, line);
     snprintf(line, sizeof(line), "AVG %u", (unsigned)s_fps_avg);
-    n = draw_text(s_ui, n, FONT_8x8, 4, 24, 60U, s_pal_white, line);
+    rendererDrawText(LAYER_UI, 4, 24, 60U, FONT_8x8, 1U, COL_AMBER, line);
     snprintf(line, sizeof(line), "MAX %u", (unsigned)s_fps_max);
-    n = draw_text(s_ui, n, FONT_8x8, 4, 34, 60U, s_pal_cyan, line);
+    rendererDrawText(LAYER_UI, 4, 34, 60U, FONT_8x8, 1U, COL_AMBER, line);
     snprintf(line, sizeof(line), "LOAD %u%% %u", (unsigned)s_load_pct, (unsigned)s_sprite_target);
-    n = draw_text(s_ui, n, FONT_5x5, 4, 48, 60U, s_pal_amber, line);
-    n = draw_text(s_ui, n, FONT_5x5, 4, 226, 60U, s_pal_cyan, "SB2 EXIT");
+    rendererDrawText(LAYER_UI, 4, 48, 60U, FONT_5x5, 1U, COL_AMBER, line);
+    rendererDrawText(LAYER_UI, 4, 226, 60U, FONT_5x5, 1U, COL_CYAN, "SB2 EXIT");
     return n;
 }
 

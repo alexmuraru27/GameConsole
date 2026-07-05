@@ -16,26 +16,9 @@
  * change — or the GameBinaryHeader layout does; the loader refuses a game built
  * against a different ABI. The value is a plain integer (no suffix) so it is
  * usable from both C and assembly.
- *
- * v5: GameBinaryHeader gained the stack_guard field (28 -> 32 bytes);
- *     rendererInit() retired from the game API and SYS_RENDERER_INIT removed from
- *     the enum (the kernel resets the renderer when it launches a game);
- *     the 15 per-button/per-axis SYS_JOY_* calls collapsed into one
- *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes);
- *     added SYS_GET_RANDOM (hardware TRNG) and SYS_BUZZER_SET_TIMBRE (per-track
- *     PWM duty / instrument timbre).
- * v6: added SYS_OS_TEXT_INPUT — the OS runs its on-screen keyboard modally on a
- *     game's behalf (e.g. high-score name entry) and fills a game buffer. The
- *     modal blocks for as long as the user types, so it exempts the calling
- *     callback from the liveness deadline for its duration (see the kernel's
- *     kernelSuspend/ResumeCallbackDeadline).
- * v7: removed SYS_BUZZER_SET_TIMBRE and the pulse-duty "timbre" feature — on the
- *     passive buzzer the duty barely altered the tone, so it wasn't worth the API
- *     surface; the buzzer is a fixed 50% square again, and buzzer_interface.h
- *     (which held only the timbre presets/range) was deleted.
  */
 
-#define CONSOLE_ABI_VERSION 7
+#define CONSOLE_ABI_VERSION 8
 
 #ifndef __ASSEMBLER__
 
@@ -66,6 +49,7 @@ typedef enum
     SYS_RENDERER_WIDTH,
     SYS_RENDERER_HEIGHT,
     SYS_RENDERER_SYSTEM_COLOR,
+    SYS_RENDERER_DRAW_TEXT, /* console-side glyph->sprite text (args via SyscallDrawTextArgs) */
 
     SYS_ASSET_METADATA,
     SYS_ASSET_DATA,
@@ -122,6 +106,20 @@ typedef struct
     uint16_t notes_number;
     bool *on_done_flag;
 } SyscallBuzzerPlayArgs;
+
+/* rendererDrawText marshalling (7 logical args + the string pointer > 4 registers).
+ * The stub fills this in game RAM; the dispatcher validates it and the string. */
+typedef struct
+{
+    const char *text;
+    int16_t x;
+    int16_t y;
+    uint16_t color; /* RGB565 ink */
+    uint8_t layer;  /* Layer */
+    uint8_t font;   /* FontSize */
+    uint8_t z;
+    uint8_t scale;
+} SyscallDrawTextArgs;
 
 #endif /* __ASSEMBLER__ */
 

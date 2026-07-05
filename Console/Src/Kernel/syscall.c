@@ -232,6 +232,23 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         return rendererGetHeightPixels();
     case SYS_RENDERER_SYSTEM_COLOR:
         return rendererSystemColor((uint8_t)a[0]);
+    case SYS_RENDERER_DRAW_TEXT:
+    {
+        const SyscallDrawTextArgs *args = (const SyscallDrawTextArgs *)a[0];
+        char textbuf[128];
+        /* Validate the marshalled struct, then copy the string into a bounded
+         * kernel buffer (per-byte range-checked) so a non-terminated or oversized
+         * game string can't walk the renderer off the end of game memory. */
+        if (!gameCanRead(args, sizeof(*args)) ||
+            !gameCopyStringIn(textbuf, sizeof(textbuf), args->text))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return 0;
+        }
+        rendererDrawText((Layer)args->layer, args->x, args->y, args->z,
+                         (FontSize)args->font, args->scale, args->color, textbuf);
+        return 0;
+    }
 
     /* ---- assets ---- */
     case SYS_ASSET_METADATA:

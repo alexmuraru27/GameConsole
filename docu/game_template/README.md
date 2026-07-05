@@ -202,6 +202,8 @@ if (in.special2.pressed) { gameExit(); }    // quit (by convention)
 void     rendererClear(void);
 void     rendererSetBackground(uint16_t color);                 // RGB565
 void     rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count);
+void     rendererDrawText(Layer layer, int16_t x, int16_t y, uint8_t z, FontSize font,
+                          uint8_t scale, uint16_t color, const char *text); // text in ONE call
 void     rendererRender(void);                                  // composite + DMA to panel
 uint16_t rendererGetWidthPixels(void);                          // 320
 uint16_t rendererGetHeightPixels(void);                         // 240
@@ -211,6 +213,15 @@ Submit per-layer `Sprite` arrays (`LAYER_BG`/`LAYER_FG`/`LAYER_UI`), then
 `rendererRender()`. A `Sprite`'s `pixels`/`palette` may point into your RAM, the
 CCM arena, or console flash (font glyphs). Types live in `renderer_interface.h`;
 the deep dive is [`../renderer.md`](../renderer.md).
+
+**Text** is best drawn with `rendererDrawText()` — one syscall draws a whole
+string (built-in `font`, integer `scale`, RGB565 `color`) on `layer` at `(x,y,z)`,
+compositing with that layer's sprites by z. The console keeps the glyph sprites and
+caches scaled glyphs, so you hold no text buffer and pay no per-glyph trap. Re-issue
+it each frame like your sprites. Centre/right-align yourself — the pen advances
+`(fontGlyphW(font) + 1) * scale` per character (so `strlen * that` is the run
+width). (You can still build glyph sprites by hand via the `font*` calls below, but
+`rendererDrawText` is cheaper and simpler.)
 
 ### Assets (stream one blob at a time from the bound `<game>.pak`)
 ```c

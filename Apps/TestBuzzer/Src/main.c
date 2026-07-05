@@ -37,13 +37,13 @@
 #define N_G5 783U
 #define N_C6 1046U
 
-/* Font-ink palettes (slot 0 transparent, 1-3 the ink colour). */
-static const uint16_t PAL_TITLE[4] = {0x0000, 0x07FF, 0x07FF, 0x07FF}; /* cyan   */
-static const uint16_t PAL_HEAD[4] = {0x0000, 0xFD20, 0xFD20, 0xFD20};  /* amber  */
-static const uint16_t PAL_TEXT[4] = {0x0000, 0xFFFF, 0xFFFF, 0xFFFF};  /* white  */
-static const uint16_t PAL_STAT[4] = {0x0000, 0x07E0, 0x07E0, 0x07E0};  /* green  */
-static const uint16_t PAL_WARN[4] = {0x0000, 0xF800, 0xF800, 0xF800};  /* red    */
-static const uint16_t PAL_DIM[4] = {0x0000, 0x8410, 0x8410, 0x8410};   /* grey   */
+/* Text ink colours (RGB565). */
+#define COL_TITLE 0x07FFU /* cyan  */
+#define COL_HEAD 0xFD20U  /* amber */
+#define COL_TEXT 0xFFFFU  /* white */
+#define COL_STAT 0x07E0U  /* green */
+#define COL_WARN 0xF800U  /* red   */
+#define COL_DIM 0x8410U   /* grey  */
 
 /* Test material. */
 static const uint16_t MEL_TUNE[] = {N_C4, 150, N_E4, 150, N_G4, 150, N_C5, 260,
@@ -92,9 +92,6 @@ static const PhaseInfo PHASES[PH_COUNT] = {
 };
 
 /* ---- run-time state ---- */
-#define UI_CAP 256U
-static Sprite s_ui[UI_CAP];
-
 static Phase s_phase;
 static uint32_t s_phase_start;    /* getSysTime() at the current step's entry     */
 static uint8_t s_sub;             /* sub-step counter for multi-stage steps       */
@@ -316,26 +313,6 @@ static void gotoPhase(Phase p, uint32_t now)
     phaseEnter(p);
 }
 
-/* Render one C string into consecutive UI sprites; glyph pixels come from console
- * flash via fontGet, so no asset pool is needed. Returns the next free index. */
-static uint16_t draw_text(uint16_t idx, FontSize size, int16_t x, int16_t y,
-                          uint8_t z, const uint16_t *palette, const char *text)
-{
-    const uint16_t gw = fontGlyphW(size), gh = fontGlyphH(size);
-    for (const char *s = text; *s && idx < UI_CAP; s++)
-    {
-        const uint8_t c = (uint8_t)*s;
-        if (c >= 0x20U && c <= 0x7EU)
-        {
-            const uint8_t *px;
-            fontGet(c, size, &px);
-            s_ui[idx++] = (Sprite){.x = x, .y = y, .w = gw, .h = gh, .z = z, .flags = 0U, .pixels = px, .palette = palette};
-        }
-        x = (int16_t)(x + gw + 1U);
-    }
-    return idx;
-}
-
 static void gameInit(void)
 {
     s_max_tracks = buzzerGetMaxTracks();
@@ -379,35 +356,35 @@ static void gameUpdate(void)
 static void gameRender(void)
 {
     const PhaseInfo *pi = &PHASES[s_phase];
-    uint16_t n = 0U;
     char line[24];
 
-    n = draw_text(n, FONT_8x8, 8, 6, 10U, PAL_TITLE, "BUZZER TEST");
+    /* One rendererDrawText syscall per line — the console expands each into glyph
+     * sprites; this game keeps no sprite array or text pool of its own. */
+    rendererDrawText(LAYER_UI, 8, 6, 10U, FONT_8x8, 1U, COL_TITLE, "BUZZER TEST");
     snprintf(line, sizeof(line), "STEP %u/%u", (unsigned)(s_phase + 1U), (unsigned)PH_COUNT);
-    n = draw_text(n, FONT_5x5, 250, 8, 10U, PAL_DIM, line);
+    rendererDrawText(LAYER_UI, 250, 8, 10U, FONT_5x5, 1U, COL_DIM, line);
 
-    n = draw_text(n, FONT_8x8, 8, 28, 10U, PAL_HEAD, pi->title);
+    rendererDrawText(LAYER_UI, 8, 28, 10U, FONT_8x8, 1U, COL_HEAD, pi->title);
     if (s_audio_active && ((getSysTime() / 300U) & 1U))
     {
-        n = draw_text(n, FONT_8x8, 262, 28, 10U, PAL_WARN, "SND");
+        rendererDrawText(LAYER_UI, 262, 28, 10U, FONT_8x8, 1U, COL_WARN, "SND");
     }
 
-    n = draw_text(n, FONT_5x5, 8, 50, 10U, PAL_TEXT, pi->desc);
+    rendererDrawText(LAYER_UI, 8, 50, 10U, FONT_5x5, 1U, COL_TEXT, pi->desc);
     if (pi->desc2 != NULL)
     {
-        n = draw_text(n, FONT_5x5, 8, 60, 10U, PAL_TEXT, pi->desc2);
+        rendererDrawText(LAYER_UI, 8, 60, 10U, FONT_5x5, 1U, COL_TEXT, pi->desc2);
     }
 
-    n = draw_text(n, FONT_8x8, 8, 96, 10U, PAL_STAT, s_status);
+    rendererDrawText(LAYER_UI, 8, 96, 10U, FONT_8x8, 1U, COL_STAT, s_status);
     if (s_extra[0] != '\0')
     {
-        n = draw_text(n, FONT_8x8, 8, 120, 10U, PAL_HEAD, s_extra);
+        rendererDrawText(LAYER_UI, 8, 120, 10U, FONT_8x8, 1U, COL_HEAD, s_extra);
     }
 
-    n = draw_text(n, FONT_5x5, 8, 226, 10U, PAL_TITLE,
-                  (s_phase == PH_DONE) ? "SB1 RESTART   SB2 EXIT" : "SB1 NEXT   SB2 EXIT");
+    rendererDrawText(LAYER_UI, 8, 226, 10U, FONT_5x5, 1U, COL_TITLE,
+                     (s_phase == PH_DONE) ? "SB1 RESTART   SB2 EXIT" : "SB1 NEXT   SB2 EXIT");
 
-    rendererSubmitLayer(LAYER_UI, s_ui, n);
     rendererRender();
     delay(20U); /* ~50 FPS is plenty for a diagnostic UI (audio is console-timed) */
 }
