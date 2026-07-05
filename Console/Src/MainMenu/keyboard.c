@@ -67,64 +67,133 @@ typedef struct
     bool cancel; /* Special Button 2 */
 } KbNav;
 
+/* Left-stick / right-stick deflection (of +/-512) that counts as a press. */
+#define KB_STICK_THRESHOLD 256
+#define KB_REPEAT_DELAY_MS 350U
+#define KB_REPEAT_RATE_MS 110U
+
 static KbNav kbPoll(void)
 {
-    static uint32_t last_action = 0U;
-    const uint32_t DEBOUNCE_MS = 180U;
-    const uint32_t now = getSysTime();
-    KbNav nav = {0};
-
-    if (now <= last_action + DEBOUNCE_MS)
+    enum
     {
-        return nav;
+        KB_GRID_UP = 1U << 0,
+        KB_GRID_DOWN = 1U << 1,
+        KB_GRID_LEFT = 1U << 2,
+        KB_GRID_RIGHT = 1U << 3,
+        KB_CARET_LEFT = 1U << 4,
+        KB_CARET_RIGHT = 1U << 5,
+        KB_CARET_HOME = 1U << 6,
+        KB_CARET_END = 1U << 7,
+        KB_TYPE = 1U << 8,
+        KB_CANCEL = 1U << 9,
+        KB_DIRS = KB_GRID_UP | KB_GRID_DOWN | KB_GRID_LEFT | KB_GRID_RIGHT |
+                  KB_CARET_LEFT | KB_CARET_RIGHT | KB_CARET_HOME | KB_CARET_END,
+    };
+    static uint16_t s_prev = 0U;
+    static uint32_t s_repeat_at = 0U;
+    const uint32_t now = getSysTime();
+
+    joystickPollFrame();
+    InputState in;
+    joystickGetState(&in);
+
+    /* Grid movement from the right pad/stick, caret movement from the left. */
+    uint16_t cur = 0U;
+    if (in.r_up.held || in.right_y > KB_STICK_THRESHOLD)
+    {
+        cur |= KB_GRID_UP;
+    }
+    if (in.r_down.held || in.right_y < -KB_STICK_THRESHOLD)
+    {
+        cur |= KB_GRID_DOWN;
+    }
+    if (in.r_left.held || in.right_x < -KB_STICK_THRESHOLD)
+    {
+        cur |= KB_GRID_LEFT;
+    }
+    if (in.r_right.held || in.right_x > KB_STICK_THRESHOLD)
+    {
+        cur |= KB_GRID_RIGHT;
+    }
+    if (in.l_left.held || in.left_x < -KB_STICK_THRESHOLD)
+    {
+        cur |= KB_CARET_LEFT;
+    }
+    if (in.l_right.held || in.left_x > KB_STICK_THRESHOLD)
+    {
+        cur |= KB_CARET_RIGHT;
+    }
+    if (in.l_up.held || in.left_y > KB_STICK_THRESHOLD)
+    {
+        cur |= KB_CARET_HOME;
+    }
+    if (in.l_down.held || in.left_y < -KB_STICK_THRESHOLD)
+    {
+        cur |= KB_CARET_END;
+    }
+    if (in.special1.held)
+    {
+        cur |= KB_TYPE;
+    }
+    if (in.special2.held)
+    {
+        cur |= KB_CANCEL;
     }
 
-    if (joystickGetRBtnUp() || joystickGetRAnalogY() == JoystickAxisStatePositive)
+    /* Edge fires at once; the 8 movement keys auto-repeat while held (type/cancel
+     * are edge-only). */
+    uint16_t fire = (uint16_t)(cur & ~s_prev);
+    if (fire & KB_DIRS)
+    {
+        s_repeat_at = now + KB_REPEAT_DELAY_MS;
+    }
+    else if ((cur & KB_DIRS) && (int32_t)(now - s_repeat_at) >= 0)
+    {
+        fire |= (uint16_t)(cur & KB_DIRS);
+        s_repeat_at = now + KB_REPEAT_RATE_MS;
+    }
+    s_prev = cur;
+
+    KbNav nav = {0};
+    if (fire & KB_GRID_UP)
     {
         nav.grid_up = true;
     }
-    else if (joystickGetRBtnDown() || joystickGetRAnalogY() == JoystickAxisStateNegative)
+    else if (fire & KB_GRID_DOWN)
     {
         nav.grid_down = true;
     }
-    else if (joystickGetRBtnLeft() || joystickGetRAnalogX() == JoystickAxisStateNegative)
+    else if (fire & KB_GRID_LEFT)
     {
         nav.grid_left = true;
     }
-    else if (joystickGetRBtnRight() || joystickGetRAnalogX() == JoystickAxisStatePositive)
+    else if (fire & KB_GRID_RIGHT)
     {
         nav.grid_right = true;
     }
-    else if (joystickGetLBtnLeft() || joystickGetLAnalogX() == JoystickAxisStateNegative)
+    else if (fire & KB_CARET_LEFT)
     {
         nav.caret_left = true;
     }
-    else if (joystickGetLBtnRight() || joystickGetLAnalogX() == JoystickAxisStatePositive)
+    else if (fire & KB_CARET_RIGHT)
     {
         nav.caret_right = true;
     }
-    else if (joystickGetLBtnUp() || joystickGetLAnalogY() == JoystickAxisStatePositive)
+    else if (fire & KB_CARET_HOME)
     {
         nav.caret_home = true;
     }
-    else if (joystickGetLBtnDown() || joystickGetLAnalogY() == JoystickAxisStateNegative)
+    else if (fire & KB_CARET_END)
     {
         nav.caret_end = true;
     }
-    else if (joystickGetSpecialBtn1())
+    else if (fire & KB_TYPE)
     {
         nav.type = true;
     }
-    else if (joystickGetSpecialBtn2())
+    else if (fire & KB_CANCEL)
     {
         nav.cancel = true;
-    }
-
-    if (nav.grid_up || nav.grid_down || nav.grid_left || nav.grid_right ||
-        nav.caret_left || nav.caret_right || nav.caret_home || nav.caret_end ||
-        nav.type || nav.cancel)
-    {
-        last_action = now;
     }
     return nav;
 }
@@ -264,9 +333,15 @@ bool keyboardEnter(const char *title, char *out, uint16_t out_size, bool mask)
     /* Wait for the button that opened the keyboard to be released, so that press
      * doesn't immediately register as a keystroke (it would type the default
      * highlighted key). */
-    while (joystickGetSpecialBtn1() || joystickGetSpecialBtn2())
+    for (;;)
     {
-        /* spin until released */
+        joystickPollFrame();
+        InputState in;
+        joystickGetState(&in);
+        if (!in.special1.held && !in.special2.held)
+        {
+            break;
+        }
     }
 
     for (;;)

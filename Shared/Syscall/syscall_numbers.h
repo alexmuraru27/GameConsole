@@ -19,7 +19,9 @@
  *
  * v5: GameBinaryHeader gained the stack_guard field (28 -> 32 bytes);
  *     rendererInit() retired from the game API and SYS_RENDERER_INIT removed from
- *     the enum (the kernel resets the renderer when it launches a game).
+ *     the enum (the kernel resets the renderer when it launches a game);
+ *     the 15 per-button/per-axis SYS_JOY_* calls collapsed into one
+ *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes).
  */
 
 #define CONSOLE_ABI_VERSION 5
@@ -43,21 +45,7 @@ typedef enum
     SYS_BUZZER_STOP,
     SYS_BUZZER_STOP_ALL,
 
-    SYS_JOY_R_UP,
-    SYS_JOY_R_RIGHT,
-    SYS_JOY_R_DOWN,
-    SYS_JOY_R_LEFT,
-    SYS_JOY_L_UP,
-    SYS_JOY_L_RIGHT,
-    SYS_JOY_L_DOWN,
-    SYS_JOY_L_LEFT,
-    SYS_JOY_SPECIAL1,
-    SYS_JOY_SPECIAL2,
-    SYS_JOY_R_ANALOG_Y,
-    SYS_JOY_R_ANALOG_X,
-    SYS_JOY_L_ANALOG_Y,
-    SYS_JOY_L_ANALOG_X,
-    SYS_JOY_ANY_PRESSED,
+    SYS_INPUT_GET_STATE, /* fill an InputState: held/pressed/released + analog axes, one trap */
 
     SYS_RENDERER_CLEAR,
     SYS_RENDERER_SET_BACKGROUND,

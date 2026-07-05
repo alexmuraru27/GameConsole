@@ -63,8 +63,10 @@ Game state lives in globals (it persists across calls); locals do not.
 
    static void gameUpdate(void)
    {
-       // read input, advance game logic
-       if (joystickGetSpecialBtn2())
+       // read the whole pad in one trap, advance game logic
+       InputState in;
+       inputGetState(&in);
+       if (in.special2.pressed)
        {
            gameExit();   // Special Button 2 returns to the console (by convention)
        }
@@ -158,19 +160,32 @@ void    buzzerStopAll(void);
 > Keep note data alive while it plays — the buzzer reads it from your RAM each tick.
 > Call `buzzerStopAll()` before returning so nothing reads freed game memory.
 
-### Joysticks (digital buttons + 3-state analog axes)
+### Input (one trap for the whole pad)
 ```c
-bool joystickGetRBtnUp(void);    bool joystickGetLBtnUp(void);
-bool joystickGetRBtnRight(void); bool joystickGetLBtnRight(void);
-bool joystickGetRBtnDown(void);  bool joystickGetLBtnDown(void);
-bool joystickGetRBtnLeft(void);  bool joystickGetLBtnLeft(void);
-bool joystickGetSpecialBtn1(void);   // confirm / select (by convention)
-bool joystickGetSpecialBtn2(void);   // back / quit (by convention)
-JoystickAxisState joystickGetRAnalogX(void);  // Off / Negative / Positive
-JoystickAxisState joystickGetRAnalogY(void);
-JoystickAxisState joystickGetLAnalogX(void);
-JoystickAxisState joystickGetLAnalogY(void);
-bool joystickIsAnyButtonPressed(void);
+void inputGetState(InputState *out);   // every button + analog axis for this frame
+
+typedef struct InputButtonState {
+    bool held;      // currently down
+    bool pressed;   // went down this frame  (rising edge)
+    bool released;  // came up this frame    (falling edge)
+} InputButtonState;
+
+typedef struct InputState {
+    InputButtonState r_up, r_right, r_down, r_left;   // right d-pad
+    InputButtonState l_up, l_right, l_down, l_left;   // left d-pad
+    InputButtonState special1, special2;              // confirm / back
+    int16_t left_x, left_y;     // left  stick, -512..+512 (up / right positive)
+    int16_t right_x, right_y;   // right stick, -512..+512
+} InputState;
+```
+The OS latches one snapshot per frame, so `pressed`/`released` are true btn/btnp edges:
+```c
+InputState in;
+inputGetState(&in);
+if (in.special1.pressed) { fire(); }        // one-shot on the press
+if (in.r_left.held)      { x -= speed; }    // continuous while held
+player_vx = in.left_x;                       // analog, already deadzoned
+if (in.special2.pressed) { gameExit(); }    // quit (by convention)
 ```
 
 ### Renderer (320×240 RGB565 scanline sprite compositor)

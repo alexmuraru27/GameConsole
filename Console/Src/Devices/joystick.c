@@ -4,7 +4,10 @@
 #include "sysclock.h"
 #include "logger.h"
 #include <stdio.h>
-// Button bits (within s_btn_data)
+
+// Button bits (within s_btn_data). This bit order matches the field order of the
+// InputButtonState members in InputState, so joystickPollFrame unpacks bit i into
+// the i-th button field.
 typedef enum JoystickBtnBit
 {
     JoystickBtnBitRUp = 0U,
@@ -20,68 +23,32 @@ typedef enum JoystickBtnBit
 } JoystickBtnBit;
 
 #define BTN_COUNT 10U
-
-#define BTN_MASK_R_UP (1U << JoystickBtnBitRUp)
-#define BTN_MASK_R_RIGHT (1U << JoystickBtnBitRRight)
-#define BTN_MASK_R_DOWN (1U << JoystickBtnBitRDown)
-#define BTN_MASK_R_LEFT (1U << JoystickBtnBitRLeft)
-#define BTN_MASK_L_UP (1U << JoystickBtnBitLUp)
-#define BTN_MASK_L_RIGHT (1U << JoystickBtnBitLRight)
-#define BTN_MASK_L_DOWN (1U << JoystickBtnBitLDown)
-#define BTN_MASK_L_LEFT (1U << JoystickBtnBitLLeft)
-#define BTN_MASK_SPECIAL1 (1U << JoystickBtnBitSpecial1)
-#define BTN_MASK_SPECIAL2 (1U << JoystickBtnBitSpecial2)
-#define BTN_MASK_DPAD_R (BTN_MASK_R_UP | BTN_MASK_R_RIGHT | BTN_MASK_R_DOWN | BTN_MASK_R_LEFT)
-#define BTN_MASK_DPAD_L (BTN_MASK_L_UP | BTN_MASK_L_RIGHT | BTN_MASK_L_DOWN | BTN_MASK_L_LEFT)
-#define BTN_MASK_ALL (BTN_MASK_DPAD_R | BTN_MASK_DPAD_L | BTN_MASK_SPECIAL1 | BTN_MASK_SPECIAL2)
-
-// Analog bits (within s_analog_data, 2 bits per axis)
-typedef enum JoystickAnalogBit
-{
-    JoystickAnalogBitRY = 0U,
-    JoystickAnalogBitRX = 2U,
-    JoystickAnalogBitLY = 4U,
-    JoystickAnalogBitLX = 6U,
-} JoystickAnalogBit;
+#define BTN_MASK_ALL ((1U << BTN_COUNT) - 1U) /* bits 0..9 */
 
 #define ANALOG_COUNT 4U
-
-#define ANALOG_MASK_RY (3U << JoystickAnalogBitRY)
-#define ANALOG_MASK_RX (3U << JoystickAnalogBitRX)
-#define ANALOG_MASK_LY (3U << JoystickAnalogBitLY)
-#define ANALOG_MASK_LX (3U << JoystickAnalogBitLX)
-
-#define ANALOG_THRESHOLD 1500U
-#define ANALOG_LOWER_THRESHOLD (2048U - ANALOG_THRESHOLD)
-#define ANALOG_HIGHER_THRESHOLD (2048U + ANALOG_THRESHOLD)
 #define DEBOUNCE_MS 5U
 
-typedef enum RawAnalogState
-{
-    RawAnalogStateMid = 0U,
-    RawAnalogStateLow = 1U,
-    RawAnalogStateHigh = 2U,
-} RawAnalogState;
+/* Raw-axis conditioning (joystickPollFrame): the 12-bit ADC reads ~0..4095 with
+ * the rest position near mid-scale. We center on ADC_CENTER, kill a small deadzone
+ * around it, then scale the usable travel to +/-AXIS_OUT_MAX so a caller gets a
+ * clean signed value with no per-axis calibration. The wiring inverts the axes
+ * (a low ADC code is a positive/up-right push), so up and right read positive. */
+#define ADC_CENTER 2048
+#define AXIS_DEADZONE 150
+#define AXIS_OUT_MAX 512
 
 static volatile uint32_t s_btn_data = 0U;
 static uint8_t s_btn_raw[BTN_COUNT];
 static uint32_t s_btn_debounce_timer[BTN_COUNT];
 
-static volatile uint32_t s_analog_data = 0U;
-static uint8_t s_analog_raw[ANALOG_COUNT];
-static uint32_t s_analog_debounce_timer[ANALOG_COUNT];
+/* Per-frame input snapshot (see joystickPollFrame / joystickGetState). */
+static uint16_t s_prev_held = 0U;
+static InputState s_frame_state;
 
 static volatile uint16_t *s_buffer_addr = 0U;
 static bool s_initialized = false;
 
-static const uint32_t s_axis_mask[] = {
-    ANALOG_MASK_LX, ANALOG_MASK_LY,
-    ANALOG_MASK_RX, ANALOG_MASK_RY};
-
-static const uint8_t s_axis_shift[] = {
-    JoystickAnalogBitLX, JoystickAnalogBitLY,
-    JoystickAnalogBitRX, JoystickAnalogBitRY};
-
+/* Debounce the raw button GPIOs into s_btn_data. Runs in the TIM7 poll ISR. */
 static void readButtons(void)
 {
     const uint32_t raw_all = gpioReadButtons();
@@ -103,30 +70,6 @@ static void readButtons(void)
     }
 }
 
-static void readAnalog(void)
-{
-    for (uint8_t i = 0U; i < ANALOG_COUNT; ++i)
-    {
-        uint8_t raw_axis = RawAnalogStateMid;
-        const uint16_t val = s_buffer_addr[i];
-        if (val < ANALOG_LOWER_THRESHOLD)
-            raw_axis = RawAnalogStateHigh;
-        else if (val > ANALOG_HIGHER_THRESHOLD)
-            raw_axis = RawAnalogStateLow;
-
-        if (raw_axis != s_analog_raw[i])
-        {
-            s_analog_raw[i] = raw_axis;
-            s_analog_debounce_timer[i] = getSysTime();
-        }
-        else if (getSysTime() - s_analog_debounce_timer[i] >= DEBOUNCE_MS)
-        {
-            s_analog_data = (s_analog_data & ~s_axis_mask[i]) |
-                            ((uint32_t)(raw_axis << s_axis_shift[i]) & s_axis_mask[i]);
-        }
-    }
-}
-
 void joystickReadData(void)
 {
     if (!s_initialized)
@@ -135,13 +78,11 @@ void joystickReadData(void)
     }
 
     readButtons();
-    readAnalog();
 }
 
 void joystickInit(void)
 {
     s_btn_data = 0U;
-    s_analog_data = 0U;
     s_buffer_addr = getAdc1BufferAddress();
 
     const uint32_t now = getSysTime();
@@ -150,111 +91,79 @@ void joystickInit(void)
         s_btn_raw[i] = 0U;
         s_btn_debounce_timer[i] = now;
     }
-    for (uint8_t i = 0U; i < ANALOG_COUNT; ++i)
-    {
-        s_analog_raw[i] = RawAnalogStateMid;
-        s_analog_debounce_timer[i] = now;
-    }
+    s_prev_held = 0U;
+    s_frame_state = (InputState){0};
     s_initialized = true;
     LOGGER_LOG_INFO(LOGGER_JOYSTICK, "init: %u buttons, %u analog axes", (unsigned)BTN_COUNT, (unsigned)ANALOG_COUNT);
 }
 
-bool joystickGetRBtnUp(void)
+/* Center, deadzone, and scale one 12-bit ADC axis to -AXIS_OUT_MAX..+AXIS_OUT_MAX.
+ * The axis is inverted (a low ADC code is a positive push), so up/right = +. */
+static int16_t axisScaled(uint16_t raw)
 {
-    return (s_btn_data & BTN_MASK_R_UP) != 0U;
-}
-bool joystickGetRBtnRight(void)
-{
-    return (s_btn_data & BTN_MASK_R_RIGHT) != 0U;
-}
-bool joystickGetRBtnDown(void)
-{
-    return (s_btn_data & BTN_MASK_R_DOWN) != 0U;
-}
-bool joystickGetRBtnLeft(void)
-{
-    return (s_btn_data & BTN_MASK_R_LEFT) != 0U;
-}
-bool joystickGetLBtnUp(void)
-{
-    return (s_btn_data & BTN_MASK_L_UP) != 0U;
-}
-bool joystickGetLBtnRight(void)
-{
-    return (s_btn_data & BTN_MASK_L_RIGHT) != 0U;
-}
-bool joystickGetLBtnDown(void)
-{
-    return (s_btn_data & BTN_MASK_L_DOWN) != 0U;
-}
-bool joystickGetLBtnLeft(void)
-{
-    return (s_btn_data & BTN_MASK_L_LEFT) != 0U;
-}
-bool joystickGetSpecialBtn1(void)
-{
-    return (s_btn_data & BTN_MASK_SPECIAL1) != 0U;
-}
-bool joystickGetSpecialBtn2(void)
-{
-    return (s_btn_data & BTN_MASK_SPECIAL2) != 0U;
-}
-bool joystickIsAnyButtonPressed(void)
-{
-    return (s_btn_data & BTN_MASK_ALL) != 0U;
-}
-
-/* Axis convention (both sticks): Positive = up (Y) / right (X). The Y axes use the
- * same raw->sign mapping as X so up reads Positive, matching the cartesian sense a
- * caller expects (and the on-screen keyboard's stick navigation). */
-JoystickAxisState joystickGetRAnalogY(void)
-{
-    switch ((s_analog_data & ANALOG_MASK_RY) >> JoystickAnalogBitRY)
+    const int32_t centered = ADC_CENTER - (int32_t)raw;
+    int32_t mag = (centered < 0) ? -centered : centered;
+    if (mag <= AXIS_DEADZONE)
     {
-    case RawAnalogStateLow:
-        return JoystickAxisStateNegative;
-    case RawAnalogStateHigh:
-        return JoystickAxisStatePositive;
-    default:
-        return JoystickAxisStateOff;
+        return 0;
     }
-}
-
-JoystickAxisState joystickGetRAnalogX(void)
-{
-    switch ((s_analog_data & ANALOG_MASK_RX) >> JoystickAnalogBitRX)
+    mag -= AXIS_DEADZONE;
+    const int32_t span = ADC_CENTER - AXIS_DEADZONE; /* max magnitude past the deadzone */
+    int32_t scaled = (mag * AXIS_OUT_MAX + span / 2) / span;
+    if (scaled > AXIS_OUT_MAX)
     {
-    case RawAnalogStateLow:
-        return JoystickAxisStateNegative;
-    case RawAnalogStateHigh:
-        return JoystickAxisStatePositive;
-    default:
-        return JoystickAxisStateOff;
+        scaled = AXIS_OUT_MAX;
     }
+    return (int16_t)((centered < 0) ? -scaled : scaled);
 }
 
-JoystickAxisState joystickGetLAnalogY(void)
+/* Fill one button's frame flags from the held/pressed/released masks at `bit`. */
+static void unpackButton(InputButtonState *b, uint16_t bit,
+                         uint16_t held, uint16_t pressed, uint16_t released)
 {
-    switch ((s_analog_data & ANALOG_MASK_LY) >> JoystickAnalogBitLY)
+    b->held = (held & bit) != 0U;
+    b->pressed = (pressed & bit) != 0U;
+    b->released = (released & bit) != 0U;
+}
+
+void joystickPollFrame(void)
+{
+    if (!s_initialized)
     {
-    case RawAnalogStateLow:
-        return JoystickAxisStateNegative;
-    case RawAnalogStateHigh:
-        return JoystickAxisStatePositive;
-    default:
-        return JoystickAxisStateOff;
+        return;
     }
+
+    /* Buttons: snapshot the debounced state and derive edges vs the previous latch.
+     * The 32-bit read is atomic against the 1 ms poll ISR that writes it. Masks are
+     * unpacked into per-button fields below (bit order == field order). */
+    const uint16_t held = (uint16_t)(s_btn_data & BTN_MASK_ALL);
+    const uint16_t pressed = (uint16_t)(held & ~s_prev_held);
+    const uint16_t released = (uint16_t)(~held & s_prev_held);
+    s_prev_held = held;
+
+    unpackButton(&s_frame_state.r_up, (1U << JoystickBtnBitRUp), held, pressed, released);
+    unpackButton(&s_frame_state.r_right, (1U << JoystickBtnBitRRight), held, pressed, released);
+    unpackButton(&s_frame_state.r_down, (1U << JoystickBtnBitRDown), held, pressed, released);
+    unpackButton(&s_frame_state.r_left, (1U << JoystickBtnBitRLeft), held, pressed, released);
+    unpackButton(&s_frame_state.l_up, (1U << JoystickBtnBitLUp), held, pressed, released);
+    unpackButton(&s_frame_state.l_right, (1U << JoystickBtnBitLRight), held, pressed, released);
+    unpackButton(&s_frame_state.l_down, (1U << JoystickBtnBitLDown), held, pressed, released);
+    unpackButton(&s_frame_state.l_left, (1U << JoystickBtnBitLLeft), held, pressed, released);
+    unpackButton(&s_frame_state.special1, (1U << JoystickBtnBitSpecial1), held, pressed, released);
+    unpackButton(&s_frame_state.special2, (1U << JoystickBtnBitSpecial2), held, pressed, released);
+
+    /* Axes: sample straight from the ADC DMA buffer (each 16-bit read is atomic).
+     * Buffer order matches the ADC channel sequence: LX, LY, RX, RY. */
+    s_frame_state.left_x = axisScaled(s_buffer_addr[0]);
+    s_frame_state.left_y = axisScaled(s_buffer_addr[1]);
+    s_frame_state.right_x = axisScaled(s_buffer_addr[2]);
+    s_frame_state.right_y = axisScaled(s_buffer_addr[3]);
 }
 
-JoystickAxisState joystickGetLAnalogX(void)
+void joystickGetState(InputState *out)
 {
-    switch ((s_analog_data & ANALOG_MASK_LX) >> JoystickAnalogBitLX)
+    if (out != NULL)
     {
-    case RawAnalogStateLow:
-        return JoystickAxisStateNegative;
-    case RawAnalogStateHigh:
-        return JoystickAxisStatePositive;
-    default:
-        return JoystickAxisStateOff;
+        *out = s_frame_state;
     }
 }

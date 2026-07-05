@@ -10,6 +10,7 @@
 #include "mp_session.h"
 #include "buzzer.h"
 #include "renderer.h"
+#include "joystick.h"
 #include "sd_layout.h"
 #include <stm32f407xx.h> /* DWT->CYCCNT for the frame delta */
 #include <stdio.h>
@@ -48,6 +49,10 @@ uint32_t gameLoaderGetDeltaUs(void)
  * throughput; GameXO sleeps out each frame to hold ~60 FPS). */
 static void gameRuntimeCollect(void)
 {
+    /* Latch one frame of input before update() runs, so the game's inputGetState()
+     * sees a stable snapshot with this frame's pressed/released edges. */
+    joystickPollFrame();
+
     const uint32_t now = DWT->CYCCNT;
     if (!s_frame_timing_started)
     {

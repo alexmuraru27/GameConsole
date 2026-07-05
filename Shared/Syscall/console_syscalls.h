@@ -39,22 +39,12 @@ bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
 void buzzerStopAll(void);
 
-/* ---- joysticks ---- */
-bool joystickGetRBtnUp(void);
-bool joystickGetRBtnRight(void);
-bool joystickGetRBtnDown(void);
-bool joystickGetRBtnLeft(void);
-bool joystickGetLBtnUp(void);
-bool joystickGetLBtnRight(void);
-bool joystickGetLBtnDown(void);
-bool joystickGetLBtnLeft(void);
-bool joystickGetSpecialBtn1(void);
-bool joystickGetSpecialBtn2(void);
-JoystickAxisState joystickGetRAnalogY(void);
-JoystickAxisState joystickGetRAnalogX(void);
-JoystickAxisState joystickGetLAnalogY(void);
-JoystickAxisState joystickGetLAnalogX(void);
-bool joystickIsAnyButtonPressed(void);
+/* ---- input ---- */
+/* Read the whole pad in one trap. *out gets each button's held / pressed /
+ * released flags (e.g. out->special1.pressed) plus the four analog axes
+ * (-512..+512). pressed and released are the edges since the previous frame — use
+ * pressed for one-shot actions (btnp), held for continuous movement. */
+void inputGetState(InputState *out);
 
 /* ---- renderer ---- */
 void rendererClear(void);

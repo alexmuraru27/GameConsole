@@ -80,11 +80,12 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - `buzzerPlayWithFlag(...)`: Play with callback.
 - `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`: Control playback.
 
-### Joystick
-- `joystickGetRBtnUp/Down/Left/Right()`: Right stick buttons.
-- `joystickGetLBtnUp/Down/Left/Right()`: Left stick buttons.
-- `joystickGetSpecialBtn1/2()`: Special buttons.
-- `joystickGetRAnalogX/Y()`, `joystickGetLAnalogX/Y()`: Analog axes.
+### Input
+The whole pad is read in one trap:
+- `inputGetState(InputState *out)`: fills an `InputState` with the buttons and analog axes for this frame.
+  - Each button is an `InputButtonState { bool held; bool pressed; bool released; }` — `r_up/r_right/r_down/r_left`, `l_up/l_right/l_down/l_left`, `special1`, `special2`. Read `in.special1.pressed` directly, no bit math. `pressed`/`released` are the rising/falling edges since the previous frame — use `pressed` for one-shot actions (btnp), `held` for continuous movement.
+  - `left_x/left_y/right_x/right_y`: raw analog axes, centered + deadzoned to **−512..+512** (up / right positive), ready for racers / twin-stick aiming with no per-game calibration.
+- Edges are latched once per frame by the OS at the frame seam, so reading twice in a frame is stable. Types live in `Shared/Api/joystick_interface.h`.
 
 ### Renderer
 A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). Games do **not** init the renderer — the kernel resets it (drops layers, disables the background) when it launches a game, so a game starts from a clean slate. The frame-submission surface exposed through `ConsoleAPI`:
@@ -145,8 +146,9 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 - Debounces and interprets button presses and analog stick positions.
 - Internal functions:
   - `joystickInit()`: Configure ADC and GPIO for input.
-  - `joystickGetLAnalogX/Y()`, `joystickGetRAnalogX/Y()`: Read analog axes.
-  - `joystickGetLBtnUp/Down/Left/Right()`, etc.: Read button states.
+  - `joystickReadData()`: TIM7 ISR poll — debounce the button GPIOs into the shared state.
+  - `joystickPollFrame()`: Latch one frame — snapshot buttons, derive pressed/released edges vs the previous latch, sample+deadzone the axes. Callers (kernel frame seam, menus) call it once per frame, then read `joystickGetState(InputState *)`.
+  - `joystickGetState(InputState *)`: Copy the latched snapshot. This is the whole read API — there are no per-button/per-axis getters.
 
 ### Buzzer (buzzer.c/h)
 - Controls sound output for effects and music.
@@ -184,13 +186,14 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 ---
 
 ## Example Usage
-Read joystick input:
+Read input (one trap, edges + analog):
 ```c
 void update() {
-    if (joystickGetLAnalogX() == JoystickAxisStatePositive) { /* move right */ }
-    if (joystickGetLAnalogX() == JoystickAxisStateNegative) { /* move left */ }
-    if (joystickGetLAnalogY() == JoystickAxisStatePositive) { /* move down */ }
-    if (joystickGetLAnalogY() == JoystickAxisStateNegative) { /* move up */ }
+    InputState in;
+    inputGetState(&in);
+    if (in.special1.pressed) { /* fire once on the press */ }
+    if (in.r_right.held)     { /* move right while held */ }
+    x += (in.left_x * speed) / 512;      /* analog, already deadzoned to -512..+512 */
 }
 ```
 
@@ -268,17 +271,20 @@ See `README.md` for license and authorship.
   ```
 
 #### Joystick
-- **Purpose:** Read analog and digital joystick input.
+- **Purpose:** Read analog and digital joystick input as one batched, edge-latched frame snapshot.
 - **Key Types:**
-  - `JoystickAxisState` enum: `JoystickAxisStateOff` (0), `JoystickAxisStateNegative` (1), `JoystickAxisStatePositive` (2). Returned by the analog-axis getters.
+  - `InputState`: one `InputButtonState { held; pressed; released; }` per button (`r_up … special2`) + `left_x/left_y/right_x/right_y` axes (−512..+512).
 - **Key Functions:**
   - `joystickInit()`: Initialize ADC/GPIO.
-  - `joystickGetLAnalogX/Y()`, `joystickGetRAnalogX/Y()`: Analog axes (`JoystickAxisState`).
-  - `joystickGetLBtnUp/Down/Left/Right()`, etc.: Button states (`bool`).
+  - `joystickPollFrame()`: Latch a frame (buttons + edges + axes). Call once per frame.
+  - `joystickGetState(InputState *)`: Copy the latched snapshot. No per-button getters exist.
 - **Usage Example:**
   ```c
-  if (joystickGetLBtnUp()) { /* move up */ }
-  if (joystickGetRAnalogX() == JoystickAxisStatePositive) { /* move right */ }
+  InputState in;
+  joystickPollFrame();
+  joystickGetState(&in);
+  if (in.l_up.pressed) { /* move up */ }
+  if (in.right_x > 256) { /* stick pushed right */ }
   ```
 
 #### ILI9341 (LCD)

@@ -159,7 +159,9 @@ if (mpHostStart() == MP_OK)
 /* Each frame in the lobby: wait for someone to join, then let the host start. */
 static void updateHostLobby(void)
 {
-    if (mpGetPlayerCount() >= 2U && joystickGetSpecialBtn1())
+    InputState in;
+    inputGetState(&in);
+    if (mpGetPlayerCount() >= 2U && in.special1.pressed)
     {
         startMatch(/* as_host = */ true);
     }
@@ -187,7 +189,9 @@ static void updateJoinBrowse(void)
 
     /* ... move a cursor over hosts[0..n-1], showing hosts[i].name ... */
 
-    if (selected && joystickGetSpecialBtn1())
+    InputState in;
+    inputGetState(&in);
+    if (selected && in.special1.pressed)
     {
         MpStatus st = mpJoin(hosts[cursor].handle);
         if (st == MP_PENDING || st == MP_OK)

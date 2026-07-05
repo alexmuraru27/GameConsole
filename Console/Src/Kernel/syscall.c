@@ -156,37 +156,17 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         buzzerStopAll();
         return 0;
 
-    /* ---- joysticks ---- */
-    case SYS_JOY_R_UP:
-        return joystickGetRBtnUp();
-    case SYS_JOY_R_RIGHT:
-        return joystickGetRBtnRight();
-    case SYS_JOY_R_DOWN:
-        return joystickGetRBtnDown();
-    case SYS_JOY_R_LEFT:
-        return joystickGetRBtnLeft();
-    case SYS_JOY_L_UP:
-        return joystickGetLBtnUp();
-    case SYS_JOY_L_RIGHT:
-        return joystickGetLBtnRight();
-    case SYS_JOY_L_DOWN:
-        return joystickGetLBtnDown();
-    case SYS_JOY_L_LEFT:
-        return joystickGetLBtnLeft();
-    case SYS_JOY_SPECIAL1:
-        return joystickGetSpecialBtn1();
-    case SYS_JOY_SPECIAL2:
-        return joystickGetSpecialBtn2();
-    case SYS_JOY_R_ANALOG_Y:
-        return joystickGetRAnalogY();
-    case SYS_JOY_R_ANALOG_X:
-        return joystickGetRAnalogX();
-    case SYS_JOY_L_ANALOG_Y:
-        return joystickGetLAnalogY();
-    case SYS_JOY_L_ANALOG_X:
-        return joystickGetLAnalogX();
-    case SYS_JOY_ANY_PRESSED:
-        return joystickIsAnyButtonPressed();
+    /* ---- input ---- */
+    case SYS_INPUT_GET_STATE:
+        /* The frame was already latched by the kernel at the collect seam; this
+         * just copies the snapshot into the game's buffer. */
+        if (!gameCanWrite((void *)a[0], sizeof(InputState)))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return 0;
+        }
+        joystickGetState((InputState *)a[0]);
+        return 0;
 
     /* ---- renderer ---- */
     case SYS_RENDERER_CLEAR:

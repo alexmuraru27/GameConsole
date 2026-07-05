@@ -27,8 +27,6 @@
 #define BOARD_Y 56
 #define GRID_T 4 /* grid line thickness */
 
-#define INPUT_DEBOUNCE_MS 200U
-
 /* Host re-broadcasts the authoritative state at least this often so a dropped
  * snapshot self-heals even when the board is otherwise idle. */
 #define MP_STATE_REBROADCAST_MS 500U
@@ -49,7 +47,7 @@ static uint8_t s_cursor_x, s_cursor_y;
 static Phase s_phase;
 static uint8_t s_result;
 static bool s_result_handled;
-static uint32_t s_last_input_ms;
+static InputState s_in; /* whole-pad snapshot, refreshed once per frame in gameStateManagerUpdate */
 
 /* ---- multiplayer state ---- */
 static bool s_is_mp;         /* the current game is networked            */
@@ -88,16 +86,6 @@ static Sprite s_fg[32];
 static Sprite s_ui[UI_MAX];
 static uint8_t s_text_pool[2048];
 
-static bool debounced(void)
-{
-    const uint32_t now = getSysTime();
-    if (now > s_last_input_ms + INPUT_DEBOUNCE_MS)
-    {
-        s_last_input_ms = now;
-        return true;
-    }
-    return false;
-}
 
 static Sprite placed(Sprite tmpl, int16_t x, int16_t y, uint8_t z)
 {
@@ -114,7 +102,6 @@ static void enterModeSelect(void)
     s_joining = false;
     s_mode_sel = 0U;
     s_phase = PHASE_MODE_SELECT;
-    s_last_input_ms = getSysTime();
 }
 
 /* Single-player round: empty board, you are X, AI is O. */
@@ -132,8 +119,6 @@ static void resetRound(void)
 void gameStateManagerInit(void)
 {
     rendererSetBackground(COL_BG);
-
-    s_last_input_ms = getSysTime();
 
     gameAssetsInit();
     gameAssetsLoadSprite(GAMEXO_GFX_MARK_X, &s_spr_x, s_pal_x);
@@ -294,17 +279,17 @@ static const char *const s_mode_labels[] = {"SINGLE PLAYER", "HOST GAME", "JOIN 
 
 static void updateModeSelect(void)
 {
-    if (joystickGetRBtnDown() && s_mode_sel + 1U < MODE_COUNT && debounced())
+    if (s_in.r_down.pressed && s_mode_sel + 1U < MODE_COUNT)
     {
         s_mode_sel++;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    else if (joystickGetRBtnUp() && s_mode_sel > 0U && debounced())
+    else if (s_in.r_up.pressed && s_mode_sel > 0U)
     {
         s_mode_sel--;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    else if (joystickGetSpecialBtn1() && debounced())
+    else if (s_in.special1.pressed)
     {
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
         if (s_mode_sel == 0U)
@@ -362,7 +347,7 @@ static void renderModeSelect(void)
 static void updateHostLobby(void)
 {
     const bool opponent_here = (mpGetPlayerCount() >= 2U);
-    if (opponent_here && joystickGetSpecialBtn1() && debounced())
+    if (opponent_here && s_in.special1.pressed)
     {
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
         startNetworkGame(true);
@@ -437,17 +422,17 @@ static void updateJoinBrowse(void)
         s_join_sel = (uint8_t)(s_host_count - 1);
     }
 
-    if (joystickGetRBtnDown() && s_join_sel + 1U < (uint8_t)s_host_count && debounced())
+    if (s_in.r_down.pressed && s_join_sel + 1U < (uint8_t)s_host_count)
     {
         s_join_sel++;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    else if (joystickGetRBtnUp() && s_join_sel > 0U && debounced())
+    else if (s_in.r_up.pressed && s_join_sel > 0U)
     {
         s_join_sel--;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    else if (joystickGetSpecialBtn1() && debounced())
+    else if (s_in.special1.pressed)
     {
         const MpStatus st = mpJoin(s_hosts[s_join_sel].handle);
         if (st == MP_PENDING || st == MP_OK)
@@ -621,12 +606,12 @@ static void renderEnd(void)
 
 static void updateChoose(void)
 {
-    if ((joystickGetRBtnLeft() || joystickGetRBtnRight()) && debounced())
+    if (s_in.r_left.pressed || s_in.r_right.pressed)
     {
         s_player_is_x = !s_player_is_x;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
     }
-    if (joystickGetSpecialBtn1() && debounced())
+    if (s_in.special1.pressed)
     {
         s_phase = PHASE_PLAYING;
         gameAssetsPlaySound(GAMEXO_SFX_MOVE);
@@ -648,19 +633,19 @@ static void aiMove(void)
 /* Move the cursor with the d-pad (shared by single- and multi-player). */
 static void moveCursor(void)
 {
-    if (joystickGetRBtnLeft() && s_cursor_x > 0U && debounced())
+    if (s_in.r_left.pressed && s_cursor_x > 0U)
     {
         s_cursor_x--;
     }
-    else if (joystickGetRBtnRight() && s_cursor_x < 2U && debounced())
+    else if (s_in.r_right.pressed && s_cursor_x < 2U)
     {
         s_cursor_x++;
     }
-    else if (joystickGetRBtnUp() && s_cursor_y > 0U && debounced())
+    else if (s_in.r_up.pressed && s_cursor_y > 0U)
     {
         s_cursor_y--;
     }
-    else if (joystickGetRBtnDown() && s_cursor_y < 2U && debounced())
+    else if (s_in.r_down.pressed && s_cursor_y < 2U)
     {
         s_cursor_y++;
     }
@@ -675,7 +660,7 @@ static void goToEnd(void)
 static void updatePlayingSingle(void)
 {
     moveCursor();
-    if (joystickGetSpecialBtn1() && debounced())
+    if (s_in.special1.pressed)
     {
         const uint8_t player = s_player_is_x ? TIC_TAC_TOE_BOARD_PLAYER_X : TIC_TAC_TOE_BOARD_PLAYER_O;
         if (ticTacToeMakeMove(s_board, s_cursor_y, s_cursor_x, player))
@@ -727,7 +712,7 @@ static void updatePlayingHost(void)
     if (s_turn == s_self_index)
     {
         moveCursor();
-        if (joystickGetSpecialBtn1() && debounced() &&
+        if (s_in.special1.pressed &&
             ticTacToeMakeMove(s_board, s_cursor_y, s_cursor_x, TIC_TAC_TOE_BOARD_PLAYER_X))
         {
             gameAssetsPlaySound(GAMEXO_SFX_MOVE);
@@ -782,7 +767,7 @@ static void updatePlayingClient(void)
     if (s_have_state && s_turn == s_self_index)
     {
         moveCursor();
-        if (joystickGetSpecialBtn1() && debounced() &&
+        if (s_in.special1.pressed &&
             s_board[s_cursor_y][s_cursor_x] == TIC_TAC_TOE_BOARD_EMPTY)
         {
             xoNetSendMove(s_cursor_y, s_cursor_x);
@@ -812,7 +797,8 @@ static void updateEnd(void)
     if (!s_result_handled)
     {
         s_result_handled = true;
-        s_last_input_ms = getSysTime(); /* hold off the restart press briefly */
+        /* No press hold-off needed: edge detection means the winning Special-1
+         * press was already consumed, so the restart only fires on a fresh press. */
         if (s_opp_left)
         {
             gameAssetsPlaySound(GAMEXO_SFX_LOSE);
@@ -827,7 +813,7 @@ static void updateEnd(void)
             gameAssetsPlaySound(player_won ? GAMEXO_SFX_WIN : GAMEXO_SFX_LOSE);
         }
     }
-    if (joystickGetSpecialBtn1() && debounced())
+    if (s_in.special1.pressed)
     {
         if (s_is_mp)
         {
@@ -844,7 +830,7 @@ static void updateEnd(void)
  * Returns true only when the game should exit. */
 static bool handleBack(void)
 {
-    if (!joystickGetSpecialBtn2() || !debounced())
+    if (!s_in.special2.pressed)
     {
         return false;
     }
@@ -878,6 +864,9 @@ static bool handleBack(void)
  * (it may advance the phase); the matching draw then reflects the new phase. */
 bool gameStateManagerUpdate(void)
 {
+    /* One pad snapshot per frame; every handler below reads edges from s_in. */
+    inputGetState(&s_in);
+
     if (handleBack())
     {
         return true;

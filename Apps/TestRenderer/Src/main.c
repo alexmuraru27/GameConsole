@@ -587,7 +587,9 @@ static void gameInit(void)
 
 static void gameUpdate(void)
 {
-    if (joystickGetSpecialBtn2())
+    InputState in;
+    inputGetState(&in);
+    if (in.special2.pressed)
     {
         gameExit();
     }

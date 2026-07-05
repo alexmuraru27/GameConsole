@@ -57,22 +57,8 @@ bool buzzerResume(uint8_t track) { return (bool)svcCall(SYS_BUZZER_RESUME, track
 bool buzzerStop(uint8_t track) { return (bool)svcCall(SYS_BUZZER_STOP, track, 0, 0, 0); }
 void buzzerStopAll(void) { (void)svcCall(SYS_BUZZER_STOP_ALL, 0, 0, 0, 0); }
 
-/* ---- joysticks ---- */
-bool joystickGetRBtnUp(void) { return (bool)svcCall(SYS_JOY_R_UP, 0, 0, 0, 0); }
-bool joystickGetRBtnRight(void) { return (bool)svcCall(SYS_JOY_R_RIGHT, 0, 0, 0, 0); }
-bool joystickGetRBtnDown(void) { return (bool)svcCall(SYS_JOY_R_DOWN, 0, 0, 0, 0); }
-bool joystickGetRBtnLeft(void) { return (bool)svcCall(SYS_JOY_R_LEFT, 0, 0, 0, 0); }
-bool joystickGetLBtnUp(void) { return (bool)svcCall(SYS_JOY_L_UP, 0, 0, 0, 0); }
-bool joystickGetLBtnRight(void) { return (bool)svcCall(SYS_JOY_L_RIGHT, 0, 0, 0, 0); }
-bool joystickGetLBtnDown(void) { return (bool)svcCall(SYS_JOY_L_DOWN, 0, 0, 0, 0); }
-bool joystickGetLBtnLeft(void) { return (bool)svcCall(SYS_JOY_L_LEFT, 0, 0, 0, 0); }
-bool joystickGetSpecialBtn1(void) { return (bool)svcCall(SYS_JOY_SPECIAL1, 0, 0, 0, 0); }
-bool joystickGetSpecialBtn2(void) { return (bool)svcCall(SYS_JOY_SPECIAL2, 0, 0, 0, 0); }
-JoystickAxisState joystickGetRAnalogY(void) { return (JoystickAxisState)svcCall(SYS_JOY_R_ANALOG_Y, 0, 0, 0, 0); }
-JoystickAxisState joystickGetRAnalogX(void) { return (JoystickAxisState)svcCall(SYS_JOY_R_ANALOG_X, 0, 0, 0, 0); }
-JoystickAxisState joystickGetLAnalogY(void) { return (JoystickAxisState)svcCall(SYS_JOY_L_ANALOG_Y, 0, 0, 0, 0); }
-JoystickAxisState joystickGetLAnalogX(void) { return (JoystickAxisState)svcCall(SYS_JOY_L_ANALOG_X, 0, 0, 0, 0); }
-bool joystickIsAnyButtonPressed(void) { return (bool)svcCall(SYS_JOY_ANY_PRESSED, 0, 0, 0, 0); }
+/* ---- input ---- */
+void inputGetState(InputState *out) { (void)svcCall(SYS_INPUT_GET_STATE, (uint32_t)out, 0, 0, 0); }
 
 /* ---- renderer ---- */
 void rendererClear(void) { (void)svcCall(SYS_RENDERER_CLEAR, 0, 0, 0, 0); }
