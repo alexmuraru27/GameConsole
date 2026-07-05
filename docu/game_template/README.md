@@ -144,6 +144,13 @@ corrupting the console. For module internals see [`../API_README.md`](../API_REA
 ```c
 uint32_t getSysTime(void);              // milliseconds since boot
 void     delay(uint32_t ms);            // busy-wait
+uint32_t getDeltaTimeUs(void);          // microseconds between the last two update() calls
+```
+
+### Random
+```c
+uint32_t getRandom(void);               // 32-bit hardware true-RNG, seed-free
+// e.g. int roll = 1 + getRandom() % 6;
 ```
 
 ### Buzzer (5-track synth; notes are interleaved uint16 {freq_hz, ms} pairs)

@@ -72,6 +72,10 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 ### System Time
 - `getSysTime()`: Returns system uptime in ms.
 - `delay(ms)`: Busy-wait delay.
+- `getDeltaTimeUs()`: Microseconds between the previous two `update()` calls (for frame-rate-independent movement).
+
+### Random
+- `getRandom()`: A fresh 32-bit value from the STM32's hardware true-RNG — seed-free, statistically solid. For a range use `getRandom() % n`.
 
 
 ### Sound (Buzzer)

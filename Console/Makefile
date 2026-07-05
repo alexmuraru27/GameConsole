@@ -32,6 +32,7 @@ Src/Peripherals/gpio.c \
 Src/Peripherals/dma.c \
 Src/Peripherals/timer.c \
 Src/Peripherals/adc.c \
+Src/Peripherals/rng.c \
 Src/Peripherals/sdio.c \
 Src/Peripherals/i2c.c \
 Src/Peripherals/watchdog.c \

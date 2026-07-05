@@ -31,6 +31,7 @@ static inline uint32_t svcCall(uint32_t id, uint32_t a0, uint32_t a1, uint32_t a
 uint32_t getSysTime(void) { return svcCall(SYS_GET_SYSTIME, 0, 0, 0, 0); }
 void delay(uint32_t d) { (void)svcCall(SYS_DELAY, d, 0, 0, 0); }
 uint32_t getDeltaTimeUs(void) { return svcCall(SYS_GET_DELTA_US, 0, 0, 0, 0); }
+uint32_t getRandom(void) { return svcCall(SYS_GET_RANDOM, 0, 0, 0, 0); }
 
 /* ---- buzzer ---- */
 uint8_t buzzerGetMaxTracks(void) { return (uint8_t)svcCall(SYS_BUZZER_GET_MAX_TRACKS, 0, 0, 0, 0); }

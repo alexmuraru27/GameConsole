@@ -10,6 +10,7 @@
 #include "dma.h"
 #include "ILI9341.h"
 #include "adc.h"
+#include "rng.h"
 #include "timer.h"
 #include "sdio.h"
 #include "ff.h"
@@ -120,7 +121,8 @@ static void peripheralsInit()
     networkInit();
     beep_step(2);
     adcInit();
-    LOGGER_LOG_INFO(LOGGER_CORE, "peripherals up: DMA/USART/ADC");
+    rngInit();
+    LOGGER_LOG_INFO(LOGGER_CORE, "peripherals up: DMA/USART/ADC/RNG");
 }
 
 static void devicesInit()

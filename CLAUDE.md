@@ -132,6 +132,9 @@ Two analog joysticks with digital d-pads + 2 special buttons. Polled by TIM7 ISR
 ### Buzzer
 5-track software synthesizer (`buzzer.c`). TIM6 fires at 1ms, advances each active track's note counter. Notes are interleaved `uint16` pairs: `{frequency_hz, duration_ms}…`; frequency 0 = pause. The highest-numbered playing track drives TIM3 PWM output on PB5 at 50% duty. Supports play with optional done-flag, pause, resume, stop, loop. Frequency constants from C2 (65 Hz) through B8 (7902 Hz) defined in `buzzer.h`.
 
+### RNG
+The STM32F407's hardware true-random-number generator (`rng.c`). Its AHB2 bus clock and the 48 MHz PLLQ that feeds its analog entropy source are already configured in `systemClockConfig()` (shared with SDIO/USB); `rngInit()` (in `peripheralsInit`) just sets `RNG_CR_RNGEN`. `rngGetRandom()` spins briefly for `RNG_SR_DRDY` and returns `RNG->DR`, self-recovering from a latched seed/clock error (clear the status, restart the generator) and bounding the spin with a timeout that falls back to the hashed cycle counter so a game syscall can never wedge the console. Exposed to games as the seed-free `getRandom()` syscall (`uint32_t`); games previously had only `getSysTime()` tricks.
+
 ### EEPROM Settings
 AT24C512 (64KB) on I2C1 at 400kHz. `settings_storage.c` provides a CRC-16 protected key/value store, packed flat with no arbitrary padding:
 - System header at 0x0000 (magic/version, game count, monotonic write sequence, CRC)
@@ -269,6 +272,7 @@ Shared conventions:
 - **Display**: ILI9341 240×320 via FSMC 16-bit 8080 parallel (PD/PE pins). Rotation 1 = landscape. Backlight on PA3, reset on PC7.
 - **Joysticks**: 2 analog axes each (ADC1 PC0–PC3), 10 digital buttons (GPIO PA0–PA12, PB11–PB12)
 - **Audio**: Passive buzzer on PB5 (TIM3_CH2)
+- **RNG**: on-chip hardware true-RNG (AHB2), clocked off the 48 MHz PLLQ domain shared with SDIO/USB
 - **Storage**: Built-in SD card via SDIO (PC8–PC12, PD2), FAT32, mount point `"0:"`. Card detect on PD3 (active-low).
 - **EEPROM**: AT24C512 on I2C1 (PB8/PB9), address `0x50`, used for console settings
 - **Network**: ESP-01 on USART1 (PA9/PA10), 923076 baud runtime over DMA (115200 for flashing), controlled via PB10/PB6/PC6/PC13

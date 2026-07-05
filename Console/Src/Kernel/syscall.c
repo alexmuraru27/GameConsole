@@ -5,6 +5,7 @@
 #include <stm32f407xx.h>
 
 #include "sysclock.h"
+#include "rng.h"
 #include "buzzer.h"
 #include "joystick.h"
 #include "renderer.h"
@@ -123,6 +124,8 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         return 0;
     case SYS_GET_DELTA_US:
         return gameLoaderGetDeltaUs();
+    case SYS_GET_RANDOM:
+        return rngGetRandom();
 
     /* ---- buzzer ---- */
     case SYS_BUZZER_GET_MAX_TRACKS:

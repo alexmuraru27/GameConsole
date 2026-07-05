@@ -21,7 +21,8 @@
  *     rendererInit() retired from the game API and SYS_RENDERER_INIT removed from
  *     the enum (the kernel resets the renderer when it launches a game);
  *     the 15 per-button/per-axis SYS_JOY_* calls collapsed into one
- *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes).
+ *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes);
+ *     added SYS_GET_RANDOM (hardware TRNG).
  */
 
 #define CONSOLE_ABI_VERSION 5
@@ -36,6 +37,7 @@ typedef enum
     SYS_GET_SYSTIME = 0,
     SYS_DELAY,
     SYS_GET_DELTA_US,
+    SYS_GET_RANDOM, /* 32-bit hardware TRNG value */
 
     SYS_BUZZER_GET_MAX_TRACKS,
     SYS_BUZZER_PLAY,

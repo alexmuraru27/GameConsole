@@ -30,6 +30,11 @@ void delay(uint32_t sys_time_delta);
  * use: pos += velocity_per_second * (getDeltaTimeUs() * 1e-6f). */
 uint32_t getDeltaTimeUs(void);
 
+/* A fresh 32-bit value from the console's hardware true-RNG — seed-free and
+ * statistically solid (no getSysTime() tricks needed). For a bounded range use
+ * getRandom() % n (a tiny modulo bias is irrelevant for gameplay). */
+uint32_t getRandom(void);
+
 /* ---- buzzer ---- */
 uint8_t buzzerGetMaxTracks(void);
 bool buzzerPlay(uint8_t track_number, bool is_looped, const uint16_t *notes_data, uint16_t notes_number);
