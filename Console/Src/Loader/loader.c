@@ -288,3 +288,45 @@ uint32_t loaderGetMaxFilenameSize()
 {
     return FF_LFN_BUF;
 }
+
+FRESULT loaderDeleteGame(const uint32_t binary_index)
+{
+    char name[FF_LFN_BUF];
+    uint32_t len = 0U;
+    FRESULT res = loaderGetFilenameByIndex(binary_index, name, &len);
+    if (res != FR_OK)
+    {
+        return res;
+    }
+
+    char path[sizeof(SD_DIR_GAMES) + FF_LFN_BUF + 1U];
+
+    /* Remove the paired asset pack first, best-effort: swap the .bin extension for
+     * .pak on a copy of the name. Many games ship without one, so a missing .pak is
+     * not an error — only the .bin removal below decides the result. */
+    char pak[FF_LFN_BUF];
+    strncpy(pak, name, sizeof(pak) - 1U);
+    pak[sizeof(pak) - 1U] = '\0';
+    char *dot = strrchr(pak, '.');
+    if (dot != NULL)
+    {
+        strcpy(dot, ".pak");
+        snprintf(path, sizeof(path), "%s/%s", SD_DIR_GAMES, pak);
+        if (f_unlink(path) == FR_OK)
+        {
+            LOGGER_LOG_INFO(LOGGER_LOADER, "deleted asset pack '%s'", pak);
+        }
+    }
+
+    snprintf(path, sizeof(path), "%s/%s", SD_DIR_GAMES, name);
+    res = f_unlink(path);
+    if (res == FR_OK)
+    {
+        LOGGER_LOG_INFO(LOGGER_LOADER, "deleted game '%s'", name);
+    }
+    else
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "delete '%s' failed (%d)", name, (int)res);
+    }
+    return res;
+}
