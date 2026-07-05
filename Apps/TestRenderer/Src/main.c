@@ -41,6 +41,12 @@
 #define COLS (RENDERER_WIDTH / TILE)  /* 20 on-screen columns */
 #define ROWS (RENDERER_HEIGHT / TILE) /* 15 rows */
 #define VIS_COLS (COLS + 1)           /* one extra column for the partial edge tile */
+/* Structures span multiple tiles — a cottage/tower/well reaches ~64 px right of its
+ * anchor column — so the foreground is also built this many columns *left* of the
+ * window. A wide structure then clips in at the left edge instead of popping out the
+ * instant its anchor column scrolls off-screen (its still-visible right half would
+ * otherwise vanish with the whole group). */
+#define FG_LEFT_MARGIN_COLS 5
 #define SCROLL_PX_PER_SEC 56.0f       /* world scroll speed (frame-rate independent) */
 
 #define LAYER_CAP 350U
@@ -271,8 +277,12 @@ static uint16_t buildBackground(uint16_t first_col)
                                     : REF(TESTRENDERER_GFX_SKY_DAY);
 
     /* NB: cast RENDERER_WIDTH to int — x starts negative (parallax offset), and an
-     * unsigned compare would convert x to a huge value and skip the whole loop. */
-    for (int x = -(far % 64); x < (int)RENDERER_WIDTH && n < LAYER_CAP - 8U; x += 64)
+     * unsigned compare would convert x to a huge value and skip the whole loop.
+     * Start one tile left of the window: the near-hills ride +32 px in front of the
+     * peaks, so without the extra column their row leaves a gap at the left edge and a
+     * hill pops in as you scroll. The extra fully-off-screen mountain is clipped away
+     * by the renderer. */
+    for (int x = -(far % 64) - 64; x < (int)RENDERER_WIDTH && n < LAYER_CAP - 8U; x += 64)
     {
         s_bg[n++] = spr((int16_t)x, 96, 0U, REF(TESTRENDERER_GFX_MOUNTAIN), 0U);      /* peaks, base ~y128 */
         s_bg[n++] = spr((int16_t)(x + 32), 112, 1U, REF(TESTRENDERER_GFX_HILLS), 0U); /* near hills in front */
@@ -302,19 +312,30 @@ static uint16_t buildForeground(uint16_t first_col)
     const Tile *dirt = REF(TESTRENDERER_GFX_DIRT);
     const Tile *dirtd = REF(TESTRENDERER_GFX_DIRT_DARK);
 
-    for (uint16_t vc = 0U; vc < VIS_COLS && n < LAYER_CAP - 32U; vc++)
+    for (int vc = -FG_LEFT_MARGIN_COLS; vc < (int)VIS_COLS && n < LAYER_CAP - 32U; vc++)
     {
-        uint16_t col = first_col + vc;
+        int col_i = (int)first_col + vc;
+        if (col_i < 0)
+        {
+            continue; /* nothing exists left of world column 0 (only just after a wrap) */
+        }
+        uint16_t col = (uint16_t)col_i;
         int16_t sx = (int16_t)((int)col * TILE - s_camera_x);
         uint8_t top = terrainTop(col);
-
-        /* ground column: surface tile, then dirt down to the floor */
-        s_fg[n++] = spr(sx, (int16_t)(top * TILE), 5U, surfaceTile(col), 0U);
-        for (uint8_t r = top + 1U; r < ROWS && n < LAYER_CAP - 12U; r++)
-        {
-            s_fg[n++] = spr(sx, (int16_t)(r * TILE), 4U, (r & 1U) ? dirt : dirtd, 0U);
-        }
         int16_t gy = (int16_t)(top * TILE); /* surface y, for things standing on the ground */
+
+        /* Ground tiles are one tile wide, so they cull correctly the moment their
+         * column leaves the window — draw them only for on-screen columns. The wider
+         * structures below run for the extra left-margin columns (vc < 0) too, so a
+         * multi-tile building clips in at the edge instead of vanishing whole. */
+        if (vc >= 0)
+        {
+            s_fg[n++] = spr(sx, gy, 5U, surfaceTile(col), 0U);
+            for (uint8_t r = top + 1U; r < ROWS && n < LAYER_CAP - 12U; r++)
+            {
+                s_fg[n++] = spr(sx, (int16_t)(r * TILE), 4U, (r & 1U) ? dirt : dirtd, 0U);
+            }
+        }
 
         /* --- scattered vegetation & props (deterministic per world column) --- */
         if (col % 11U == 3U) /* a tall tree (32x48, big -> uncached, spans chunks) */
