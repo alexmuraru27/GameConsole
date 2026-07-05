@@ -10,10 +10,12 @@
  *   Settings/   server.txt and other config text
  *   Firmware/   ESP01.bin (and future console OS images)
  *   Manifests/  the fetched remote manifest + the local downloaded-diff record
+ *   Crashes/    crash.log — one appended line per game fault/hang (see crash_report)
  */
 #define SD_DIR_GAMES "Games"
 #define SD_DIR_SETTINGS "Settings"
 #define SD_DIR_FIRMWARE "Firmware"
 #define SD_DIR_MANIFESTS "Manifests"
+#define SD_DIR_CRASHES "Crashes"
 
 #endif /* __SD_LAYOUT_H */

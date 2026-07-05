@@ -18,6 +18,11 @@ FRESULT loaderGetFilenameByIndex(uint32_t binary_index, char *filename_out, uint
  * best-effort, since a game may ship without one. */
 FRESULT loaderDeleteGame(uint32_t binary_index);
 
+/* Append one line (a newline is added) to Crashes/crash.log, creating it if needed.
+ * Best-effort: a failure is logged but not surfaced (crash recovery must not fail on
+ * a full/absent card). */
+void loaderAppendCrashLog(const char *line);
+
 /* ------------------------------------------------------------------ *
  *  Removable-media (SD card) state. loaderMediaInit() mounts the card
  *  at boot. loaderMediaSync() is polled by the menu each frame: it

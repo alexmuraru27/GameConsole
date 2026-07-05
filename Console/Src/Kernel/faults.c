@@ -1,5 +1,6 @@
 #include "faults.h"
 #include "scheduler.h"
+#include "crash_report.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stm32f407xx.h>
@@ -88,6 +89,12 @@ uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
     if (from_psp && kernelGameActive())
     {
         printf(">>> game crashed; returning to console\n");
+        /* Persist the essentials before we clear the sticky bits — the menu shows
+         * them on the crash banner and appends them to Crashes/crash.log, so the
+         * fault can be decoded offline without a probe (tools/scripts/decode_crash.py).
+         * MMFAR/BFAR must be read now, before the W1C below invalidates them. */
+        crashReportCaptureFault((uint8_t)kind, frame[6], frame[5], frame[7],
+                                cfsr, SCB->HFSR, SCB->MMFAR, SCB->BFAR);
         SCB->CFSR = cfsr;       /* write-1-to-clear the sticky fault bits */
         SCB->HFSR = SCB->HFSR;
         kernelRequestLeave(true);

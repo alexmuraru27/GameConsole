@@ -78,6 +78,7 @@ Src/Fonts/font8x8.c \
 Src/Fonts/font_utils.c \
 Src/Renderer/renderer.c \
 Src/Kernel/faults.c \
+Src/Kernel/crash_report.c \
 Src/Kernel/syscall.c \
 Src/Kernel/mpu.c \
 Src/Kernel/scheduler.c \

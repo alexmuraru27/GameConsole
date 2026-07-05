@@ -6,6 +6,7 @@
 #include "logger.h"
 #include "sysclock.h"
 #include "scheduler.h"
+#include "crash_report.h"
 #include "watchdog.h"
 #include "mp_session.h"
 #include "buzzer.h"
@@ -217,6 +218,11 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     bindGamePak();
     bindGameSettings();
 
+    /* Arm a fresh crash record (stores the .bin name) before any game code runs, so a
+     * fault during bootstrap/init is attributed correctly. */
+    const FILINFO *const finfo = loaderGetFileInfo();
+    crashReportBeginSession((finfo != NULL) ? finfo->fname : NULL);
+
     /* Hand the game a clean renderer: drop the menu's layers and disable its
      * background fill so the game never inherits the menu's background color if it
      * forgets to set its own. Games no longer init the renderer themselves (the
@@ -247,6 +253,14 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     const bool crashed = kernelGameCrashed();
     if (crashed)
     {
+        /* A crash with no CPU fault captured is a hang the liveness deadline caught. */
+        if (crashReportLast()->kind == CRASH_NONE)
+        {
+            crashReportMarkHang();
+        }
+        char line[256]; /* base line is ~170 chars before the CFSR flag names */
+        crashReportFormatLine(line, sizeof(line));
+        loaderAppendCrashLog(line); /* persist to SD for offline decode */
         LOGGER_LOG_ERROR(LOGGER_LOADER, "game crashed; recovered to console");
     }
     else

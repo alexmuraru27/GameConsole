@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "loader.h"
 #include "game_loader.h"
+#include "crash_report.h"
 #include "joystick.h"
 #include "buzzer.h"
 #include "sysclock.h"
@@ -100,6 +101,7 @@ void gameListEnter(void)
  * surface and, on a crash, arm the recovery banner. */
 static void playSelected(void)
 {
+    s_crash_banner = false; /* dismiss any lingering banner before this launch */
     buzzerPlay(0U, false, s_select_notes, 2U);
     LOGGER_LOG_INFO(LOGGER_MENU, "game start: '%s'", s_names[s_selected]);
     const uint8_t result = gameLoaderLoadGame((uint8_t)s_selected);
@@ -249,10 +251,17 @@ void gameListRender(void)
     {
         if (getSysTime() < s_crash_banner_until)
         {
-            char banner[GL_NAME_CHARS + 24U];
-            snprintf(banner, sizeof(banner), "%s crashed - recovered", s_crash_name);
-            const int16_t x = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, banner)) / 2);
-            n = menuDrawText(n, &font5x5, x, 30, g_menu_pal_accent, banner);
+            /* Two lines below the title underline: which game, then the decoded cause
+             * (e.g. "PC 0x2001A3F4 DACCVIOL") — the same detail written to crash.log. */
+            char line1[GL_NAME_CHARS + 12U];
+            snprintf(line1, sizeof(line1), "%s crashed", s_crash_name);
+            const int16_t x1 = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, line1)) / 2);
+            n = menuDrawText(n, &font5x5, x1, 60, g_menu_pal_alert, line1);
+
+            char line2[48];
+            crashReportFormatBanner(line2, sizeof(line2));
+            const int16_t x2 = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, line2)) / 2);
+            n = menuDrawText(n, &font5x5, x2, 72, g_menu_pal_accent, line2);
         }
         else
         {
