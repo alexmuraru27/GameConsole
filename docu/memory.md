@@ -148,7 +148,7 @@ AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c`, p
 
 Each data slot holds a `GameDataEntity` (version, size, ≤2042 B data, CRC).
 
-Game saves are keyed by the game's `.bin` name (extension stripped, matched case-insensitively). A game declares `has_settings` in its binary header; the loader then binds a slot for it (created on first need) and the running game reads/writes it through the settings `ConsoleAPI`. When all 48 slots are taken, writes return `STORAGE_FULL` — nothing is evicted automatically; callers free space via the list / delete / evict-oldest APIs. Corrupt directory entries or data slots are freed automatically on init by `settingsStorageCleanupCorrupted()`.
+Game saves are keyed by the game's `.bin` name (extension stripped, matched case-insensitively). Binding is automatic — there is no `has_settings` header flag: the loader binds a slot for every game as it loads (`settingsStorageBindGame`), and the 2 KB slot is allocated lazily on the game's first write (a game that never writes never consumes a slot). The running game reads/writes it through the settings `ConsoleAPI`. When all 29 slots are taken, writes return `STORAGE_FULL` — nothing is evicted automatically; callers free space via the list / delete / evict-oldest APIs. Corrupt directory entries or data slots are freed automatically on init by `settingsStorageCleanupCorrupted()`.
 
 ## Linker scripts
 

@@ -89,7 +89,7 @@ See `docu/memory.md` for the full map. Quick reference:
 `GAME_RAM` is a power-of-two size aligned to its size (`0x20018000`) so a single ARMv7-M MPU region confines an unprivileged game to it; the old 2K `SHARED_RAM` was reclaimed when the function-pointer API became SVC syscalls. CCM is D-bus only on the STM32F4, so **game code must run from SRAM (`GAME_RAM`), never CCM** — CCM holds the data-only asset arena. Games ship as two files in the SD `Games/` folder: `GameXO.bin` (32-byte header + code + rodata + data, all targeting SRAM) + `GameXO.pak` (assets, streamed lazily by ID into the CCM arena). See `docu/memory.md` for the authoritative map.
 
 ### EEPROM
-AT24C512 (64KB) on I2C1. `settings_storage.c` splits it into a 16KB console partition (system header + 48-entry game directory + console settings blob) and a 48KB games partition (48 × 1KB save slots). Game saves are keyed by `.bin` name, CRC-16-CCITT protected, auto-cleaned on init. See `docu/memory.md`.
+AT24C512 (64KB) on I2C1. `settings_storage.c` lays it out flat (no fixed partition split): a 256 B system header (0x0000), a 29-entry game directory (0x0100, 73 B/entry), one 2 KB console-settings entity (0x0945), then 29 × 2 KB game save slots (0x1145 onward), keyed 1:1 with the directory. Game saves are keyed by `.bin` name, CRC-16-CCITT protected, auto-cleaned on init. See `docu/memory.md` and the EEPROM Settings subsystem below for the authoritative map.
 ### Kernel / game isolation (`Console/Src/Kernel/`)
 Games run as untrusted, unprivileged code; the console is the kernel. A game **never** calls console code directly — it traps in via SVC.
 - **Syscall ABI** (`syscall.c`, `Shared/Syscall/`): each API call is a typed C stub that puts the syscall id in `r12`, args in `r0-r3`, and runs `svc #0`. `SVC_Handler` runs privileged on the **MSP (kernel stack)**, validates, dispatches to the real console function, and returns the result in the caller's `r0`. SVC is at the lowest priority so a long syscall (e.g. a full render) stays preemptible by the buzzer/joystick timer ISRs. Pointer arguments are range-checked (`gameCanRead`/`gameCanWrite`) so a game can't make the kernel touch console memory on its behalf; `gameLog` is formatted game-side and passed as raw bytes so no format string reaches the kernel.
@@ -139,7 +139,7 @@ AT24C512 (64KB) on I2C1 at 400kHz. `settings_storage.c` provides a CRC-16 protec
 - Console settings at 0x0945 (one 2 KB `ConsoleSettingsEntity`: version, size, ≤2042B data, CRC)
 - Game data at 0x1145 (29 × 2 KB `GameDataEntity` slots: version, size, ≤2042B data, CRC)
 
-Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). A game opts in via `has_settings` in its binary header; the loader binds a slot (`settingsStorageBindGame`) and the game reaches it through the settings `ConsoleAPI`. When all 48 slots are full, writes return `STORAGE_FULL` — nothing is auto-evicted; callers manage space with the list / delete / `settingsStorageEvictOldest` APIs. All writes validate with CRC-16-CCITT (polynomial 0x1021, initial 0xFFFF). Corrupt entries are auto-cleaned on init via `settingsStorageCleanupCorrupted()`. The typed console blob lives in `console_settings_storage.c`.
+Game saves are keyed by the `.bin` name (extension stripped, case-insensitive). Binding is **automatic** — there is no `has_settings` header flag: the loader calls `settingsStorageBindGame()` for every game as it loads, and the 2 KB slot is allocated lazily on the game's first `settingsWrite` (a game that never writes never consumes a slot). The game reaches its slot through the settings `ConsoleAPI`. When all 29 slots are full, writes return `STORAGE_FULL` — nothing is auto-evicted; callers manage space with the list / delete / `settingsStorageEvictOldest` APIs. All writes validate with CRC-16-CCITT (polynomial 0x1021, initial 0xFFFF). Corrupt entries are auto-cleaned on init via `settingsStorageCleanupCorrupted()`. The typed console blob lives in `console_settings_storage.c`.
 
 ### DMA
 Four uses, all on DMA2: **ADC1 DMA** (Stream0 ch0, circular, 16-bit) transfers 4 ADC channels continuously; **FSMC DMA** (Stream6 ch0, memory-to-memory) bursts pixel data to the ILI9341 display for opaque tile rendering; and the **USART1/ESP-01 link** (`usart.c`) uses **RX DMA** (Stream2 ch4, circular ring) draining `USART1->DR` into a 2 KB ring continuously so no byte is lost even when an ISR stalls the consumer (this is what makes the high runtime baud safe), plus **TX DMA** (Stream7 ch4, per-transfer) streaming each frame out before the code waits on the USART shift register to empty.
@@ -274,7 +274,7 @@ Shared conventions:
 - **Network**: ESP-01 on USART1 (PA9/PA10), 923076 baud runtime over DMA (115200 for flashing), controlled via PB10/PB6/PC6/PC13
 - **Debug interface**: SWD (PA13/PA14) + SWO (PB3)
 
-EEPROM layout: console partition 0x0000–0x3FFF (system header 0x0000, game directory 0x0100, console settings 0x1000), games partition 0x4000–0xFFFF (48 × 1KB save slots).
+EEPROM layout (flat, 64 KB): system header 0x0000, game directory 0x0100 (29 × 73 B), console settings 0x0945 (2 KB), game save slots 0x1145 (29 × 2 KB). See the EEPROM Settings subsystem and `docu/memory.md`.
 
 ## Code Quality
 
