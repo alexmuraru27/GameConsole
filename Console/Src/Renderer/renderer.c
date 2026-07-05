@@ -141,6 +141,17 @@ void rendererClear(void)
     memset(s_active_sprites, 0U, sizeof(s_active_sprites));
 }
 
+/* Reset the per-game renderer state at launch (console-side, not a game syscall):
+ * drop every layer and disable the background fill, so a freshly loaded game
+ * starts from a clean slate and never inherits the menu's background color if it
+ * forgets to set its own. The one-time compositor-table / scanline-buffer setup
+ * stays in rendererInit() (boot); this only clears the mutable frame state. */
+void rendererResetState(void)
+{
+    memset(s_active_sprites, 0U, sizeof(s_active_sprites));
+    s_bg_enabled = false;
+}
+
 /* Set the color painted where no sprite draws (enables per-chunk background
  * fill). RGB565. Until called, uncovered pixels keep stale buffer contents. */
 void rendererSetBackground(uint16_t color)

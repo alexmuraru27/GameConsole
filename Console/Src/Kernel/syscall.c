@@ -189,9 +189,6 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         return joystickIsAnyButtonPressed();
 
     /* ---- renderer ---- */
-    case SYS_RENDERER_INIT:
-        rendererInit();
-        return 0;
     case SYS_RENDERER_CLEAR:
         rendererClear();
         return 0;

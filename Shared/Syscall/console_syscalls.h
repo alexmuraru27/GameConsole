@@ -57,7 +57,6 @@ JoystickAxisState joystickGetLAnalogX(void);
 bool joystickIsAnyButtonPressed(void);
 
 /* ---- renderer ---- */
-void rendererInit(void);
 void rendererClear(void);
 void rendererSetBackground(uint16_t color);
 void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count);

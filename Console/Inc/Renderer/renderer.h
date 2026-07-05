@@ -5,7 +5,8 @@
 #include "stdbool.h"
 #include "renderer_interface.h" /* RENDERER_WIDTH/HEIGHT, SpriteFlags, Layer, Sprite */
 
-void rendererInit(void);
+void rendererInit(void);       /* boot-time: build compositor tables + clear buffers */
+void rendererResetState(void); /* per-game launch: drop layers + disable background */
 void rendererClear(void);
 void rendererSetBackground(uint16_t color); /* RGB565 painted where no sprite draws */
 void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count);

@@ -68,17 +68,21 @@ The `.bin` file on the SD card is a flat image of the game's `GAME_RAM` contents
 
 ```
 GAME_RAM  (in .bin)
-├── .game_header      28 B     GameBinaryHeader (magic, ABI version, callbacks)
+├── .game_header      32 B     GameBinaryHeader (magic, ABI version, callbacks, stack-guard base)
 ├── .text                      game code
 ├── .rodata                    constants and strings
 ├── .data                      initialized globals
+                               ── (above, NOLOAD, not in .bin) ──
+├── .bss                       zero-initialized globals (zeroed by the bootstrap)
+├── .stack_guard      256 B    no-access MPU guard band just below the PSP (overflow → fault)
+└── ._user_heap_stack          heap (0) + stack, growing down from the top of GAME_RAM
 ```
 
-`.bss` and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file. Because the game is RAM-resident, every section is linked at its final `GAME_RAM` address, so copying the whole image to `GAME_RAM` lands each section in place: no per-section table and no separate LMA copy.
+`.bss`, `.stack_guard`, and `.asset_area` are `NOLOAD` — they occupy zero bytes in the `.bin` file. Because the game is RAM-resident, every section is linked at its final `GAME_RAM` address, so copying the whole image to `GAME_RAM` lands each section in place: no per-section table and no separate LMA copy. The `.stack_guard` band is 256-aligned/256-sized so the kernel can map it as one ARMv7-M MPU region; its base is published in the header (`stack_guard`).
 
 ### GameBinaryHeader
 
-A 28-byte prefix at offset 0 of the binary. The loader reads it, validates the game, and the kernel drives the named callbacks — it needs nothing else (the game manages its own `.bss` in the bootstrap):
+A 32-byte prefix at offset 0 of the binary. The loader reads it, validates the game, and the kernel drives the named callbacks — it needs nothing else (the game manages its own `.bss` in the bootstrap):
 
 | Field          | Meaning                                                       |
 | -------------- | ------------------------------------------------------------ |
@@ -89,12 +93,13 @@ A 28-byte prefix at offset 0 of the binary. The loader reads it, validates the g
 | `init`         | game init — the OS calls it once after the bootstrap         |
 | `update`       | game update — the OS calls it every frame                    |
 | `render`       | game render — the OS calls it every frame                    |
+| `stack_guard`  | base of the 256-byte stack-overflow guard band (the `.stack_guard` section, just below the descending PSP); the kernel maps it as a no-access MPU region |
 
-`entry_point`/`frame_return` are filled by `DECLARE_GAME_HEADER` from the shared syscall library; the game only names `init`/`update`/`render`.
+`entry_point`/`frame_return`/`stack_guard` are filled by `DECLARE_GAME_HEADER` from the shared syscall library + app linker script; the game only names `init`/`update`/`render`.
 
 ### Loading sequence
 
-1. Read the 28-byte header; reject on bad magic or mismatched ABI version
+1. Read the 32-byte header; reject on bad magic or mismatched ABI version
 2. Copy the whole `.bin` to `GAME_RAM` base (`.text`/`.rodata`/`.data` land at their linked addresses)
 3. `kernelRunGame()` programs the MPU regions, then drives the game **OS-first**: it invokes each callback by building a fresh **unprivileged** PSP exception frame at the top of `GAME_RAM` and entering via an SVC (`SYS_INVOKE`), parking the console's context on the MSP
 4. The first invoke runs `_game_start` (zero `.bss`, `__libc_init_array`), the second runs `init`; each returns to the OS via the `_game_return` trampoline (`SYS_FRAME_DONE`), leaving the MPU/session up
@@ -153,7 +158,7 @@ All linker scripts live in `linker/`.
 | -------------------- | ---------------- | ---------------------------------------------------------------------------------- |
 | `linker/common.ld`   | Both             | MEMORY region definitions, the `.game_header` output section, region-bound symbols (`__game_ram_start/size`, …) the kernel uses for the MPU and pointer validation |
 | `linker/console.ld`  | Console firmware | `.isr_vector`, `.text`, `.rodata` → flash; `.data`, `.bss` → CONSOLE_RAM           |
-| `linker/app.ld`      | Games / apps     | `.text`, `.rodata`, `.data`, `.bss`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
+| `linker/app.ld`      | Games / apps     | `.text`, `.rodata`, `.data`, `.bss`, `.stack_guard`, `._user_heap_stack` → GAME_RAM; `.asset_area` → GAME_RAM_ASSET |
 | `linker/bootloader.ld` | Bootloader     | standalone sector-0 link map (its own MEMORY block, no INCLUDE) |
 
 `linker/common.ld` is included by `app.ld` and `console.ld` via `INCLUDE "common.ld"`, resolved from the linker search path (the Makefiles pass `-L .../linker`). The ASSERTs validate that `GAME_RAM` stays 32K-aligned at `0x20018000` (so it is a single clean MPU region) and that the SRAM region sizes sum to 128K.

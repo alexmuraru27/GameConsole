@@ -7,7 +7,6 @@
 #include <string.h>
 #include <stdio.h>
 
-
 #define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
 
 /* Slate + cyan palette, matching the console menu. */
@@ -53,17 +52,17 @@ static bool s_result_handled;
 static uint32_t s_last_input_ms;
 
 /* ---- multiplayer state ---- */
-static bool s_is_mp;          /* the current game is networked            */
-static bool s_self_is_host;   /* our role this game                       */
-static uint8_t s_self_index;  /* our player index (host = 0)              */
-static uint8_t s_opp_index;   /* the opponent's player index             */
-static uint8_t s_turn;        /* player index whose turn it is            */
-static bool s_opp_left;       /* opponent dropped mid-game                */
-static bool s_have_state;     /* client: a snapshot has arrived           */
+static bool s_is_mp;         /* the current game is networked            */
+static bool s_self_is_host;  /* our role this game                       */
+static uint8_t s_self_index; /* our player index (host = 0)              */
+static uint8_t s_opp_index;  /* the opponent's player index             */
+static uint8_t s_turn;       /* player index whose turn it is            */
+static bool s_opp_left;      /* opponent dropped mid-game                */
+static bool s_have_state;    /* client: a snapshot has arrived           */
 static uint32_t s_last_state_ms;
-static uint8_t s_mode_sel;    /* highlighted row in PHASE_MODE_SELECT     */
-static uint8_t s_join_sel;    /* highlighted row in PHASE_JOIN_BROWSE     */
-static bool s_joining;        /* a join request is in flight              */
+static uint8_t s_mode_sel; /* highlighted row in PHASE_MODE_SELECT     */
+static uint8_t s_join_sel; /* highlighted row in PHASE_JOIN_BROWSE     */
+static bool s_joining;     /* a join request is in flight              */
 static MpHostInfo s_hosts[8];
 static int s_host_count;
 static char s_self_name[MP_NAME_MAX + 1];
@@ -132,7 +131,6 @@ static void resetRound(void)
 
 void gameStateManagerInit(void)
 {
-    rendererInit();
     rendererSetBackground(COL_BG);
 
     s_last_input_ms = getSysTime();
@@ -269,8 +267,8 @@ static void startNetworkGame(bool as_host)
     if (as_host)
     {
         ticTacToeInitBoard(s_board);
-        s_turn = 0U;          /* host (X) moves first */
-        s_have_state = true;  /* host always holds the authoritative board */
+        s_turn = 0U;         /* host (X) moves first */
+        s_have_state = true; /* host always holds the authoritative board */
         hostBroadcastState();
     }
     else

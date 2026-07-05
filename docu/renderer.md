@@ -93,7 +93,8 @@ typedef struct {
     const uint16_t *palette;// RGB565 colors; index 0 is transparent
 } Sprite;
 
-void     rendererInit(void);                       // once, at boot
+void     rendererInit(void);                       // once, at boot (console-owned, not a game call)
+void     rendererResetState(void);                 // per game launch: drop layers + disable background
 void     rendererClear(void);                      // start of each frame
 void     rendererSubmit(Layer layer, const Sprite *sprite);
 void     rendererRender(void);                     // sort + composite + DMA
@@ -681,7 +682,8 @@ pkill -9 -f openocd            # free the SWD/debug connection for the next flas
 A minimal frame, modeled on `main.c`:
 
 ```c
-/* one-time */
+/* one-time, console boot only (devicesInit); a loaded game skips this — the
+ * kernel resets the renderer (rendererResetState) when it launches the game */
 rendererInit();
 
 /* palette: index 0 transparent, then up to 3 (2bpp) or 15 (4bpp) colors */

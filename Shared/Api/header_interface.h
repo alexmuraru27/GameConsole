@@ -38,6 +38,7 @@ typedef struct
     uint32_t init;         /* game init  — OS calls once, after the bootstrap */
     uint32_t update;       /* game update — OS calls every frame */
     uint32_t render;       /* game render — OS calls every frame */
+    uint32_t stack_guard;  /* base of the 256-byte stack-overflow guard band (below the PSP) */
 } GameBinaryHeader;
 
 /* The runtime stubs the macro wires into the header. Both live in the shared
@@ -45,6 +46,13 @@ typedef struct
  * references them by name. */
 void _game_start(void);  /* zero .bss + run constructors, then return to the OS */
 void _game_return(void); /* trap back to the OS when a callback returns */
+
+/* Base of the game's stack-overflow guard band, defined by the app linker script
+ * (app.ld). The kernel maps this 256-byte band as a no-access MPU region just
+ * below the descending PSP so an overflow faults instead of corrupting .bss.
+ * Only referenced inside DECLARE_GAME_HEADER (a game-side construct); the console
+ * never expands the macro, so its link never needs this symbol. */
+extern uint32_t __stack_guard_start[];
 
 /*
  * Emit the binary header. Use once at file scope in the game's main.c, e.g.
@@ -63,6 +71,7 @@ void _game_return(void); /* trap back to the OS when a callback returns */
         .init = (uint32_t)(init_fn),                               \
         .update = (uint32_t)(update_fn),                           \
         .render = (uint32_t)(render_fn),                           \
+        .stack_guard = (uint32_t)__stack_guard_start,             \
     }
 
 #endif /* __ASSEMBLER__ */

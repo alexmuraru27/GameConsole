@@ -72,6 +72,22 @@ SECTIONS
     __game_data_no_init_end = .;
   } >GAME_RAM
 
+  /* Stack-overflow guard band. Sits just below the descending PSP (which starts
+   * at the top of GAME_RAM); the kernel maps it as a no-access MPU region for the
+   * unprivileged game, so an overflowing push/store traps as a recoverable
+   * MemManage fault — pinpointing the offending instruction — instead of silently
+   * clobbering .bss. NOLOAD (not in the .bin) and 256-aligned/256-sized so it can
+   * back a single ARMv7-M MPU region; its base is published to the kernel through
+   * the game header (stack_guard). The _Min_Stack_Size assert below still
+   * guarantees the usable stack above the band. */
+  .stack_guard (NOLOAD) :
+  {
+    . = ALIGN(256);
+    __stack_guard_start = .;
+    . = . + 256;
+    __stack_guard_end = .;
+  } >GAME_RAM
+
   ._user_heap_stack :
   {
     . = ALIGN(8);
@@ -104,3 +120,4 @@ ASSERT(__game_header_end <= __game_text_start, "Linker symbols order should be p
 ASSERT(__game_text_end <= __game_ro_data_start, "Linker symbols order should be preserved in memory");
 ASSERT(__game_ro_data_end <= __game_data_init_start, "Linker symbols order should be preserved in memory");
 ASSERT(__game_data_init_end <= __game_data_no_init_start, "Linker symbols order should be preserved in memory");
+ASSERT(__game_data_no_init_end <= __stack_guard_start, "Stack guard band must sit above .bss");

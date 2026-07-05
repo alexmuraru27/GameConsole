@@ -75,7 +75,6 @@ JoystickAxisState joystickGetLAnalogX(void) { return (JoystickAxisState)svcCall(
 bool joystickIsAnyButtonPressed(void) { return (bool)svcCall(SYS_JOY_ANY_PRESSED, 0, 0, 0, 0); }
 
 /* ---- renderer ---- */
-void rendererInit(void) { (void)svcCall(SYS_RENDERER_INIT, 0, 0, 0, 0); }
 void rendererClear(void) { (void)svcCall(SYS_RENDERER_CLEAR, 0, 0, 0, 0); }
 void rendererSetBackground(uint16_t color) { (void)svcCall(SYS_RENDERER_SET_BACKGROUND, color, 0, 0, 0); }
 

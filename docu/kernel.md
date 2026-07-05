@@ -95,7 +95,7 @@ Because the SVC handler runs at the **lowest** exception priority (§7), a long 
 
 ## 3. Memory protection — the MPU wall
 
-The MPU (`mpu.c`) is enabled at boot with **`PRIVDEFENA`**: privileged code (the console) keeps the full default memory map, while unprivileged code (a game) gets access *only* through regions the kernel explicitly opens. When a game is running it has exactly **two** regions; everything else faults.
+The MPU (`mpu.c`) is enabled at boot with **`PRIVDEFENA`**: privileged code (the console) keeps the full default memory map, while unprivileged code (a game) gets access *only* through regions the kernel explicitly opens. When a game is running it has **three** regions; everything else faults.
 
 ```
    addr                         region / access
@@ -114,7 +114,12 @@ The MPU (`mpu.c`) is enabled at boot with **`PRIVDEFENA`**: privileged code (the
             │ 96 KB          │                   renderer buffers, DMA, FatFs…
  0x20018000 ├────────────────┤  MPU region 0  ── game: RWX
             │ GAME_RAM 32 KB │                   game code + rodata + data + bss
- 0x20020000 └────────────────┘                   + stack (one power-of-two region)
+            │  .bss          │                   + stack (one power-of-two region)
+            │ ┌────────────┐ │  MPU region 2  ── game: NO ACCESS (256 B guard)
+            │ │stack guard │ │                   overlaps region 0, higher number
+            │ └────────────┘ │                   wins → overflow traps here
+            │  stack ↓ ↓ ↓   │
+ 0x20020000 └────────────────┘
             ┊                ┊
  0x40000000 ┌────────────────┐  background map ── game: TRAPS  (MemManage)
             │ peripherals    │                   GPIO, timers, I2C, SDIO, FSMC…
@@ -125,9 +130,10 @@ The MPU (`mpu.c`) is enabled at boot with **`PRIVDEFENA`**: privileged code (the
 | ------ | ---- | ---- | ----------- | ----- |
 | 0 — `GAME_RAM` | `0x20018000` | 32 KB | **RWX** | code + data + stack share one region (single RWX region by design; W^X not enforced) |
 | 1 — CCM arena | `0x10000000` | 64 KB | **RW, XN** | data only — CCM can't execute on the STM32F4 anyway |
+| 2 — stack guard | *(per-game)* | 256 B | **none** (`AP_PRIV`) | no-access band just below the PSP; base from the game header (`stack_guard`). Overlaps region 0 and wins as the higher-numbered region, so a stack overflow faults on the offending instruction instead of silently corrupting `.bss`. Privileged-accessible so the console is never faulted by it. |
 | *(everything else)* | — | — | **none** | console RAM, peripherals, flash → recoverable MemManage fault |
 
-`GAME_RAM` is sized and aligned to a power of two (32 KB at `0x20018000`) specifically so it is a *single, clean* MPU region — no sub-region tricks. The regions are programmed in `mpuConfigureForGame()` right before a game is entered and torn down in `mpuReleaseGame()` the moment it exits or crashes, so no unprivileged access ever outlives the game.
+`GAME_RAM` is sized and aligned to a power of two (32 KB at `0x20018000`) specifically so it is a *single, clean* MPU region — no sub-region tricks. The **stack guard** is a 256-byte no-access band the game's linker places (the `.stack_guard` section in `app.ld`, 256-aligned) between `.bss` and the descending stack; its base rides in the game header, and `mpuConfigureForGame()` validates it sits inside `GAME_RAM` before arming region 2 (a bad/zero base just leaves the guard off — the game still runs, only unguarded). A deep-recursing or runaway game trips it and returns to the menu as "crashed" with an exact fault PC, rather than silently clobbering its own data. The regions are programmed in `mpuConfigureForGame()` right before a game is entered and torn down in `mpuReleaseGame()` the moment it exits or crashes, so no unprivileged access ever outlives the game.
 
 The renderer, the buzzer ISR, and the asset loader all read game RAM **from the kernel side** (privileged) — which the background map permits — so the game submitting sprite pointers or note data costs nothing extra.
 
@@ -303,12 +309,12 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
     │
     ▼
   gameLoaderLoadGame(idx)                       (privileged, MSP, Thread)
-    │  read 28-byte header → check magic + ABI version
+    │  read 32-byte header → check magic + ABI version
     │  copy the whole .bin to GAME_RAM (flat image, sections land in place)
     │  bind .pak + settings slot
     ▼
   kernelRunGame(header, collect, send)
-    │  mpuConfigureForGame()                     ← wall goes up (once)
+    │  mpuConfigureForGame(header->stack_guard)  ← wall goes up (once)
     │  ┌─ for each callback: kernelInvokeGame(fn) ─────────────────────────┐
     │  │   build fresh PSP frame at top of GAME_RAM (PC=fn, LR=_game_return)│
     │  │   kernelTriggerInvoke():  svc SYS_INVOKE                           │

@@ -124,10 +124,10 @@ void kernelRunGame(const GameBinaryHeader *header,
     s_game_hung = false;
     s_game_active = true;
 
-    LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game: init=0x%08lX update=0x%08lX render=0x%08lX",
+    LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game: init=0x%08lX update=0x%08lX render=0x%08lX guard=0x%08lX",
                     (unsigned long)(header->init & ~0x1U), (unsigned long)(header->update & ~0x1U),
-                    (unsigned long)(header->render & ~0x1U));
-    mpuConfigureForGame();
+                    (unsigned long)(header->render & ~0x1U), (unsigned long)header->stack_guard);
+    mpuConfigureForGame(header->stack_guard);
 
     /* One-time C-runtime bootstrap (zero .bss, run ctors), then the game's init. */
     kernelInvokeGame(header->entry_point);

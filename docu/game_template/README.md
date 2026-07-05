@@ -38,10 +38,13 @@ Game state lives in globals (it persists across calls); locals do not.
    ```
 
 3. **No `startup.s`** — a game has no vector table and no hand-written entry. The
-   12→28-byte binary header is emitted by the `DECLARE_GAME_HEADER` macro (step 4),
+   32-byte binary header is emitted by the `DECLARE_GAME_HEADER` macro (step 4),
    and the C-runtime bootstrap (`_game_start`: zero `.bss` → run ctors) plus the
    callback return trampoline (`_game_return`) come from the shared
-   `console_syscalls.c` linked in step 2. You write only your three callbacks.
+   `console_syscalls.c` linked in step 2. You write only your three callbacks. The
+   macro also publishes the stack-overflow guard base (`.stack_guard` from
+   `app.ld`), so the kernel can trap a stack overflow instead of letting it corrupt
+   `.bss` — nothing for the game to wire up.
 
 4. **Write the callbacks + the header** — include the umbrella header, write
    `init`/`update`/`render`, and declare the header at file scope:
@@ -52,7 +55,9 @@ Game state lives in globals (it persists across calls); locals do not.
    static void gameInit(void)
    {
        gameLog("Hello from my game!");   // game-local printf() is unreliable; use gameLog
-       rendererInit();
+       // The kernel hands you a clean renderer (layers dropped, background off) —
+       // no renderer init to call; just set a background if you want one:
+       rendererSetBackground(rendererSystemColor(0));
        // load assets, set up state (in globals — locals don't persist between calls)
    }
 
@@ -103,21 +108,22 @@ linker symbols yourself). See [`../memory.md`](../memory.md).
 
 ## The binary header (`DECLARE_GAME_HEADER`)
 
-The header is the first 28 bytes of the `.bin`, emitted by the macro straight from
+The header is the first 32 bytes of the `.bin`, emitted by the macro straight from
 the shared ABI constants and your callback names (so nothing is duplicated):
 
 ```
    offset  0:  magic         0x47414D45  "GAME"
    offset  4:  abi_version   CONSOLE_ABI_VERSION   (loader refuses a mismatch)
-   offset  8:  entry_point   &_game_start    one-time C-runtime bootstrap   ┐ filled by
-   offset 12:  frame_return  &_game_return   callback return trampoline      ┘ the macro
-   offset 16:  init          your gameInit                                   ┐ your three
-   offset 20:  update        your gameUpdate                                  │ callbacks
-   offset 24:  render        your gameRender                                 ┘
+   offset  8:  entry_point   &_game_start         one-time C-runtime bootstrap  ┐ filled by
+   offset 12:  frame_return  &_game_return        callback return trampoline    ┘ the macro
+   offset 16:  init          your gameInit                                      ┐ your three
+   offset 20:  update        your gameUpdate                                     │ callbacks
+   offset 24:  render        your gameRender                                    ┘
+   offset 28:  stack_guard   &__stack_guard_start stack-overflow guard base     ── the macro (app.ld)
 ```
 
-The macro fills `entry_point`/`frame_return` from the shared syscall library
-(you never name them). The OS invokes `entry_point` once to set up the C runtime,
+The macro fills `entry_point`/`frame_return`/`stack_guard` from the shared syscall
+library and app linker script (you never name them). The OS invokes `entry_point` once to set up the C runtime,
 then `init`, then loops `update`/`render`. Each callback runs unprivileged and
 returns to the OS through `frame_return` (an SVC) — a game cannot return into
 console code directly. `gameExit()` ends the session early.
@@ -169,7 +175,8 @@ bool joystickIsAnyButtonPressed(void);
 
 ### Renderer (320×240 RGB565 scanline sprite compositor)
 ```c
-void     rendererInit(void);
+/* No rendererInit(): the kernel resets the renderer (drops layers, disables the
+ * background) when it launches your game, so you start from a clean slate. */
 void     rendererClear(void);
 void     rendererSetBackground(uint16_t color);                 // RGB565
 void     rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count);

@@ -212,6 +212,12 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
     bindGamePak();
     bindGameSettings();
 
+    /* Hand the game a clean renderer: drop the menu's layers and disable its
+     * background fill so the game never inherits the menu's background color if it
+     * forgets to set its own. Games no longer init the renderer themselves (the
+     * boot-time rendererInit stays console-owned). */
+    rendererResetState();
+
     LOGGER_LOG_INFO(LOGGER_LOADER, "starting game @ 0x%08lX", (unsigned long)s_game_header.entry_point);
 
     /* Reset the watchdog window before handing off: the image read above ran since

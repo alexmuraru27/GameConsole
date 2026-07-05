@@ -13,11 +13,16 @@
  * function, and writes the result back into the caller's stacked r0.
  *
  * Bump CONSOLE_ABI_VERSION whenever the id assignments or argument marshalling
- * change; the loader refuses a game built against a different ABI. The value is a
- * plain integer (no suffix) so it is usable from both C and assembly.
+ * change — or the GameBinaryHeader layout does; the loader refuses a game built
+ * against a different ABI. The value is a plain integer (no suffix) so it is
+ * usable from both C and assembly.
+ *
+ * v5: GameBinaryHeader gained the stack_guard field (28 -> 32 bytes);
+ *     rendererInit() retired from the game API and SYS_RENDERER_INIT removed from
+ *     the enum (the kernel resets the renderer when it launches a game).
  */
 
-#define CONSOLE_ABI_VERSION 4
+#define CONSOLE_ABI_VERSION 5
 
 #ifndef __ASSEMBLER__
 
@@ -54,7 +59,6 @@ typedef enum
     SYS_JOY_L_ANALOG_X,
     SYS_JOY_ANY_PRESSED,
 
-    SYS_RENDERER_INIT,
     SYS_RENDERER_CLEAR,
     SYS_RENDERER_SET_BACKGROUND,
     SYS_RENDERER_SUBMIT_LAYER,

@@ -87,8 +87,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - `joystickGetRAnalogX/Y()`, `joystickGetLAnalogX/Y()`: Analog axes.
 
 ### Renderer
-A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). The two functions exposed through `ConsoleAPI`:
-- `rendererInit()`: Build the compositor tables and clear the scanline buffers.
+A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). Games do **not** init the renderer — the kernel resets it (drops layers, disables the background) when it launches a game, so a game starts from a clean slate. The frame-submission surface exposed through `ConsoleAPI`:
 - `rendererRender()`: Sort sprites by `z`, bin them into 16-line chunks, composite back-to-front, and DMA the frame to the ILI9341.
 
 The full sprite-submission surface is exposed through `ConsoleAPI`, so loaded games draw the same way the console does. The `Sprite`/`Layer`/`SpriteFlags` types live in the shared API (`Shared/Api/renderer_interface.h`):
@@ -133,7 +132,8 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 - 64-color system palette (RGB565). Three layers: `LAYER_BG`, `LAYER_FG`, `LAYER_UI`.
 - Compiled `-O3` even in debug builds (it is the per-frame hot path); optimized from **24 → 76 FPS** on a full screen — see [`renderer.md`](renderer.md) for the full pipeline and optimization journey.
 - Public functions:
-  - `rendererInit()`: Build compositor tables, clear scanline buffers.
+  - `rendererInit()`: Build compositor tables, clear scanline buffers. **Console-owned, boot-time only** — called once from `devicesInit()`, not exposed to games.
+  - `rendererResetState()`: Drop all layers + disable the background. The kernel calls it when it launches a game, so a game inherits a clean slate (not the menu's background).
   - `rendererClear()`: Drop all layers at the start of a frame.
   - `rendererSetBackground(color)`: RGB565 fill for pixels no sprite covers.
   - `rendererSubmitLayer(layer, sprites, count)`: Borrow a layer's sprite array for the frame.
@@ -298,12 +298,14 @@ See `README.md` for license and authorship.
 ### Renderer
 - **Purpose:** Scanline-based graphics engine for the ILI9341 display.
 - **Key Functions:**
-  - `rendererInit()`: Initialize scanline buffers.
+  - `rendererInit()`: Build compositor tables + scanline buffers (console boot only).
+  - `rendererResetState()`: Drop layers + disable background (kernel calls it per game launch).
   - `rendererRender()`: Draw the current frame.
   - `rendererGetWidthPixels()`, `rendererGetHeightPixels()`: Screen dimensions (320×240).
-- **Usage Example:**
+- **Usage Example (game side — no init needed):**
   ```c
-  rendererInit();
+  rendererSetBackground(rendererSystemColor(0));
+  rendererSubmitLayer(LAYER_BG, sprites, count);
   rendererRender();
   ```
 
@@ -363,7 +365,7 @@ Quick reference:
 - **System palette:** 64 fixed colors (below)
 - **Layers:** `LAYER_BG`, `LAYER_FG`, `LAYER_UI`
 - **Pixel formats:** 2bpp / 4bpp planar tiles; slot 0 transparent unless `SPRITE_OPAQUE`; `SPRITE_FLIP_H/V`
-- **Public API:** `rendererInit`, `rendererClear`, `rendererSetBackground`, `rendererSubmitLayer`, `rendererRender`, `rendererGetWidthPixels`, `rendererGetHeightPixels`
+- **Public API:** `rendererInit` (console boot only), `rendererResetState` (kernel, per game launch), `rendererClear`, `rendererSetBackground`, `rendererSubmitLayer`, `rendererRender`, `rendererGetWidthPixels`, `rendererGetHeightPixels`
 
 ## System Palette
 ![system_palette](system_palette.png)
