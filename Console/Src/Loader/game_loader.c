@@ -8,6 +8,8 @@
 #include "scheduler.h"
 #include "watchdog.h"
 #include "mp_session.h"
+#include "buzzer.h"
+#include "renderer.h"
 #include "sd_layout.h"
 #include <stm32f407xx.h> /* DWT->CYCCNT for the frame delta */
 #include <stdio.h>
@@ -25,8 +27,8 @@ extern uint32_t __game_ram_start, __game_ram_size;
  * resolution at zero interrupt cost. The first frame of a session reports 0 (no
  * prior frame), and the delta is clamped so a one-off stall (a long SD access,
  * say) can't fling a game's sprites across the screen in a single step. */
-#define CPU_CYCLES_PER_US 168U      /* DWT->CYCCNT runs at the 168 MHz CPU clock */
-#define FRAME_DELTA_MAX_US 100000U  /* 100 ms safety cap */
+#define CPU_CYCLES_PER_US 168U     /* DWT->CYCCNT runs at the 168 MHz CPU clock */
+#define FRAME_DELTA_MAX_US 100000U /* 100 ms safety cap */
 static uint32_t s_prev_frame_cyc;
 static bool s_frame_timing_started;
 static volatile uint32_t s_frame_delta_us;
@@ -228,6 +230,8 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
      * a clean exit OR a crash can never leave the ESP-NOW link or a peer session up
      * for the next game. Idempotent when no session was active. */
     mpSessionStop();
+    buzzerStopAll();
+    rendererClear();
 
     const bool crashed = kernelGameCrashed();
     if (crashed)
