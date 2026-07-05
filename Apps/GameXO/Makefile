@@ -27,8 +27,8 @@ Src/game_state_manager.c \
 Src/tic_tac_toe_logic.c\
 Src/game_assets.c \
 Src/xo_net.c \
-Src/syscalls.c \
-$(REPO_ROOT)/Shared/Syscall/console_syscalls.c
+$(REPO_ROOT)/Shared/Syscall/console_syscalls.c \
+$(REPO_ROOT)/Shared/Syscall/libc_stubs.c
 
 # ASM sources
 # None: a game has no vector table and no startup.s. The binary header is emitted

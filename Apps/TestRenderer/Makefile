@@ -23,8 +23,8 @@ OPT = -Og
 # streamed into RAM at init (see the asset pack section below).
 C_SOURCES =  \
 Src/main.c \
-Src/syscalls.c \
-$(REPO_ROOT)/Shared/Syscall/console_syscalls.c
+$(REPO_ROOT)/Shared/Syscall/console_syscalls.c \
+$(REPO_ROOT)/Shared/Syscall/libc_stubs.c
 
 # ASM sources
 # None: a game has no vector table and no startup.s. The binary header is emitted
