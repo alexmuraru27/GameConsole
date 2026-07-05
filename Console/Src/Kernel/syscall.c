@@ -15,6 +15,8 @@
 #include "font_utils.h"
 #include "game_loader.h"
 #include "mp_session.h"
+#include "scheduler.h"
+#include "keyboard.h"
 #include "logger.h"
 
 /*
@@ -67,6 +69,35 @@ static bool gameCanRead(const void *p, uint32_t len)
     }
     return gameCanWrite(p, len) ||
            rangeWithin(a, len, (uint32_t)&__console_flash_start, (uint32_t)&__console_flash_size);
+}
+
+/* Copy a NUL-terminated game string into a console buffer, byte by byte, and
+ * validate each byte lies in game-readable memory before it is read. A game
+ * supplies the string's start but not its length, so the console cannot trust it
+ * to terminate; this bounds the scan by `dst_size` AND refuses (returns false) the
+ * moment an address falls outside the game's memory — a game can't walk the kernel
+ * off the end of its own region. `dst` is always left NUL-terminated on success
+ * (the string is silently truncated if it is longer than the buffer). */
+static bool gameCopyStringIn(char *dst, uint32_t dst_size, const char *src)
+{
+    if (dst_size == 0U)
+    {
+        return false;
+    }
+    for (uint32_t i = 0U; i < dst_size - 1U; i++)
+    {
+        if (!gameCanRead(src + i, 1U))
+        {
+            return false;
+        }
+        dst[i] = src[i];
+        if (src[i] == '\0')
+        {
+            return true;
+        }
+    }
+    dst[dst_size - 1U] = '\0';
+    return true;
 }
 
 /* Packed pixel / palette extents the renderer will read for one sprite. */
@@ -277,6 +308,30 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
         }
         loggerGameLog("%.*s", (int)a[1], (const char *)a[0]);
         return 0;
+
+    /* ---- OS UI services ---- */
+    case SYS_OS_TEXT_INPUT:
+    {
+        /* a[0] = title (game C-string), a[1] = out buffer, a[2] = capacity. */
+        char title[48];
+        char *const buf = (char *)a[1];
+        const uint16_t max = (uint16_t)a[2];
+        if (max == 0U || !gameCanWrite(buf, max) ||
+            !gameCopyStringIn(title, sizeof(title), (const char *)a[0]))
+        {
+            LOGGER_LOG_WARN(LOGGER_KERNEL, "syscall %lu rejected: bad pointer", (unsigned long)id);
+            return false;
+        }
+        LOGGER_LOG_INFO(LOGGER_KERNEL, "osTextInput: opening keyboard modal (cap=%u)", (unsigned)max);
+        /* The keyboard blocks for as long as the player types; exempt this callback
+         * from the liveness deadline while it is open, then re-arm a fresh budget.
+         * (The IWDG is fed from inside the keyboard loop.) */
+        kernelSuspendCallbackDeadline();
+        const bool confirmed = keyboardModal(title, buf, max);
+        kernelResumeCallbackDeadline();
+        LOGGER_LOG_INFO(LOGGER_KERNEL, "osTextInput: %s", confirmed ? "confirmed" : "cancelled");
+        return (uint32_t)confirmed;
+    }
 
     /* ---- multiplayer (the game drives; mp_session.c owns the session) ---- */
     case SYS_MP_GET_ROLE:

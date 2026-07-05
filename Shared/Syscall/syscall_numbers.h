@@ -24,9 +24,14 @@
  *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes);
  *     added SYS_GET_RANDOM (hardware TRNG) and SYS_BUZZER_SET_TIMBRE (per-track
  *     PWM duty / instrument timbre).
+ * v6: added SYS_OS_TEXT_INPUT — the OS runs its on-screen keyboard modally on a
+ *     game's behalf (e.g. high-score name entry) and fills a game buffer. The
+ *     modal blocks for as long as the user types, so it exempts the calling
+ *     callback from the liveness deadline for its duration (see the kernel's
+ *     kernelSuspend/ResumeCallbackDeadline).
  */
 
-#define CONSOLE_ABI_VERSION 5
+#define CONSOLE_ABI_VERSION 6
 
 #ifndef __ASSEMBLER__
 
@@ -73,6 +78,9 @@ typedef enum
     SYS_FONT_SCALE,
 
     SYS_LOG,
+
+    /* ---- OS UI services (the console runs a modal on the game's behalf) ---- */
+    SYS_OS_TEXT_INPUT, /* run the on-screen keyboard modally; fill a game buffer */
 
     /* ---- multiplayer (ESP-NOW; the game drives the lobby, the OS owns the session) ---- */
     SYS_MP_GET_ROLE,

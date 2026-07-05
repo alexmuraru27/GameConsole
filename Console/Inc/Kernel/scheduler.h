@@ -48,4 +48,12 @@ void kernelRequestLeave(bool crashed);
  * No-op when no game callback is in flight. */
 void kernelGameDeadlineTick(uint32_t now_ms);
 
+/* Pause / resume the per-callback liveness deadline while a game callback is
+ * legitimately blocked in a kernel-side modal it requested (the osTextInput
+ * keyboard). The player drives the modal at human speed, so the 2 s budget must
+ * not fire; resume re-arms a fresh budget for whatever runs after the call.
+ * Always pair a suspend with a resume. */
+void kernelSuspendCallbackDeadline(void);
+void kernelResumeCallbackDeadline(void);
+
 #endif /* __KERNEL_SCHEDULER_H */

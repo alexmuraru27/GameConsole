@@ -156,8 +156,24 @@ void rendererResetState(void)
  * fill). RGB565. Until called, uncovered pixels keep stale buffer contents. */
 void rendererSetBackground(uint16_t color)
 {
+    rendererSetBackgroundState(true, color);
+}
+
+/* Console-only: read/restore the mutable background-fill state (color + whether
+ * enabled). A full-screen OS modal over a running game (the osTextInput keyboard)
+ * saves the game's state, paints its own backdrop, then restores it verbatim on
+ * close — games set their background once at init, so the modal must not clobber
+ * it. Not a game syscall. */
+void rendererGetBackground(bool *enabled, uint16_t *color)
+{
+    *enabled = s_bg_enabled;
+    *color = s_bg_color;
+}
+
+void rendererSetBackgroundState(bool enabled, uint16_t color)
+{
     s_bg_color = color;
-    s_bg_enabled = true;
+    s_bg_enabled = enabled;
 }
 
 /* Borrow a layer's whole sprite array (game-owned, kept alive until render).

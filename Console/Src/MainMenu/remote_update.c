@@ -425,7 +425,7 @@ void remoteServerAddrRun(void)
     char addr[80];
     downloaderGetServerAddr(addr, sizeof(addr)); /* current value, pre-fills the keyboard */
 
-    if (keyboardEnter("SERVER ADDRESS", addr, sizeof(addr), false))
+    if (keyboardModal("SERVER ADDRESS", addr, sizeof(addr)))
     {
         menuResetSurface();
         if (downloaderSetServerAddr(addr))

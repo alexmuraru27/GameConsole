@@ -250,6 +250,25 @@ uint16_t fontSize(FontSize size, uint8_t scale);            // bytes a scaled gl
 void     fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);  // scale into your buffer
 ```
 
+### OS text input (borrow the console's on-screen keyboard)
+```c
+bool osTextInput(const char *title, char *buf, uint16_t max);   // true = confirmed, false = cancelled
+```
+The OS runs its on-screen keyboard modally on your behalf and writes the typed
+string into `buf` (capacity `max`, always NUL-terminated) — high-score name entry
+for free, no keyboard to build. Pre-fill `buf` to offer a default. The call
+**blocks** while the keyboard is open (the OS paints it over your game and restores
+your screen on close, so your next `render()` just redraws as usual), and it is
+exempt from the per-callback time budget for its duration. Don't call it during an
+active multiplayer session — it stalls the per-frame radio service while open.
+```c
+char name[12] = "PLAYER";
+if (osTextInput("ENTER NAME", name, sizeof(name)))
+{
+    saveHighScore(name, score);
+}
+```
+
 ### Multiplayer (ESP-NOW; local wireless, up to 4 consoles)
 ```c
 MpRole   mpGetRole(void);                          // NONE / HOST / CLIENT

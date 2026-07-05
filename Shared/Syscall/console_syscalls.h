@@ -87,6 +87,17 @@ void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst);
  * game to make the console deref an arbitrary pointer via %s. */
 void gameLog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
+/* ---- OS UI services ---- */
+/* Pop up the console's on-screen keyboard modally and let the player type a
+ * string. Blocks (the OS runs the keyboard console-side) until the player
+ * confirms with DONE or cancels; returns true on confirm, false on cancel. `buf`
+ * (capacity `max`, NUL-terminated) receives the text and may be pre-filled to
+ * offer a default. Handy for high-score name entry. `title` labels the screen.
+ * The OS paints the keyboard over your game and restores your screen when it
+ * closes; the game's next render() redraws as usual. Not for use mid-multiplayer:
+ * it blocks the per-frame ESP-NOW service for as long as the keyboard is open. */
+bool osTextInput(const char *title, char *buf, uint16_t max);
+
 /* ---- multiplayer (ESP-NOW local wireless, up to MP_MAX_PLAYERS consoles) ----
  * The game owns the lobby UI and drives the session; the OS owns discovery, the
  * peer table, player indices, heartbeat liveness and the message mailboxes. A

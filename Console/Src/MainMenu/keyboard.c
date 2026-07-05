@@ -8,6 +8,7 @@
 #include "sysclock.h"
 #include "fonts.h"
 #include "joystick.h"
+#include "watchdog.h"
 
 /*
  * Character rows 0..5 plus a bottom action row (index 6). Letter rows (1..3)
@@ -228,7 +229,7 @@ static void drawCell(uint16_t *n, int16_t x, int16_t y, const char *text, bool s
     *n = menuDrawText(*n, &font8x8, x, y, pal, text);
 }
 
-static void render(const char *title, const char *text, uint16_t len, uint16_t caret, bool mask, bool shift, int row, int col)
+static void render(const char *title, const char *text, uint16_t len, uint16_t caret, bool shift, int row, int col)
 {
     char glyph[2] = {0, 0};
     uint16_t n = 0U;
@@ -236,12 +237,12 @@ static void render(const char *title, const char *text, uint16_t len, uint16_t c
     rendererClear();
     n = menuDrawTitle(n, title);
 
-    /* Typed text (masked or plain). */
+    /* Typed text (always shown in clear). */
     char display[96];
     uint16_t dn = 0U;
     for (uint16_t i = 0U; i < len && dn < sizeof(display) - 1U; i++)
     {
-        display[dn++] = mask ? '*' : text[i];
+        display[dn++] = text[i];
     }
     display[dn] = '\0';
     n = menuDrawText(n, &font8x8, KB_X0, KB_TEXT_Y, g_menu_pal_item_sel, display);
@@ -316,7 +317,10 @@ static void deleteChar(char *out, uint16_t *len, uint16_t *caret)
     out[*len] = '\0';
 }
 
-bool keyboardEnter(const char *title, char *out, uint16_t out_size, bool mask)
+/* The raw keyboard entry loop — private. Callers go through keyboardModal, which
+ * wraps this with the full-screen screen management (backdrop + background
+ * save/restore). Blocks until the player confirms (DONE) or cancels. */
+static bool keyboardEnter(const char *title, char *out, uint16_t out_size)
 {
     if (out == NULL || out_size == 0U)
     {
@@ -346,6 +350,12 @@ bool keyboardEnter(const char *title, char *out, uint16_t out_size, bool mask)
 
     for (;;)
     {
+        /* This loop blocks the caller (a menu, or a game via osTextInput) for as
+         * long as the player takes to type — well past the IWDG window. It is
+         * cooperative waiting, not a wedge, so feed the watchdog like the other
+         * long-running blocking loops (downloader, flasher) do. */
+        watchdogKick();
+
         const KbNav nav = kbPoll();
 
         if (nav.cancel)
@@ -422,6 +432,29 @@ bool keyboardEnter(const char *title, char *out, uint16_t out_size, bool mask)
             buzzerPlay(0U, false, s_key_notes, 1U);
         }
 
-        render(title, out, len, caret, mask, shift, row, col);
+        render(title, out, len, caret, shift, row, col);
     }
+}
+
+bool keyboardModal(const char *title, char *out, uint16_t out_size)
+{
+    /* The single public entry to the on-screen keyboard: a full-screen modal over
+     * whatever the caller had on screen — a settings menu, or a running game via
+     * osTextInput. Snapshot the renderer background, paint the standard menu
+     * backdrop behind the keys, run the keyboard, then hand the background back
+     * exactly as it was. A game sets its background once at init and never again,
+     * so the modal must leave it untouched (a menu's is already the menu backdrop,
+     * so the save/restore is a harmless identity there). */
+    bool prev_bg_enabled;
+    uint16_t prev_bg_color;
+    rendererGetBackground(&prev_bg_enabled, &prev_bg_color);
+    menuResetSurface(); /* opaque menu backdrop while the keyboard is open */
+
+    const bool confirmed = keyboardEnter(title, out, out_size);
+
+    rendererSetBackgroundState(prev_bg_enabled, prev_bg_color);
+    /* Drop the keyboard's UI layer so its sprites can't bleed into the caller's
+     * next frame; the caller (menu or game) rebuilds the screen on its next render. */
+    rendererClear();
+    return confirmed;
 }

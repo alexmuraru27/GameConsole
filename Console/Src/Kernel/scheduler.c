@@ -37,6 +37,11 @@ static uint32_t s_game_psp = 0U;
 #define GAME_CALLBACK_BUDGET_MS 2000U
 static volatile bool s_callback_running = false;
 static volatile uint32_t s_callback_deadline_ms = 0U;
+/* Set while a callback is legitimately blocked inside the kernel for longer than
+ * the budget — a modal OS service the game requested (osTextInput's on-screen
+ * keyboard), which the player drives at human speed. The deadline is paused for
+ * the duration so the game isn't abandoned as "hung" while the modal is up. */
+static volatile bool s_deadline_suspended = false;
 /* Return address (LR) installed in every invoked callback's frame — the game-side
  * _game_return trampoline that traps back here when a callback returns. */
 static uint32_t s_game_frame_return = 0U;
@@ -107,13 +112,31 @@ static void kernelInvokeGame(uint32_t callback)
  * recovery is logged once back in kernelRunGame. */
 void kernelGameDeadlineTick(uint32_t now_ms)
 {
-    if (s_callback_running && s_game_active &&
+    if (s_callback_running && s_game_active && !s_deadline_suspended &&
         (int32_t)(now_ms - s_callback_deadline_ms) >= 0)
     {
         s_callback_running = false;
         s_game_hung = true;
         kernelRequestLeave(true);
     }
+}
+
+/* Pause / resume the per-callback liveness deadline around a kernel-side modal the
+ * running game asked for (osTextInput). The keyboard blocks for as long as the
+ * player types — far beyond the 2 s budget — but that is cooperative waiting, not
+ * a runaway game, so the deadline must not fire meanwhile. Resume re-arms a fresh
+ * full budget so the time spent in the modal is not charged against whatever the
+ * game does after the call returns. Bracket every suspend with a resume. (The IWDG
+ * is fed separately from inside the keyboard's own loop.) */
+void kernelSuspendCallbackDeadline(void)
+{
+    s_deadline_suspended = true;
+}
+
+void kernelResumeCallbackDeadline(void)
+{
+    s_callback_deadline_ms = getSysTime() + GAME_CALLBACK_BUDGET_MS;
+    s_deadline_suspended = false;
 }
 
 void kernelRunGame(const GameBinaryHeader *header,

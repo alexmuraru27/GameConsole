@@ -139,6 +139,12 @@ void gameLog(const char *fmt, ...)
     (void)svcCall(SYS_LOG, (uint32_t)buf, (uint32_t)n, 0, 0);
 }
 
+/* ---- OS UI services ---- */
+bool osTextInput(const char *title, char *buf, uint16_t max)
+{
+    return (bool)svcCall(SYS_OS_TEXT_INPUT, (uint32_t)title, (uint32_t)buf, max, 0);
+}
+
 /* ---- multiplayer ---- */
 MpRole mpGetRole(void) { return (MpRole)svcCall(SYS_MP_GET_ROLE, 0, 0, 0, 0); }
 MpStatus mpHostStart(void) { return (MpStatus)svcCall(SYS_MP_HOST_START, 0, 0, 0, 0); }

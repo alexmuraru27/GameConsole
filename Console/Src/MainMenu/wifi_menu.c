@@ -189,7 +189,7 @@ void wifiMenuRun(void)
             }
             else
             {
-                have_pass = keyboardEnter("WIFI PASSWORD", pass, sizeof(pass), false);
+                have_pass = keyboardModal("WIFI PASSWORD", pass, sizeof(pass));
                 menuResetSurface();
             }
 

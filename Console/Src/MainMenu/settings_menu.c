@@ -67,7 +67,7 @@ static void playerNameRun(void)
     strncpy(name, s_console_settings.player_name, sizeof(name) - 1U); /* pre-fill current */
     name[sizeof(name) - 1U] = '\0';
 
-    if (keyboardEnter("PLAYER NAME", name, sizeof(name), false))
+    if (keyboardModal("PLAYER NAME", name, sizeof(name)))
     {
         menuResetSurface();
         strncpy(s_console_settings.player_name, name, sizeof(s_console_settings.player_name) - 1U);
