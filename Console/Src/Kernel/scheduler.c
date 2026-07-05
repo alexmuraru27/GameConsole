@@ -32,9 +32,9 @@ static uint32_t s_game_psp = 0U;
  * scheduled (each callback must return promptly; a game self-paces with short
  * delay()s, not a multi-second block in one callback), so the budget is generous
  * next to a real frame (<16 ms) or an asset-heavy init, yet still recovers in
- * human time. The timed-out game returns to the menu as "crashed". Tune here.
+ * human time. The timed-out game returns to the menu as "crashed".
+ * GAME_CALLBACK_BUDGET_MS lives in scheduler.h (shared with the SYS_DELAY cap).
  */
-#define GAME_CALLBACK_BUDGET_MS 2000U
 static volatile bool s_callback_running = false;
 static volatile uint32_t s_callback_deadline_ms = 0U;
 /* Set while a callback is legitimately blocked inside the kernel for longer than

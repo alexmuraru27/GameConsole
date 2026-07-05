@@ -35,7 +35,9 @@ void SysTick_Handler(void)
 void delay(const uint32_t sys_time_delta)
 {
     s_timing_delay = s_system_time + sys_time_delta;
-    while (s_timing_delay > s_system_time)
+    /* Wrap-safe: compare the signed difference so the wait still ends correctly when
+     * s_system_time rolls over uint32 (~49.7 days of uptime) mid-delay. */
+    while ((int32_t)(s_timing_delay - s_system_time) > 0)
     {
     };
 }

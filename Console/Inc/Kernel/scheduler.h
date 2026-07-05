@@ -42,6 +42,14 @@ bool kernelGameActive(void);
  * (true). */
 void kernelRequestLeave(bool crashed);
 
+/* Per-callback CPU-time budget (ms). A game callback (bootstrap/init/update/render)
+ * that runs longer is abandoned like a crash by kernelGameDeadlineTick — and it is
+ * the ceiling a single game delay() may block the SVC handler (see SYS_DELAY in
+ * svcDispatch): that handler shares PendSV's priority, so it must not out-wait the
+ * leave the deadline pends. Generous next to a real frame (<16 ms), yet recovers in
+ * human time. */
+#define GAME_CALLBACK_BUDGET_MS 2000U
+
 /* Liveness tick, called from SysTick (1 ms). If the game callback currently
  * executing has run past its time budget, abandon it like a crash so a runaway
  * game (e.g. an infinite loop, which faults never catch) can't wedge the console.

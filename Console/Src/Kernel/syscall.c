@@ -133,6 +133,35 @@ static bool spritesValid(const Sprite *sprites, uint16_t count)
 }
 
 /*
+ * A game's delay(), bounded and preemptible. SYS_DELAY runs in the SVC handler,
+ * which shares PendSV's (lowest) priority, so a plain delay() would out-wait the
+ * PendSV the liveness deadline pends to abandon a runaway game: the callback
+ * deadline (SysTick, higher priority) would fire and set the leave pending, but
+ * PendSV could not preempt the equal-priority handler to act on it — the console
+ * would freeze until the IWDG hard-resets it. So poll instead: a wrap-safe busy
+ * wait that bails the instant a session leave is pending (the deadline tick, a
+ * crash, or gameExit have all set PENDSVSET by then), letting the handler return so
+ * PendSV tail-chains and the game recovers gracefully. The clamp to one callback
+ * budget is an independent backstop, bounding the wait even if the deadline never
+ * fired.
+ */
+static void gameDelay(uint32_t ms)
+{
+    if (ms > GAME_CALLBACK_BUDGET_MS)
+    {
+        ms = GAME_CALLBACK_BUDGET_MS;
+    }
+    const uint32_t deadline = getSysTime() + ms;
+    while ((int32_t)(deadline - getSysTime()) > 0)
+    {
+        if ((SCB->ICSR & SCB_ICSR_PENDSVSET_Msk) != 0U)
+        {
+            break; /* a leave is pending — return so PendSV can end the session */
+        }
+    }
+}
+
+/*
  * The dispatcher is deliberately an explicit switch rather than a generated
  * table: this is the trust boundary between the console and an untrusted game,
  * so every argument cast — and (from Phase D) every pointer validation — is meant
@@ -151,7 +180,7 @@ uint32_t svcDispatch(uint32_t id, uint32_t *a)
     case SYS_GET_SYSTIME:
         return getSysTime();
     case SYS_DELAY:
-        delay(a[0]);
+        gameDelay(a[0]);
         return 0;
     case SYS_GET_DELTA_US:
         return gameLoaderGetDeltaUs();
