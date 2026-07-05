@@ -83,6 +83,7 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 - `buzzerPlay(track, data, size)`: Play sound data.
 - `buzzerPlayWithFlag(...)`: Play with callback.
 - `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`: Control playback.
+- `buzzerSetTimbre(track, duty_percent)`: Set a track's pulse duty (10–90; returns false if out of range) as an "instrument" — 50 = square, lower = thinner/reedier. Presets `BUZZER_TIMBRE_SQUARE/_PULSE/_THIN`. Sticky across plays; default square.
 
 ### Input
 The whole pad is read in one trap:
@@ -155,12 +156,13 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
   - `joystickGetState(InputState *)`: Copy the latched snapshot. This is the whole read API — there are no per-button/per-axis getters.
 
 ### Buzzer (buzzer.c/h)
-- Controls sound output for effects and music.
-- Supports multiple tracks and callback-based playback.
+- Controls sound output for effects and music. 5 tracks over one PWM voice.
 - Internal functions:
   - `buzzerInit()`: Set up timers and output pins.
   - `buzzerPlay()`, `buzzerPause()`, `buzzerResume()`, `buzzerStop()`: Playback control.
   - `buzzerPlayWithFlag()`: Play sound and trigger callback on completion.
+  - `buzzerSetTimbre()`: Set a track's pulse duty percent (10–90; rejects out-of-range) as an instrument timbre; sticky, default square.
+  - `buzzerRefreshOutput()` (static): the single arbitration point — drives the PWM from the highest track that is *audibly* playing, falling through paused/rested/muted tracks instead of silencing lower ones.
 
 ### Asset Loader (asset_loader.c/h)
 - Serves game assets (tiles, sounds, etc.) from the `.pak` bound to the running game on the SD card.

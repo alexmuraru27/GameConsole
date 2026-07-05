@@ -7,7 +7,6 @@
 #include "logger.h"
 
 #define SOUND_TRACKS 5
-#define INVALID_TRACK 255
 typedef struct
 {
     const uint16_t *notes_data; // interleaved {freq_hz, duration_ms, freq_hz, duration_ms, ...}
@@ -17,6 +16,7 @@ typedef struct
     bool *on_done_flag;         // Set to true by the ISR when the track finishes
     uint32_t note_idx;          // Index of current note being played
     uint32_t ms_counter;        // Counts milliseconds for current note
+    uint8_t duty;               // PWM duty % (timbre); sticky across plays, default square
 } TrackData;
 
 static TrackData s_track_data_queue[SOUND_TRACKS];
@@ -38,6 +38,7 @@ void buzzerInit(void)
         s_track_data_queue[track_id].on_done_flag = NULL;
         s_track_data_queue[track_id].note_idx = 0U;
         s_track_data_queue[track_id].ms_counter = 0U;
+        s_track_data_queue[track_id].duty = (uint8_t)BUZZER_TIMBRE_SQUARE;
     }
     LOGGER_LOG_INFO(LOGGER_BUZZER, "init: %u tracks", (unsigned)SOUND_TRACKS);
 }
@@ -58,33 +59,6 @@ static bool clearTrack(const uint8_t track_number)
     return false;
 }
 
-static bool isOtherTrackPlaying(const uint8_t track_number)
-{
-    for (uint8_t track_id = 0U; track_id < SOUND_TRACKS; track_id++)
-    {
-        if (s_track_data_queue[track_id].is_playing && (track_id != track_number))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static uint8_t getLastTrackPlaying()
-{
-    // Returns the last track that is found to be playing
-    // Defaults to INVALID_TRACK
-    for (uint8_t track_id = SOUND_TRACKS; track_id > 0U; track_id--)
-    {
-        if (s_track_data_queue[track_id - 1U].is_playing)
-        {
-            return track_id - 1U;
-        }
-    }
-
-    return INVALID_TRACK;
-}
-
 static void signalDone(uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
@@ -96,44 +70,59 @@ static void signalDone(uint8_t track_number)
     }
 }
 
-static void updatePWM(uint8_t track_id)
+/* Drive the single PWM channel from the right track. With one voice, the
+ * highest-numbered track wins — but only while it is *audibly* playing: a track
+ * that is paused, stopped, or sitting on a rest (freq 0) is skipped so the channel
+ * falls through to a lower track that has something to sound, instead of going
+ * silent. Muted, or nothing to play -> output off. Every state change (note
+ * advance, pause/resume, stop, mute, timbre) routes through here, so arbitration
+ * lives in exactly one place. */
+static void buzzerRefreshOutput(void)
 {
-    if (track_id < SOUND_TRACKS)
+    if (!s_muted)
     {
-        // If we ended the song
-        if (s_track_data_queue[track_id].note_idx >= s_track_data_queue[track_id].notes)
+        for (uint8_t i = SOUND_TRACKS; i > 0U; i--)
         {
-            if (s_track_data_queue[track_id].is_looped)
+            const TrackData *const t = &s_track_data_queue[i - 1U];
+            if (t->is_playing && t->note_idx < t->notes)
             {
-                // If it's looped -> reset the note index to 0
-                signalDone(track_id);
-                s_track_data_queue[track_id].note_idx = 0U;
-            }
-            else
-            {
-                // If it's not looped, just stop it
-                buzzerStop(track_id);
-                return;
-            }
-        }
-
-        s_track_data_queue[track_id].ms_counter = 0;
-
-        // highest track IDs have priority in playing
-        if (track_id == getLastTrackPlaying())
-        {
-            const uint32_t frequency_hz = s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U];
-
-            if (s_muted || frequency_hz == 0)
-            {
-                timer3Disable();
-            }
-            else
-            {
-                timer3Trigger(frequency_hz, 50U);
+                const uint16_t frequency_hz = t->notes_data[t->note_idx * 2U];
+                if (frequency_hz != 0U)
+                {
+                    timer3Trigger(frequency_hz, t->duty);
+                    return;
+                }
             }
         }
     }
+    timer3Disable();
+}
+
+/* Advance to the note the ISR just stepped onto: loop or stop at the end,
+ * otherwise reset the millisecond counter and re-arbitrate the output. */
+static void updatePWM(uint8_t track_id)
+{
+    if (track_id >= SOUND_TRACKS)
+    {
+        return;
+    }
+
+    if (s_track_data_queue[track_id].note_idx >= s_track_data_queue[track_id].notes)
+    {
+        if (s_track_data_queue[track_id].is_looped)
+        {
+            signalDone(track_id);
+            s_track_data_queue[track_id].note_idx = 0U;
+        }
+        else
+        {
+            buzzerStop(track_id); /* clears the track and refreshes the output */
+            return;
+        }
+    }
+
+    s_track_data_queue[track_id].ms_counter = 0U;
+    buzzerRefreshOutput();
 }
 
 bool buzzerPause(const uint8_t track_number)
@@ -141,10 +130,7 @@ bool buzzerPause(const uint8_t track_number)
     if (track_number < SOUND_TRACKS)
     {
         s_track_data_queue[track_number].is_playing = false;
-        if (!isOtherTrackPlaying(track_number))
-        {
-            timer3Disable();
-        }
+        buzzerRefreshOutput(); /* hand the channel to a lower track, don't go silent */
         return true;
     }
     return false;
@@ -154,12 +140,9 @@ bool buzzerStop(const uint8_t track_number)
 {
     if (track_number < SOUND_TRACKS)
     {
-        if (!isOtherTrackPlaying(track_number))
-        {
-            timer3Disable();
-        }
         signalDone(track_number);
         clearTrack(track_number);
+        buzzerRefreshOutput();
         return true;
     }
     return false;
@@ -179,9 +162,26 @@ bool buzzerResume(uint8_t track_number)
     if (track_number < SOUND_TRACKS && s_track_data_queue[track_number].notes_data != NULL)
     {
         s_track_data_queue[track_number].is_playing = true;
+        buzzerRefreshOutput(); /* reclaim the channel if it is now the top voice */
         return true;
     }
     return false;
+}
+
+bool buzzerSetTimbre(uint8_t track_number, uint8_t duty_percent)
+{
+    if (track_number >= SOUND_TRACKS ||
+        duty_percent < BUZZER_DUTY_MIN || duty_percent > BUZZER_DUTY_MAX)
+    {
+        LOGGER_LOG_WARN(LOGGER_BUZZER, "timbre rejected: track=%u duty=%u%% (want %u..%u)",
+                        (unsigned)track_number, (unsigned)duty_percent,
+                        (unsigned)BUZZER_DUTY_MIN, (unsigned)BUZZER_DUTY_MAX);
+        return false;
+    }
+    s_track_data_queue[track_number].duty = duty_percent;
+    buzzerRefreshOutput(); /* apply live if this track owns the channel */
+    LOGGER_LOG_DEBUG(LOGGER_BUZZER, "timbre track %u -> %u%% duty", (unsigned)track_number, (unsigned)duty_percent);
+    return true;
 }
 
 void buzzerInterruptHandler(void)
@@ -237,23 +237,7 @@ void buzzerSetMute(const bool muted)
 {
     LOGGER_LOG_INFO(LOGGER_BUZZER, "mute=%d", (int)muted);
     s_muted = muted;
-    if (muted)
-    {
-        timer3Disable();
-    }
-    else
-    {
-        // Restore PWM for the current note on the highest-priority active track
-        uint8_t track_id = getLastTrackPlaying();
-        if (track_id != INVALID_TRACK)
-        {
-            const uint32_t freq = s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U];
-            if (freq != 0)
-            {
-                timer3Trigger(freq, 50U);
-            }
-        }
-    }
+    buzzerRefreshOutput(); /* silences when muted, restores the top voice when unmuted */
 }
 
 bool buzzerIsMuted(void)

@@ -2,6 +2,7 @@
 #define __BUZZER_H
 #include <stdint.h>
 #include "stdbool.h"
+#include "buzzer_interface.h" /* BUZZER_DUTY_* / BUZZER_TIMBRE_* (shared with games) */
 
 // in hertz
 #define NOTE_PAUSE 0U
@@ -99,6 +100,11 @@ bool buzzerPause(uint8_t track_number);
 bool buzzerResume(uint8_t track_number);
 bool buzzerStop(uint8_t track_number);
 void buzzerStopAll();
+/* Set a track's timbre = PWM duty percent. Returns false (no change) if the track
+ * is invalid or duty is outside [BUZZER_DUTY_MIN, BUZZER_DUTY_MAX]. Sticky across
+ * plays; applies live if the track is currently sounding. Default is
+ * BUZZER_TIMBRE_SQUARE (50%). */
+bool buzzerSetTimbre(uint8_t track_number, uint8_t duty_percent);
 void buzzerSetMute(bool muted);
 bool buzzerIsMuted(void);
 

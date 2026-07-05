@@ -22,7 +22,8 @@
  *     the enum (the kernel resets the renderer when it launches a game);
  *     the 15 per-button/per-axis SYS_JOY_* calls collapsed into one
  *     SYS_INPUT_GET_STATE (batched pad snapshot with edge events + raw axes);
- *     added SYS_GET_RANDOM (hardware TRNG).
+ *     added SYS_GET_RANDOM (hardware TRNG) and SYS_BUZZER_SET_TIMBRE (per-track
+ *     PWM duty / instrument timbre).
  */
 
 #define CONSOLE_ABI_VERSION 5
@@ -46,6 +47,7 @@ typedef enum
     SYS_BUZZER_RESUME,
     SYS_BUZZER_STOP,
     SYS_BUZZER_STOP_ALL,
+    SYS_BUZZER_SET_TIMBRE, /* per-track PWM duty (instrument timbre) */
 
     SYS_INPUT_GET_STATE, /* fill an InputState: held/pressed/released + analog axes, one trap */
 
