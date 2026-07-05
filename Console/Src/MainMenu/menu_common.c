@@ -2,6 +2,7 @@
 #include "font_utils.h"
 #include "joystick.h"
 #include "sysclock.h"
+#include "Util/utils.h"
 #include <string.h>
 
 /* ------------------------------------------------------------------ *
@@ -128,14 +129,18 @@ uint16_t menuDrawFooter(uint16_t idx, const char *text)
 #define NAV_REPEAT_DELAY_MS 350U
 #define NAV_REPEAT_RATE_MS 110U
 
+/* Persistent state for menuPollNav(): rising-edge detectors for the analog-stick
+ * threshold crossings (the d-pad buttons already arrive edge-detected as .pressed),
+ * plus the two typematic auto-repeat deadlines. */
+EDGE_DETECTOR_DECLARE(s_up_edge, EDGE_RISING);
+EDGE_DETECTOR_DECLARE(s_down_edge, EDGE_RISING);
+EDGE_DETECTOR_DECLARE(s_left_edge, EDGE_RISING);
+EDGE_DETECTOR_DECLARE(s_right_edge, EDGE_RISING);
+static uint32_t s_repeat_at_v = 0U; /* up/down repeat deadline */
+static uint32_t s_repeat_at_h = 0U; /* left/right repeat deadline */
+
 MenuNav menuPollNav(void)
 {
-    static bool s_up_stick_prev = false;
-    static bool s_down_stick_prev = false;
-    static bool s_left_stick_prev = false;
-    static bool s_right_stick_prev = false;
-    static uint32_t s_repeat_at_v = 0U; /* up/down repeat deadline */
-    static uint32_t s_repeat_at_h = 0U; /* left/right repeat deadline */
     const uint32_t now = getSysTime();
 
     joystickPollFrame();
@@ -155,17 +160,19 @@ MenuNav menuPollNav(void)
     /* Fresh press edges. Button edges come from the per-button pressed flags, which
      * are latched every frame (including while a game runs), so a button still held
      * when we return to a menu does not re-fire. The stick self-centers on release,
-     * so a simple local threshold-crossing is enough and carries no stale press. */
-    bool up = in.l_up.pressed || in.r_up.pressed || (up_stick && !s_up_stick_prev);
-    bool down = in.l_down.pressed || in.r_down.pressed || (down_stick && !s_down_stick_prev);
-    bool left = in.l_left.pressed || in.r_left.pressed || (left_stick && !s_left_stick_prev);
-    bool right = in.l_right.pressed || in.r_right.pressed || (right_stick && !s_right_stick_prev);
+     * so a rising edge on its threshold crossing carries no stale press. The edge
+     * detectors are stepped once each here (unconditionally) — not inside the ||
+     * below, whose short-circuit could skip the state update. */
+    const bool up_edge = edgeUpdate(&s_up_edge, up_stick);
+    const bool down_edge = edgeUpdate(&s_down_edge, down_stick);
+    const bool left_edge = edgeUpdate(&s_left_edge, left_stick);
+    const bool right_edge = edgeUpdate(&s_right_edge, right_stick);
+    bool up = in.l_up.pressed || in.r_up.pressed || up_edge;
+    bool down = in.l_down.pressed || in.r_down.pressed || down_edge;
+    bool left = in.l_left.pressed || in.r_left.pressed || left_edge;
+    bool right = in.l_right.pressed || in.r_right.pressed || right_edge;
     const bool enter = in.special1.pressed;
     const bool back = in.special2.pressed;
-    s_up_stick_prev = up_stick;
-    s_down_stick_prev = down_stick;
-    s_left_stick_prev = left_stick;
-    s_right_stick_prev = right_stick;
 
     /* Up/down and left/right auto-repeat while held (separate deadlines so one axis'
      * repeat never resets the other); enter/back stay edge-only. */
