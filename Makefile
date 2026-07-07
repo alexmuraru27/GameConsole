@@ -43,7 +43,17 @@ esp:
 	$(MAKE) -C Esp01s all
 
 $(BUILD_DIR):
-	mkdir $@		
+	mkdir $@
+#######################################
+# compile database
+#######################################
+# Full clean rebuild under bear so every translation unit is recompiled and
+# recorded — an incremental build would skip up-to-date .o files and bear
+# would silently miss their compile commands.
+refreshcompilecommands:
+	-rm -fR $(BUILD_DIR)
+	bear -- $(MAKE) -j$(shell nproc) all
+
 #######################################
 # clean up
 #######################################
