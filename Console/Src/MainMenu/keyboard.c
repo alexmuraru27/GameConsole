@@ -70,6 +70,7 @@ typedef struct
 
 /* Left-stick / right-stick deflection (of +/-512) that counts as a press. */
 #define KB_STICK_THRESHOLD 256
+#define KB_CARET_BLINK_MS 400U /* text caret blink; distinct from the menu chevron */
 #define KB_REPEAT_DELAY_MS 350U
 #define KB_REPEAT_RATE_MS 110U
 
@@ -226,7 +227,7 @@ static void drawCell(uint16_t *n, int16_t x, int16_t y, const char *text, bool s
         /* a small underline marks the active key */
         *n = menuDrawBar(*n, x - 1, (int16_t)(y + 10), (uint16_t)(menuTextWidth(font8x8.size, text) + 2U), g_menu_pal_accent);
     }
-    *n = menuDrawText(*n, &font8x8, x, y, pal, text);
+    menuDrawText(&font8x8, x, y, pal, text);
 }
 
 static void render(const char *title, const char *text, uint16_t len, uint16_t caret, bool shift, int row, int col)
@@ -245,17 +246,17 @@ static void render(const char *title, const char *text, uint16_t len, uint16_t c
         display[dn++] = text[i];
     }
     display[dn] = '\0';
-    n = menuDrawText(n, &font8x8, KB_X0, KB_TEXT_Y, g_menu_pal_item_sel, display);
+    menuDrawText(&font8x8, KB_X0, KB_TEXT_Y, g_menu_pal_item_sel, display);
 
     /* Blinking caret at its position within the text (left pad moves it). */
-    if (((getSysTime() / 400U) & 1U) == 0U)
+    if (((getSysTime() / KB_CARET_BLINK_MS) & 1U) == 0U)
     {
         char pre[96];
         const uint16_t pn = (caret < dn) ? caret : dn;
         memcpy(pre, display, pn);
         pre[pn] = '\0';
         const int16_t cx = (int16_t)(KB_X0 + menuTextWidth(font8x8.size, pre));
-        n = menuDrawText(n, &font8x8, cx, KB_TEXT_Y, g_menu_pal_accent, "|");
+        menuDrawText(&font8x8, cx, KB_TEXT_Y, g_menu_pal_accent, "|");
     }
 
     /* Character rows. */
@@ -281,10 +282,10 @@ static void render(const char *title, const char *text, uint16_t len, uint16_t c
             n = menuDrawBar(n, KB_ACTION_X[a] - 1, (int16_t)(ay + 10),
                             (uint16_t)(menuTextWidth(font8x8.size, KB_ACTIONS[a]) + 2U), g_menu_pal_accent);
         }
-        n = menuDrawText(n, &font8x8, KB_ACTION_X[a], ay, pal, KB_ACTIONS[a]);
+        menuDrawText(&font8x8, KB_ACTION_X[a], ay, pal, KB_ACTIONS[a]);
     }
 
-    n = menuDrawFooter(n, "L: cursor   R: keys   A: type   B: cancel");
+    menuDrawFooter("L: cursor   R: keys   A: type   B: cancel");
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();

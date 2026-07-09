@@ -204,7 +204,7 @@ static void rowStatus(const DisplayRow *r, char out[4])
 
 static void renderList(int count, int selected, int top)
 {
-    const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool cursor_on = menuCursorVisible();
     uint16_t n = 0U;
 
     rendererClear();
@@ -212,7 +212,7 @@ static void renderList(int count, int selected, int top)
 
     if (count == 0)
     {
-        n = menuDrawText(n, &font8x8, 60, 110, g_menu_pal_item, "Nothing on server");
+        menuDrawText(&font8x8, 60, 110, g_menu_pal_item, "Nothing on server");
     }
     for (int i = 0; i < RU_VISIBLE_ROWS && (top + i) < count; i++)
     {
@@ -224,20 +224,20 @@ static void renderList(int count, int selected, int top)
 
         if (sel && cursor_on)
         {
-            n = menuDrawText(n, &font8x8, 42, y, g_menu_pal_accent, ">");
+            menuDrawText(&font8x8, 42, y, g_menu_pal_accent, ">");
         }
         /* Highlight a CRC mismatch (vs the last download) in the accent colour. */
         const uint16_t *label_pal = sel ? g_menu_pal_item_sel
                                         : (mismatch ? g_menu_pal_accent : g_menu_pal_item);
-        n = menuDrawText(n, &font8x8, 60, y, label_pal, e->name);
+        menuDrawText(&font8x8, 60, y, label_pal, e->name);
 
         const char *tag = s_status[row];
         const uint16_t *tag_pal = mismatch ? g_menu_pal_accent : g_menu_pal_footer;
         const int16_t tx = (int16_t)(rendererGetWidthPixels() - 60 - (int16_t)menuTextWidth(font8x8.size, tag));
-        n = menuDrawText(n, &font8x8, tx, y, tag_pal, tag);
+        menuDrawText(&font8x8, tx, y, tag_pal, tag);
     }
 
-    n = menuDrawFooter(n, "UP/DOWN   A download   B back");
+    menuDrawFooter("UP/DOWN   A download   B back");
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();
 }

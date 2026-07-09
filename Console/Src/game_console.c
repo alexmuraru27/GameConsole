@@ -15,7 +15,7 @@
 #include "timer.h"
 #include "sdio.h"
 #include "ff.h"
-#include "string.h"
+#include <string.h>
 #include "asset_loader.h"
 #include "loader.h"
 #include "i2c.h"
@@ -30,7 +30,7 @@
 #include "syscall.h"
 #include "mpu.h"
 #include "watchdog.h"
-#include "stdio.h"
+#include <stdio.h>
 
 const uint16_t s_boot_notes[] = {
     NOTE_D4, 450, NOTE_FS4, 400, NOTE_A4, 350, NOTE_D5, 300, NOTE_FS5, 250, NOTE_A5, 200,
@@ -66,15 +66,26 @@ static const uint16_t s_step_notes[] = {
     80,
 };
 
-static void beep_step(uint8_t step)
+/* Boot-progress beep cursor. Each phase calls beepNext() in bring-up order; the
+ * step index auto-advances so inserting or removing an init step can never
+ * desync the ascending scale from s_step_notes[] (it is reset at the top of
+ * gameConsoleInit). */
+static uint8_t s_boot_step;
+
+static void beepStep(uint8_t step)
 {
     if (step >= (sizeof(s_step_notes) / sizeof(uint16_t) / 2U))
     {
-        LOGGER_LOG_ERROR(LOGGER_CORE, "beep_step: step %u out of range", step);
+        LOGGER_LOG_ERROR(LOGGER_CORE, "beepStep: step %u out of range", step);
         return;
     }
     buzzerPlay(0, false, &s_step_notes[step * 2U], 1);
     delay(150);
+}
+
+static void beepNext(void)
+{
+    beepStep(s_boot_step++);
 }
 
 /* The minimal core every later phase (and the boot beeps) depends on: trace,
@@ -117,12 +128,12 @@ static void applyConsoleSettings(void)
 
 static void peripheralsInit()
 {
-    beep_step(0);
+    beepNext();
     dmaInit((uint32_t)FSMC_DATA_ADDRESS);
-    beep_step(1);
+    beepNext();
     usartInit();
     networkInit();
-    beep_step(2);
+    beepNext();
     adcInit();
     rngInit();
     LOGGER_LOG_INFO(LOGGER_CORE, "peripherals up: DMA/USART/ADC/RNG");
@@ -130,20 +141,21 @@ static void peripheralsInit()
 
 static void devicesInit()
 {
-    beep_step(3);
+    beepNext();
     ili9341Init(1U, ILI9341_WIDTH, ILI9341_HEIGHT);
-    beep_step(4);
+    beepNext();
     rendererInit();
-    beep_step(5);
+    beepNext();
     joystickInit();
-    beep_step(6);
+    beepNext();
     loaderMediaInit();
-    beep_step(7);
+    beepNext();
     LOGGER_LOG_INFO(LOGGER_CORE, "devices up: display/renderer/joystick/SD");
 }
 
 void gameConsoleInit()
 {
+    s_boot_step = 0U;
     coreInit();
     storageInit();
     applyConsoleSettings(); /* honor the persisted mute before the first beep */
@@ -151,7 +163,7 @@ void gameConsoleInit()
     peripheralsInit();
     devicesInit();
     mpuInit(); /* arm MPU confinement before any game can run */
-    beep_step(8);
+    beepNext();
     playBootSong();
     watchdogInit(); /* arm the last-resort reset backstop now that bring-up is done */
     LOGGER_LOG_INFO(LOGGER_CORE, "console ready");

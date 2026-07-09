@@ -41,6 +41,11 @@ void menuResetSurface(void)
     rendererSetBackground(MENU_COL_BG);
 }
 
+bool menuCursorVisible(void)
+{
+    return ((getSysTime() / MENU_BLINK_MS) & 1U) == 0U;
+}
+
 static uint16_t glyphAdvance(FontSize size)
 {
     return (uint16_t)(fontGlyphW(size) + 1U);
@@ -53,22 +58,21 @@ uint16_t menuTextWidth(FontSize size, const char *text)
 }
 
 /* Text is drawn straight through the renderer's console-side text path (glyph
- * expansion + scaled-glyph caching live there); only the bars below still build
- * sprites into g_menu_ui. Menu text sits at z=1 so it composites over the z=0 bars
- * on LAYER_UI. `idx` is returned unchanged — no g_menu_ui slot is consumed. The
- * single-tint colour is palette index 1 (the theme palettes are {0, c, c, c}). */
-uint16_t menuDrawText(uint16_t idx, const Font *font, int16_t x, int16_t y,
-                      const uint16_t *palette, const char *text)
+ * expansion + scaled-glyph caching live there) and consumes NO g_menu_ui slot,
+ * so these helpers take no sprite index — only the bars/gauges below build
+ * sprites into g_menu_ui. Menu text sits at z=1 so it composites over the z=0
+ * bars on LAYER_UI. The single-tint colour is palette index 1 (the theme
+ * palettes are {0, c, c, c}). */
+static void menuDrawTextScaled(const Font *font, int16_t x, int16_t y, uint8_t scale,
+                               const uint16_t *palette, const char *text)
 {
-    rendererDrawText(LAYER_UI, x, y, 1U, font->size, 1U, palette[1], text);
-    return idx;
+    rendererDrawText(LAYER_UI, x, y, 1U, font->size, scale, palette[1], text);
 }
 
-static uint16_t drawTextScaled(uint16_t idx, const Font *font, int16_t x, int16_t y,
-                               uint8_t factor, const uint16_t *palette, const char *text)
+void menuDrawText(const Font *font, int16_t x, int16_t y,
+                  const uint16_t *palette, const char *text)
 {
-    rendererDrawText(LAYER_UI, x, y, 1U, font->size, factor, palette[1], text);
-    return idx;
+    menuDrawTextScaled(font, x, y, 1U, palette, text);
 }
 
 /* A horizontal bar of `width` px, starting at x, on row y, in `palette`'s ink. */
@@ -103,6 +107,62 @@ uint16_t menuDrawGauge(uint16_t idx, int16_t x, int16_t y, uint8_t total, uint8_
     return idx;
 }
 
+int16_t menuCenterX(FontSize size, const char *text)
+{
+    const int16_t w = (int16_t)rendererGetWidthPixels();
+    return (int16_t)((w - (int16_t)menuTextWidth(size, text)) / 2);
+}
+
+void menuDrawTextCentered(const Font *font, int16_t y, const uint16_t *palette, const char *text)
+{
+    menuDrawText(font, menuCenterX(font->size, text), y, palette, text);
+}
+
+uint16_t menuDrawProgressBar(uint16_t idx, int16_t x, int16_t y, uint16_t w, uint8_t rows,
+                             uint32_t done, uint32_t total)
+{
+    const uint32_t fill = (total > 0U) ? (uint32_t)((uint64_t)w * done / total) : 0U;
+    for (uint8_t i = 0U; i < rows; i++)
+    {
+        const int16_t ry = (int16_t)(y + (int)i * MENU_BAR_H);
+        idx = menuDrawBar(idx, x, ry, w, g_menu_pal_footer); /* dim track */
+        if (fill > 0U)
+        {
+            idx = menuDrawBar(idx, x, ry, (uint16_t)fill, g_menu_pal_accent); /* accent fill */
+        }
+    }
+    return idx;
+}
+
+void menuModalInfo(const char *title, const char *line, const uint16_t *palette)
+{
+    uint16_t n = 0U;
+    rendererClear();
+    n = menuDrawTitle(n, title);
+    menuDrawTextCentered(&font8x8, 110, palette, line);
+    rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
+    rendererRender();
+}
+
+void menuModalWaitBack(const char *title, const char *line, const uint16_t *palette)
+{
+    while (true)
+    {
+        const MenuNav nav = menuPollNav();
+        if (nav.back)
+        {
+            return;
+        }
+        uint16_t n = 0U;
+        rendererClear();
+        n = menuDrawTitle(n, title);
+        menuDrawTextCentered(&font8x8, 110, palette, line);
+        menuDrawFooter("Special Button 2: back");
+        rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
+        rendererRender();
+    }
+}
+
 uint16_t menuDrawTitle(uint16_t idx, const char *text)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
@@ -110,16 +170,15 @@ uint16_t menuDrawTitle(uint16_t idx, const char *text)
     const uint16_t title_w = (uint16_t)(strlen(text) * glyph_step);
     const int16_t title_x = (int16_t)((screen_w - (int16_t)title_w) / 2);
 
-    idx = drawTextScaled(idx, &font8x8, title_x, TITLE_Y, TITLE_SCALE, g_menu_pal_title, text);
-    idx = menuDrawBar(idx, title_x, UNDERLINE_Y, title_w, g_menu_pal_accent);
-    return idx;
+    menuDrawTextScaled(&font8x8, title_x, TITLE_Y, TITLE_SCALE, g_menu_pal_title, text);
+    return menuDrawBar(idx, title_x, UNDERLINE_Y, title_w, g_menu_pal_accent);
 }
 
-uint16_t menuDrawFooter(uint16_t idx, const char *text)
+void menuDrawFooter(const char *text)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
     const int16_t fx = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, text)) / 2);
-    return menuDrawText(idx, &font5x5, fx, MENU_FOOTER_Y, g_menu_pal_footer, text);
+    menuDrawText(&font5x5, fx, MENU_FOOTER_Y, g_menu_pal_footer, text);
 }
 
 /* Right-stick deflection (of +/-512) that counts as a directional press. */

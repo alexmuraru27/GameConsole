@@ -1,6 +1,6 @@
 #ifndef __EXTERNAL_EEPROM_H
 #define __EXTERNAL_EEPROM_H
-#include "stdint.h"
+#include <stdint.h>
 
 #define EXTERNAL_EEPROM_AT24C512_PAGE_SIZE 128U
 #define EXTERNAL_EEPROM_AT24C512_ADDRESS 0x50U

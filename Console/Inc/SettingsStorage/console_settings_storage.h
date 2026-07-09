@@ -1,7 +1,7 @@
 #ifndef __CONSOLE_SETTINGS_STORAGE_H
 #define __CONSOLE_SETTINGS_STORAGE_H
-#include "stdbool.h"
-#include "stdint.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include "settings_interface.h"    /* SettingsStorageStatus */
 #include "multiplayer_interface.h" /* MP_NAME_MAX (player name length) */
 

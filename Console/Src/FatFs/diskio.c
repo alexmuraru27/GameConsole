@@ -95,7 +95,7 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
  * write can be retried. A single 512 B scratch handles any `count`. */
 static bool verifyWrite(const BYTE *buff, LBA_t sector, UINT count)
 {
-    static uint8_t s_verify[512];
+    static uint8_t s_verify[SD_BLOCK_SIZE];
     sdWaitCardReady(); /* programming must finish before reading back */
     for (UINT i = 0; i < count; i++)
     {
@@ -103,7 +103,7 @@ static bool verifyWrite(const BYTE *buff, LBA_t sector, UINT count)
         {
             return false;
         }
-        if (memcmp(s_verify, buff + ((uint32_t)i * 512U), 512U) != 0)
+        if (memcmp(s_verify, buff + ((uint32_t)i * SD_BLOCK_SIZE), SD_BLOCK_SIZE) != 0)
         {
             return false;
         }
@@ -172,11 +172,11 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
     case GET_SECTOR_COUNT:
     {
         uint32_t c = getSdSectorCount();
-        *(LBA_t *)buff = c ? c : ((getSdType() == SD_CARD_SDHC) ? 0x3B00000UL : 0x100000UL);
+        *(LBA_t *)buff = c ? c : ((getSdType() == SD_CARD_SDHC) ? SD_DEFAULT_SECTORS_SDHC : SD_DEFAULT_SECTORS_SDSC);
     }
         return RES_OK;
     case GET_SECTOR_SIZE:
-        *(WORD *)buff = 512;
+        *(WORD *)buff = SD_BLOCK_SIZE;
         return RES_OK;
     case GET_BLOCK_SIZE:
         *(DWORD *)buff = 1;

@@ -154,7 +154,7 @@ static uint8_t s_depth; /* current frame index: s_stack[s_depth] */
 
 /* Layout. */
 #define ROW_LABEL_X 60
-#define ROW_CURSOR_DX 18 /* cursor sits this far left of the label */
+#define ROW_CURSOR_DX MENU_CURSOR_DX /* cursor sits this far left of the label */
 #define ROW_RIGHT_PAD 60 /* right margin for a toggle's value column */
 
 static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
@@ -275,16 +275,16 @@ static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool sel
 
     if (selected && cursor_on)
     {
-        n = menuDrawText(n, &font8x8, (int16_t)(ROW_LABEL_X - ROW_CURSOR_DX), y, g_menu_pal_accent, ">");
+        menuDrawText(&font8x8, (int16_t)(ROW_LABEL_X - ROW_CURSOR_DX), y, g_menu_pal_accent, ">");
     }
-    n = menuDrawText(n, &font8x8, ROW_LABEL_X, y, label_pal, item->label);
+    menuDrawText(&font8x8, ROW_LABEL_X, y, label_pal, item->label);
 
     if (item->kind == SETTING_TOGGLE)
     {
         const bool on = item->get();
         const char *value = on ? "[ON]" : "[OFF]";
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, value));
-        n = menuDrawText(n, &font8x8, vx, y, on ? g_menu_pal_accent : g_menu_pal_footer, value);
+        menuDrawText(&font8x8, vx, y, on ? g_menu_pal_accent : g_menu_pal_footer, value);
     }
     else if (item->kind == SETTING_NUMBER)
     {
@@ -292,7 +292,7 @@ static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool sel
         char value[8];
         snprintf(value, sizeof(value), "%u%%", (unsigned)val);
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, value));
-        n = menuDrawText(n, &font8x8, vx, y, g_menu_pal_accent, value);
+        menuDrawText(&font8x8, vx, y, g_menu_pal_accent, value);
 
         /* Segmented gauge: one cell per step, the first `filled` lit. */
         const uint8_t total = (uint8_t)((item->num_max - item->num_min) / item->num_step + 1U);
@@ -303,7 +303,7 @@ static uint16_t drawRow(uint16_t n, const SettingNode *item, int16_t y, bool sel
     else if (item->kind == SETTING_CATEGORY || item->kind == SETTING_ACTION)
     {
         const int16_t vx = (int16_t)(screen_w - ROW_RIGHT_PAD - (int16_t)menuTextWidth(font8x8.size, ">"));
-        n = menuDrawText(n, &font8x8, vx, y, label_pal, ">");
+        menuDrawText(&font8x8, vx, y, label_pal, ">");
     }
     return n;
 }
@@ -312,7 +312,7 @@ void settingsMenuRender(void)
 {
     const NavFrame *const frame = &s_stack[s_depth];
     const SettingNode *const category = frame->node;
-    const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool cursor_on = menuCursorVisible();
     uint16_t n = 0U;
 
     rendererClear();
@@ -327,7 +327,7 @@ void settingsMenuRender(void)
     /* A slider takes left/right; everything else takes A to enter/toggle. */
     const bool number_selected = (category->child_count > 0U) &&
                                  (category->children[frame->selected].kind == SETTING_NUMBER);
-    n = menuDrawFooter(n, number_selected ? "UP/DOWN move   LEFT/RIGHT adjust   B back"
+    menuDrawFooter(number_selected ? "UP/DOWN move   LEFT/RIGHT adjust   B back"
                                           : "UP/DOWN move   A select   B back");
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);

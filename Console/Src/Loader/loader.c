@@ -4,15 +4,16 @@
 #include "sysclock.h"
 #include "logger.h"
 #include "sd_layout.h"
-#include "stdbool.h"
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-FIL s_active_file;
-FILINFO s_active_fileinfo;
-
-bool s_is_file_opened = false;
+/* The single open-game file handle + its directory entry. Internal to the loader;
+ * reached from outside only through loaderGetFile()/loaderGetFileInfo(). */
+static FIL s_active_file;
+static FILINFO s_active_fileinfo;
+static bool s_is_file_opened = false;
 
 /* Mounted FatFs work area for the SD volume, plus the debounced card-detect
  * state. The card-detect line can bounce while a card is being seated, so a
@@ -104,39 +105,71 @@ static bool isBinaryFile(const char *filename)
     return false;
 }
 
-bool loaderIsFileOpened()
+bool loaderIsFileOpened(void)
 {
     return s_is_file_opened;
 }
 
-uint32_t loaderGetBinaryFilesNumberInDirectory(void)
+/* Walk Games/, skipping hidden/system/sub-directory entries, and return the
+ * FILINFO of the `index`-th .bin file (0-based) in *out. FR_OK if found; FR_NO_FILE
+ * if there are fewer than index+1 binaries; or the FatFs error that ended the walk.
+ * The one place the "scan Games/, filter .bin, act on the Nth match" walk lives. */
+static FRESULT findNthBinary(uint32_t index, FILINFO *out)
 {
-    FRESULT res;
     DIR dir;
     FILINFO finfo;
-    uint32_t file_count = 0U;
-
-    res = f_opendir(&dir, SD_DIR_GAMES);
+    FRESULT res = f_opendir(&dir, SD_DIR_GAMES);
     if (res != FR_OK)
     {
-        return 0U;
+        return res;
     }
 
-    while (1)
+    uint32_t match = 0U;
+    for (;;)
     {
         res = f_readdir(&dir, &finfo);
-
-        if (res != FR_OK || finfo.fname[0U] == 0U)
+        if (res != FR_OK)
         {
             break;
         }
-
+        if (finfo.fname[0U] == 0U)
+        {
+            res = FR_NO_FILE;
+            break;
+        }
         if (finfo.fattrib & (AM_HID | AM_SYS | AM_DIR))
         {
             continue;
         }
-
         if (isBinaryFile(finfo.fname))
+        {
+            if (match == index)
+            {
+                *out = finfo;
+                res = FR_OK;
+                break;
+            }
+            match++;
+        }
+    }
+
+    f_closedir(&dir);
+    return res;
+}
+
+uint32_t loaderGetBinaryFilesNumberInDirectory(void)
+{
+    DIR dir;
+    FILINFO finfo;
+    if (f_opendir(&dir, SD_DIR_GAMES) != FR_OK)
+    {
+        return 0U;
+    }
+
+    uint32_t file_count = 0U;
+    while (f_readdir(&dir, &finfo) == FR_OK && finfo.fname[0U] != 0U)
+    {
+        if ((finfo.fattrib & (AM_HID | AM_SYS | AM_DIR)) == 0U && isBinaryFile(finfo.fname))
         {
             file_count++;
         }
@@ -146,7 +179,7 @@ uint32_t loaderGetBinaryFilesNumberInDirectory(void)
     return file_count;
 }
 
-FIL *loaderGetFile()
+FIL *loaderGetFile(void)
 {
     if (s_is_file_opened)
     {
@@ -155,7 +188,7 @@ FIL *loaderGetFile()
     return NULL;
 }
 
-FILINFO *loaderGetFileInfo()
+FILINFO *loaderGetFileInfo(void)
 {
     if (s_is_file_opened)
     {
@@ -164,7 +197,7 @@ FILINFO *loaderGetFileInfo()
     return NULL;
 }
 
-FRESULT loaderCloseFile()
+FRESULT loaderCloseFile(void)
 {
     s_is_file_opened = false;
     return f_close(&s_active_file);
@@ -172,66 +205,27 @@ FRESULT loaderCloseFile()
 
 FRESULT loaderOpenFile(const uint32_t binary_index)
 {
-    FRESULT res;
-    DIR dir;
     FILINFO finfo;
-    uint32_t binary_file_index = 0U;
-
-    res = f_opendir(&dir, SD_DIR_GAMES);
+    FRESULT res = findNthBinary(binary_index, &finfo);
     if (res != FR_OK)
     {
         return res;
     }
 
-    while (1)
+    /* f_readdir gives the bare name; open it under Games/. */
+    char path[FF_LFN_BUF + sizeof(SD_DIR_GAMES) + 1U];
+    snprintf(path, sizeof(path), "%s/%s", SD_DIR_GAMES, finfo.fname);
+    res = f_open(&s_active_file, path, FA_READ);
+    s_active_fileinfo = finfo;
+    if (res == FR_OK)
     {
-        res = f_readdir(&dir, &finfo);
-
-        if (res != FR_OK)
-        {
-            f_closedir(&dir);
-            return res;
-        }
-
-        if (finfo.fname[0U] == 0U)
-        {
-            f_closedir(&dir);
-            return FR_NO_FILE;
-        }
-
-        if (finfo.fattrib & (AM_HID | AM_SYS | AM_DIR))
-        {
-            continue;
-        }
-
-        if (isBinaryFile(finfo.fname))
-        {
-            if (binary_file_index == binary_index)
-            {
-                /* f_readdir gives the bare name; open it under Games/. */
-                char path[FF_LFN_BUF + sizeof(SD_DIR_GAMES) + 1U];
-                snprintf(path, sizeof(path), "%s/%s", SD_DIR_GAMES, finfo.fname);
-                res = f_open(&s_active_file, path, FA_READ);
-                s_active_fileinfo = finfo;
-                if (res == FR_OK)
-                {
-                    s_is_file_opened = true;
-                }
-                f_closedir(&dir);
-                return res;
-            }
-            binary_file_index++;
-        }
+        s_is_file_opened = true;
     }
+    return res;
 }
 
 FRESULT loaderGetFilenameByIndex(const uint32_t binary_index, char *const filename_out, uint32_t *const filename_length)
 {
-    FRESULT res;
-    DIR dir;
-    FILINFO finfo;
-    uint32_t binary_file_index = 0U;
-
     if (!filename_out || !filename_length)
     {
         return FR_INVALID_PARAMETER;
@@ -241,48 +235,17 @@ FRESULT loaderGetFilenameByIndex(const uint32_t binary_index, char *const filena
     filename_out[0] = '\0';
     *filename_length = 0U;
 
-    res = f_opendir(&dir, SD_DIR_GAMES);
+    FILINFO finfo;
+    FRESULT res = findNthBinary(binary_index, &finfo);
     if (res != FR_OK)
     {
         return res;
     }
 
-    while (1)
-    {
-        res = f_readdir(&dir, &finfo);
-
-        if (res != FR_OK)
-        {
-            f_closedir(&dir);
-            return res;
-        }
-
-        if (finfo.fname[0U] == 0U)
-        {
-            f_closedir(&dir);
-            return FR_NO_FILE;
-        }
-
-        if (finfo.fattrib & (AM_HID | AM_SYS | AM_DIR))
-        {
-            continue;
-        }
-
-        if (isBinaryFile(finfo.fname))
-        {
-            if (binary_file_index == binary_index)
-            {
-                uint32_t actual_length = strlen(finfo.fname);
-                strncpy(filename_out, finfo.fname, FF_LFN_BUF - 1U);
-                filename_out[FF_LFN_BUF - 1U] = '\0';
-                *filename_length = actual_length;
-
-                f_closedir(&dir);
-                return FR_OK;
-            }
-            binary_file_index++;
-        }
-    }
+    strncpy(filename_out, finfo.fname, FF_LFN_BUF - 1U);
+    filename_out[FF_LFN_BUF - 1U] = '\0';
+    *filename_length = (uint32_t)strlen(finfo.fname);
+    return FR_OK;
 }
 
 uint32_t loaderGetMaxFilenameSize()

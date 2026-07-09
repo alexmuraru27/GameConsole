@@ -1,12 +1,13 @@
 #include "i2c.h"
 #include <stm32f407xx.h>
-#include "stddef.h"
+#include <stddef.h>
 #include "gpio.h"
+#include "sysclock.h"
 #include "logger.h"
 
-#define I2C_CCR_VALUE 0x23U   // Calculated for 400kHz with 42MHz APB1
-#define I2C_TRISE_VALUE 14U   // Rise time for fast mode
-#define I2C_APB1_FREQ_MHZ 42U // APB1 frequency in MHz
+#define I2C_CCR_VALUE 0x23U                     // Calculated for 400kHz with 42MHz APB1
+#define I2C_TRISE_VALUE 14U                     // Rise time for fast mode
+#define I2C_APB1_FREQ_MHZ (PCLK1_HZ / 1000000U) // APB1 (PCLK1) frequency in MHz
 
 #define I2C_TIMEOUT_COUNT 1000000U
 

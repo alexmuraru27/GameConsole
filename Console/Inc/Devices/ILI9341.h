@@ -27,8 +27,6 @@
 #define ILI9341_GREENYELLOW 0xAFE5
 #define ILI9341_PINK 0xFC18
 
-#define RGB2COLOR(r, g, b) (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3))
-
 void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height);
 void ili9341FillScreen(uint16_t color);
 void ili9341DrawScanlines(uint8_t lines, uint16_t lines_offset, uint16_t array_size, const uint16_t *data);

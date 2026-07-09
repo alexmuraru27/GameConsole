@@ -8,6 +8,7 @@
 #include "buzzer.h"
 #include "fonts.h"
 #include "downloader.h"
+#include "logger.h"
 
 /* Progress-bar geometry. */
 #define BAR_X 40
@@ -20,38 +21,25 @@ static const uint16_t s_fail_notes[] = {NOTE_A4, 120U, NOTE_E4, 200U};
 void flashUiScreen(const char *title, const char *line, const uint16_t *line_pal,
                    bool show_bar, uint32_t done, uint32_t total, const char *footer)
 {
-    const int16_t screen_w = (int16_t)rendererGetWidthPixels();
     uint16_t n = 0U;
 
     rendererClear();
     n = menuDrawTitle(n, title);
-
-    const int16_t lx = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, line)) / 2);
-    n = menuDrawText(n, &font8x8, lx, 96, line_pal, line);
+    menuDrawTextCentered(&font8x8, 96, line_pal, line);
 
     if (show_bar)
     {
-        const uint32_t fill = (total > 0U) ? (uint32_t)((uint64_t)BAR_W * done / total) : 0U;
-        for (int i = 0; i < BAR_ROWS; i++)
-        {
-            const int16_t y = (int16_t)(BAR_Y + i * MENU_BAR_H);
-            n = menuDrawBar(n, BAR_X, y, BAR_W, g_menu_pal_footer); /* track */
-            if (fill > 0U)
-            {
-                n = menuDrawBar(n, BAR_X, y, (uint16_t)fill, g_menu_pal_accent); /* fill */
-            }
-        }
+        n = menuDrawProgressBar(n, BAR_X, BAR_Y, BAR_W, BAR_ROWS, done, total);
 
         char pct[8];
         const uint32_t percent = (total > 0U) ? (done * 100U / total) : 0U;
         snprintf(pct, sizeof(pct), "%lu%%", (unsigned long)percent);
-        const int16_t px = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, pct)) / 2);
-        n = menuDrawText(n, &font8x8, px, (int16_t)(BAR_Y + BAR_ROWS * MENU_BAR_H + 8), g_menu_pal_item_sel, pct);
+        menuDrawTextCentered(&font8x8, (int16_t)(BAR_Y + BAR_ROWS * MENU_BAR_H + 8), g_menu_pal_item_sel, pct);
     }
 
     if (footer != NULL)
     {
-        n = menuDrawFooter(n, footer);
+        menuDrawFooter(footer);
     }
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
@@ -65,7 +53,6 @@ bool flashUiConfirmMismatch(const char *title, uint32_t have, uint32_t want)
              (unsigned long)have, (unsigned long)want);
     buzzerPlay(0U, false, s_fail_notes, 2U);
 
-    const int16_t screen_w = (int16_t)rendererGetWidthPixels();
     while (true)
     {
         const MenuNav nav = menuPollNav();
@@ -81,12 +68,9 @@ bool flashUiConfirmMismatch(const char *title, uint32_t have, uint32_t want)
         uint16_t n = 0U;
         rendererClear();
         n = menuDrawTitle(n, title);
-        const char *warn = "Image CRC mismatch";
-        const int16_t wx = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, warn)) / 2);
-        n = menuDrawText(n, &font8x8, wx, 84, g_menu_pal_alert, warn);
-        const int16_t dx = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, detail)) / 2);
-        n = menuDrawText(n, &font8x8, dx, 108, g_menu_pal_footer, detail);
-        n = menuDrawFooter(n, "A: flash anyway   B: cancel");
+        menuDrawTextCentered(&font8x8, 84, g_menu_pal_alert, "Image CRC mismatch");
+        menuDrawTextCentered(&font8x8, 108, g_menu_pal_footer, detail);
+        menuDrawFooter("A: flash anyway   B: cancel");
         rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
         rendererRender();
     }
@@ -94,15 +78,35 @@ bool flashUiConfirmMismatch(const char *title, uint32_t have, uint32_t want)
 
 void flashUiWaitBack(const char *title, const char *line, const uint16_t *line_pal)
 {
-    while (true)
+    menuModalWaitBack(title, line, line_pal);
+}
+
+void flashUiFail(const char *title, const char *msg)
+{
+    buzzerPlay(0U, false, s_fail_notes, 2U);
+    flashUiWaitBack(title, msg, g_menu_pal_alert);
+}
+
+bool flashUiPreflashConfirm(const char *title, const char *basename, uint32_t have_crc)
+{
+    uint32_t want_crc = 0U;
+    if (!flashUiRecordedCrc(basename, &want_crc))
     {
-        const MenuNav nav = menuPollNav();
-        if (nav.back)
-        {
-            return;
-        }
-        flashUiScreen(title, line, line_pal, false, 0U, 0U, "Special Button 2: back");
+        /* No download record (e.g. hand-copied onto the card): no reference CRC.
+         * Proceed — the downstream flow still verifies the transfer — but flag it. */
+        LOGGER_LOG_WARN(LOGGER_FLASHER, "no CRC record for '%s'; proceeding without pre-verify", basename);
+        return true;
     }
+    if (have_crc != want_crc)
+    {
+        LOGGER_LOG_WARN(LOGGER_FLASHER, "pre-flash CRC mismatch on '%s': have %08lX want %08lX (asking user)",
+                        basename, (unsigned long)have_crc, (unsigned long)want_crc);
+        const bool proceed = flashUiConfirmMismatch(title, have_crc, want_crc);
+        LOGGER_LOG_INFO(LOGGER_FLASHER, "user chose to %s", proceed ? "flash anyway" : "cancel");
+        return proceed;
+    }
+    LOGGER_LOG_INFO(LOGGER_FLASHER, "pre-flash CRC ok (%08lX)", (unsigned long)want_crc);
+    return true;
 }
 
 bool flashUiRecordedCrc(const char *basename, uint32_t *crc)

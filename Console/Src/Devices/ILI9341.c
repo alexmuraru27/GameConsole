@@ -151,6 +151,47 @@ void ili9341FillScreen(uint16_t color)
     }
 }
 
+/* One panel-config command: its register plus `len` data bytes. The init sequence
+ * as a readable table (register + payload), so it can be audited against the
+ * datasheet without wading through per-command boilerplate. Longest payload is the
+ * 15-byte gamma curves. */
+typedef struct
+{
+    uint8_t cmd;
+    uint8_t len;
+    uint8_t data[15];
+} Ili9341InitCmd;
+
+static const Ili9341InitCmd s_init_seq[] = {
+    {ILI9341_PWCTRA, 5, {0x39, 0x2C, 0x00, 0x34, 0x02}},
+    {ILI9341_PWCTRB, 3, {0x00, 0xC1, 0x30}},
+    {ILI9341_DRIVERTIMINGCTR_A, 3, {0x85, 0x00, 0x78}},
+    {ILI9341_DRIVERTIMINGCTR_B, 2, {0x00, 0x00}},
+    {ILI9341_PWRON_SEQ_CTR, 4, {0x64, 0x03, 0x12, 0x81}},
+    {ILI9341_PUMP_RATIO, 1, {0x20}},
+    {ILI9341_PWCTR1, 1, {0x23}},
+    {ILI9341_PWCTR2, 1, {0x10}},
+    {ILI9341_VMCTR1, 2, {0x3E, 0x28}},
+    {ILI9341_VMCTR2, 1, {0x86}},
+    {ILI9341_MADCTL, 1, {0x48}},
+    {ILI9341_PIXFMT, 1, {0x55}}, /* 16-bit RGB565 */
+    {ILI9341_FRMCTR1, 2, {0x00, 0x18}},
+    {ILI9341_DFUNCTR, 3, {0x08, 0x82, 0x27}},
+    {ILI9341_3G, 1, {0x00}}, /* 3-Gamma control: disabled */
+    {ILI9341_GAMMASET, 1, {0x01}},
+    {ILI9341_GMCTRP1, 15, {0x0F, 0x31, 0x2B, 0x0C, 0x0E, 0x08, 0x4E, 0xF1, 0x37, 0x07, 0x10, 0x03, 0x0E, 0x09, 0x00}},
+    {ILI9341_GMCTRN1, 15, {0x00, 0x0E, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1, 0x48, 0x08, 0x0F, 0x0C, 0x31, 0x36, 0x0F}},
+};
+
+static void ili9341SendInitSeq(const Ili9341InitCmd *seq, uint32_t count)
+{
+    for (uint32_t i = 0U; i < count; i++)
+    {
+        ili9341WriteCommand(seq[i].cmd);
+        ili9341WriteDataBuffer(seq[i].data, seq[i].len);
+    }
+}
+
 void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height)
 {
     fsmcInit();
@@ -161,98 +202,7 @@ void ili9341Init(uint8_t rotation, uint16_t window_width, uint16_t window_height
     ili9341WriteCommand(0x01);
     delay(5U);
 
-    {
-        ili9341WriteCommand(ILI9341_PWCTRA);
-        const uint8_t data[] = {0x39, 0x2C, 0x00, 0x34, 0x02};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PWCTRB);
-        const uint8_t data[] = {0x00, 0xC1, 0x30};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_DRIVERTIMINGCTR_A);
-        const uint8_t data[] = {0x85, 0x00, 0x78};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_DRIVERTIMINGCTR_B);
-        const uint8_t data[] = {0x00, 0x00};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PWRON_SEQ_CTR);
-        const uint8_t data[] = {0x64, 0x03, 0x12, 0x81};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PUMP_RATIO);
-        const uint8_t data[] = {0x20};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PWCTR1);
-        const uint8_t data[] = {0x23};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PWCTR2);
-        const uint8_t data[] = {0x10};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_VMCTR1);
-        const uint8_t data[] = {0x3E, 0x28};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_VMCTR2);
-        const uint8_t data[] = {0x86};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_MADCTL);
-        const uint8_t data[] = {0x48};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_PIXFMT);
-        const uint8_t data[] = {0x55}; // 16-bit RGB565
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_FRMCTR1);
-        const uint8_t data[] = {0x00, 0x18};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_DFUNCTR);
-        const uint8_t data[] = {0x08, 0x82, 0x27};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_3G);
-        const uint8_t data[] = {0x00};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_GAMMASET);
-        const uint8_t data[] = {0x01};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_GMCTRP1);
-        const uint8_t data[] = {0x0F, 0x31, 0x2B, 0x0C, 0x0E, 0x08, 0x4E, 0xF1,
-                                0x37, 0x07, 0x10, 0x03, 0x0E, 0x09, 0x00};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
-    {
-        ili9341WriteCommand(ILI9341_GMCTRN1);
-        const uint8_t data[] = {0x00, 0x0E, 0x14, 0x03, 0x11, 0x07, 0x31, 0xC1,
-                                0x48, 0x08, 0x0F, 0x0C, 0x31, 0x36, 0x0F};
-        ili9341WriteDataBuffer(data, sizeof(data));
-    }
+    ili9341SendInitSeq(s_init_seq, sizeof(s_init_seq) / sizeof(s_init_seq[0]));
 
     delay(5U);
     ili9341WriteCommand(ILI9341_SLPOUT);

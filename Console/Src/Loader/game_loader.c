@@ -169,43 +169,91 @@ static void bindGameSettings(void)
     settingsStorageBindGame(finfo->fname);
 }
 
-uint8_t gameLoaderLoadGame(uint8_t binary_index)
+/* Read the 32-byte header from the open game file and validate its magic + ABI
+ * version, filling s_game_header and setting s_is_game_header_valid on success.
+ * Returns FR_OK, or an error code (a FatFs FRESULT or GAME_LOADER_RET_ERR) for the
+ * caller to close the file and propagate. */
+static uint8_t readAndValidateHeader(void)
 {
-    FRESULT res;
-    s_is_game_header_valid = false;
-    s_frame_timing_started = false; /* fresh frame-delta baseline for this game */
-
-    LOGGER_LOG_INFO(LOGGER_LOADER, "loading game index %u", binary_index);
-
-    res = loaderOpenFile(binary_index);
-    if (res != FR_OK)
-    {
-        LOGGER_LOG_ERROR(LOGGER_LOADER, "open game %u failed (%d)", binary_index, res);
-        return res;
-    }
-
     UINT header_bytes_read = 0U;
-    res = f_read(loaderGetFile(), &s_game_header, sizeof(GameBinaryHeader), &header_bytes_read);
+    FRESULT res = f_read(loaderGetFile(), &s_game_header, sizeof(GameBinaryHeader), &header_bytes_read);
     if (res != FR_OK || header_bytes_read != sizeof(GameBinaryHeader))
     {
-        loaderCloseFile();
-        return (res != FR_OK) ? res : (uint8_t)FR_INT_ERR;
+        return (res != FR_OK) ? (uint8_t)res : (uint8_t)FR_INT_ERR;
     }
 
     if (s_game_header.magic != GAME_BINARY_MAGIC)
     {
         LOGGER_LOG_ERROR(LOGGER_LOADER, "bad game magic 0x%08lX", (unsigned long)s_game_header.magic);
-        loaderCloseFile();
         return GAME_LOADER_RET_ERR;
     }
     if (s_game_header.abi_version != CONSOLE_ABI_VERSION)
     {
         LOGGER_LOG_ERROR(LOGGER_LOADER, "game ABI v%lu != console ABI v%u",
                          (unsigned long)s_game_header.abi_version, (unsigned)CONSOLE_ABI_VERSION);
-        loaderCloseFile();
         return GAME_LOADER_RET_ERR;
     }
     s_is_game_header_valid = true;
+    return FR_OK;
+}
+
+/* Tear down after the game returns or crashes: drop any multiplayer session, stop
+ * audio, clear the screen, detect + persist a crash, and release the pak / settings
+ * / file bindings. Returns true if the game crashed. Every path is idempotent so a
+ * clean exit and a crash both leave the console in the same known state. */
+static bool finalizeGameExit(void)
+{
+    /* A game may have opened a multiplayer session; tear it down unconditionally so
+     * a clean exit OR a crash can never leave the ESP-NOW link or a peer session up
+     * for the next game. Idempotent when no session was active. */
+    mpSessionStop();
+    buzzerStopAll();
+    rendererClear();
+
+    const bool crashed = kernelGameCrashed();
+    if (crashed)
+    {
+        /* A crash with no CPU fault captured is a hang the liveness deadline caught. */
+        if (crashReportLast()->kind == CRASH_NONE)
+        {
+            crashReportMarkHang();
+        }
+        char line[256]; /* base line is ~170 chars before the CFSR flag names */
+        crashReportFormatLine(line, sizeof(line));
+        loaderAppendCrashLog(line); /* persist to SD for offline decode */
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "game crashed; recovered to console");
+    }
+    else
+    {
+        LOGGER_LOG_INFO(LOGGER_LOADER, "game returned to console");
+    }
+
+    settingsStorageUnbindGame();
+    assetLoaderClosePak();
+    loaderCloseFile();
+    return crashed;
+}
+
+uint8_t gameLoaderLoadGame(uint8_t binary_index)
+{
+    s_is_game_header_valid = false;
+    s_frame_timing_started = false; /* fresh frame-delta baseline for this game */
+
+    LOGGER_LOG_INFO(LOGGER_LOADER, "loading game index %u", binary_index);
+
+    FRESULT res = loaderOpenFile(binary_index);
+    if (res != FR_OK)
+    {
+        LOGGER_LOG_ERROR(LOGGER_LOADER, "open game %u failed (%d)", binary_index, res);
+        return res;
+    }
+
+    const uint8_t hdr = readAndValidateHeader();
+    if (hdr != FR_OK)
+    {
+        loaderCloseFile();
+        return hdr;
+    }
 
     res = loadImageToGameRam(loaderGetFile());
     if (res != FR_OK)
@@ -243,38 +291,10 @@ uint8_t gameLoaderLoadGame(uint8_t binary_index)
      * exits cleanly or crashes — either way the console resumes privileged on the MSP. */
     kernelRunGame(&s_game_header, gameRuntimeCollect, gameRuntimeFlush);
 
-    /* A game may have opened a multiplayer session; tear it down unconditionally so
-     * a clean exit OR a crash can never leave the ESP-NOW link or a peer session up
-     * for the next game. Idempotent when no session was active. */
-    mpSessionStop();
-    buzzerStopAll();
-    rendererClear();
-
-    const bool crashed = kernelGameCrashed();
-    if (crashed)
-    {
-        /* A crash with no CPU fault captured is a hang the liveness deadline caught. */
-        if (crashReportLast()->kind == CRASH_NONE)
-        {
-            crashReportMarkHang();
-        }
-        char line[256]; /* base line is ~170 chars before the CFSR flag names */
-        crashReportFormatLine(line, sizeof(line));
-        loaderAppendCrashLog(line); /* persist to SD for offline decode */
-        LOGGER_LOG_ERROR(LOGGER_LOADER, "game crashed; recovered to console");
-    }
-    else
-    {
-        LOGGER_LOG_INFO(LOGGER_LOADER, "game returned to console");
-    }
-
-    settingsStorageUnbindGame();
-    assetLoaderClosePak();
-    loaderCloseFile();
-    return crashed ? GAME_LOADER_RET_CRASHED : GAME_LOADER_RET_OK;
+    return finalizeGameExit() ? GAME_LOADER_RET_CRASHED : GAME_LOADER_RET_OK;
 }
 
-uint8_t gameLoaderCloseGame()
+uint8_t gameLoaderCloseGame(void)
 {
     return loaderCloseFile();
 }

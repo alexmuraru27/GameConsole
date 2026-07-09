@@ -1,16 +1,16 @@
 #ifndef __LOADER_H
 #define __LOADER_H
-#include "stdint.h"
+#include <stdint.h>
 #include "ff.h"
-#include "stdbool.h"
+#include <stdbool.h>
 
 FRESULT loaderOpenFile(uint32_t binary_index);
-FIL *loaderGetFile();
-FILINFO *loaderGetFileInfo();
-FRESULT loaderCloseFile();
-bool loaderIsFileOpened();
+FIL *loaderGetFile(void);
+FILINFO *loaderGetFileInfo(void);
+FRESULT loaderCloseFile(void);
+bool loaderIsFileOpened(void);
 uint32_t loaderGetMaxFilenameSize(void);
-uint32_t loaderGetBinaryFilesNumberInDirectory();
+uint32_t loaderGetBinaryFilesNumberInDirectory(void);
 FRESULT loaderGetFilenameByIndex(uint32_t binary_index, char *filename_out, uint32_t *filename_length);
 
 /* Delete game #binary_index: removes Games/<name>.bin and, if present, its paired

@@ -26,6 +26,16 @@ bool flashUiConfirmMismatch(const char *title, uint32_t have, uint32_t want);
 /* Render `line` under `title` and block until Special Button 2 is pressed. */
 void flashUiWaitBack(const char *title, const char *line, const uint16_t *line_pal);
 
+/* Failure path shared by both flash flows: play the failure tone, then show `msg`
+ * in the alert colour and wait for Special Button 2. */
+void flashUiFail(const char *title, const char *msg);
+
+/* Pre-flash CRC gate. Compares `have_crc` (the on-card image's CRC) with the CRC
+ * recorded for `basename` when it was downloaded: no record -> proceed (logged);
+ * match -> proceed; mismatch -> warn and ask via flashUiConfirmMismatch. Returns
+ * true if the caller should go ahead with the flash/commit. */
+bool flashUiPreflashConfirm(const char *title, const char *basename, uint32_t have_crc);
+
 /* CRC-32 recorded for a firmware file when it was last downloaded. The local
  * download manifest (downloaded.csv) keys on the remote path (e.g. "Firmware/Console.bin"),
  * so match by `basename` against our SD filename. Returns true and sets *crc if a

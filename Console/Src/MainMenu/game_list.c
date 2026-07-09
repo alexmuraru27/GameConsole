@@ -225,7 +225,7 @@ static uint32_t firstVisibleRow(void)
 void gameListRender(void)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
-    const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool cursor_on = menuCursorVisible();
     uint16_t n = 0U;
 
     rendererClear();
@@ -236,12 +236,12 @@ void gameListRender(void)
     {
         const char *q = "DELETE THIS GAME?";
         const int16_t qx = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, q)) / 2);
-        n = menuDrawText(n, &font8x8, qx, 104, g_menu_pal_alert, q);
+        menuDrawText(&font8x8, qx, 104, g_menu_pal_alert, q);
 
         const int16_t nx = (int16_t)((screen_w - (int16_t)menuTextWidth(font8x8.size, s_names[s_selected])) / 2);
-        n = menuDrawText(n, &font8x8, nx, 132, g_menu_pal_item_sel, s_names[s_selected]);
+        menuDrawText(&font8x8, nx, 132, g_menu_pal_item_sel, s_names[s_selected]);
 
-        n = menuDrawFooter(n, "A delete   B cancel");
+        menuDrawFooter("A delete   B cancel");
         rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
         rendererRender();
         return;
@@ -256,12 +256,12 @@ void gameListRender(void)
             char line1[GL_NAME_CHARS + 12U];
             snprintf(line1, sizeof(line1), "%s crashed", s_crash_name);
             const int16_t x1 = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, line1)) / 2);
-            n = menuDrawText(n, &font5x5, x1, 60, g_menu_pal_alert, line1);
+            menuDrawText(&font5x5, x1, 60, g_menu_pal_alert, line1);
 
             char line2[48];
             crashReportFormatBanner(line2, sizeof(line2));
             const int16_t x2 = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, line2)) / 2);
-            n = menuDrawText(n, &font5x5, x2, 72, g_menu_pal_accent, line2);
+            menuDrawText(&font5x5, x2, 72, g_menu_pal_accent, line2);
         }
         else
         {
@@ -273,7 +273,7 @@ void gameListRender(void)
     {
         const char *msg = "No games on the SD card";
         const int16_t x = (int16_t)((screen_w - (int16_t)menuTextWidth(font5x5.size, msg)) / 2);
-        n = menuDrawText(n, &font5x5, x, 120, g_menu_pal_empty, msg);
+        menuDrawText(&font5x5, x, 120, g_menu_pal_empty, msg);
     }
     else
     {
@@ -290,16 +290,16 @@ void gameListRender(void)
 
             if (selected && cursor_on)
             {
-                n = menuDrawText(n, &font8x8, (int16_t)(name_x - 18), y, g_menu_pal_accent, ">");
+                menuDrawText(&font8x8, (int16_t)(name_x - MENU_CURSOR_DX), y, g_menu_pal_accent, ">");
             }
-            n = menuDrawText(n, &font8x8, name_x, y,
+            menuDrawText(&font8x8, name_x, y,
                              selected ? g_menu_pal_item_sel : g_menu_pal_item, s_names[i]);
         }
     }
 
     const char *footer = (s_num_games == 0U) ? "insert an SD card with .bin games"
                                              : "UP/DOWN browse   A play   HOLD A delete   B back";
-    n = menuDrawFooter(n, footer);
+    menuDrawFooter(footer);
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();

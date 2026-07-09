@@ -42,13 +42,43 @@ void fontGet(uint8_t ch, FontSize size, const uint8_t **pixels)
 /*  Scaled-glyph size and the scaler itself.                          */
 /* ------------------------------------------------------------------ */
 
+/* Glyph bitmaps are 2 bits/pixel, packed MSB-first, 4 pixels per byte: column 0
+ * lives in bits 7-6, column 3 in bits 1-0. Slot 0 is transparent. */
+#define FONT_BPP             2U
+#define FONT_PIXELS_PER_BYTE 4U /* 8 / FONT_BPP */
+#define FONT_SLOT_MASK       3U /* (1 << FONT_BPP) - 1 */
+
+/* Bytes needed for one row of `w` pixels at FONT_BPP. */
+static inline uint8_t fontRowStride(uint8_t w)
+{
+    return (uint8_t)((w * FONT_BPP + 7U) / 8U);
+}
+
+/* Byte index / bit shift of the 2-bit slot for pixel column `x`. */
+static inline uint8_t fontSlotByte(uint8_t x)
+{
+    return (uint8_t)(x / FONT_PIXELS_PER_BYTE);
+}
+static inline uint8_t fontSlotShift(uint8_t x)
+{
+    return (uint8_t)(6U - (x % FONT_PIXELS_PER_BYTE) * FONT_BPP);
+}
+
+/* Dimensions of a glyph scaled by `scale`: pixel width/height and the packed
+ * row stride in bytes. The single source of the scaled-glyph geometry. */
+static void fontScaledDims(FontSize size, uint8_t scale,
+                           uint8_t *outW, uint8_t *outH, uint8_t *outStride)
+{
+    *outW      = (uint8_t)(s_fontW[size] * scale);
+    *outH      = (uint8_t)(s_fontH[size] * scale);
+    *outStride = fontRowStride(*outW);
+}
+
 uint16_t fontSize(FontSize size, uint8_t scale)
 {
-    uint8_t inW       = s_fontW[size];
-    uint8_t inH       = s_fontH[size];
-    uint8_t outW      = (uint8_t)(inW * scale);
-    uint8_t outH      = (uint8_t)(inH * scale);
-    uint8_t outStride = (uint8_t)((outW * 2U + 7U) / 8U);
+    uint8_t outW, outH, outStride;
+    fontScaledDims(size, scale, &outW, &outH, &outStride);
+    (void)outW;
     return (uint16_t)outStride * outH;
 }
 
@@ -57,12 +87,12 @@ void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst)
     const uint8_t *src;
     fontGet(ch, size, &src);
 
-    uint8_t inW       = s_fontW[size];
-    uint8_t inH       = s_fontH[size];
-    uint8_t outW      = (uint8_t)(inW * scale);
-    uint8_t outH      = (uint8_t)(inH * scale);
-    uint8_t outStride = (uint8_t)((outW * 2U + 7U) / 8U);
-    uint8_t inStride  = (uint8_t)((inW * 2U + 7U) / 8U);
+    uint8_t inW      = s_fontW[size];
+    uint8_t inH      = s_fontH[size];
+    uint8_t inStride = fontRowStride(inW);
+    uint8_t outW, outH, outStride;
+    fontScaledDims(size, scale, &outW, &outH, &outStride);
+    (void)outW;
 
     memset(dst, 0, (uint16_t)outStride * outH);
 
@@ -70,9 +100,8 @@ void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst)
     {
         for (uint8_t srcX = 0U; srcX < inW; srcX++)
         {
-            uint8_t srcByte  = src[srcY * inStride + (srcX >> 2U)];
-            uint8_t srcShift = (uint8_t)(6U - (srcX & 3U) * 2U);
-            uint8_t slot     = (srcByte >> srcShift) & 3U;
+            uint8_t srcByte = src[srcY * inStride + fontSlotByte(srcX)];
+            uint8_t slot    = (srcByte >> fontSlotShift(srcX)) & FONT_SLOT_MASK;
 
             if (slot == 0U)
             {
@@ -87,9 +116,8 @@ void fontScale(uint8_t ch, FontSize size, uint8_t scale, uint8_t *dst)
                 for (uint8_t dstX = 0U; dstX < scale; dstX++)
                 {
                     uint8_t dstCol   = (uint8_t)(blockX + dstX);
-                    uint8_t *dstByte = &dst[dstRow * outStride + (dstCol >> 2U)];
-                    uint8_t dstShift = (uint8_t)(6U - (dstCol & 3U) * 2U);
-                    *dstByte = (uint8_t)(*dstByte | (slot << dstShift));
+                    uint8_t *dstByte = &dst[dstRow * outStride + fontSlotByte(dstCol)];
+                    *dstByte         = (uint8_t)(*dstByte | (slot << fontSlotShift(dstCol)));
                 }
             }
         }

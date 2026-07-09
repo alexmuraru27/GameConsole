@@ -9,62 +9,18 @@
  * game->console switch (no reset happens on a game crash). */
 static CrashReport s_report;
 
-/* CFSR sub-flags, most-diagnostic first: the banner shows the first one set, the log
- * line lists them all. Kept here (not shared with faults.c's SWO decode) because the
- * two sinks want different shapes — one primary flag vs. the full verbose dump. */
-typedef struct
-{
-    uint32_t mask;
-    const char *name;
-} CfsrFlag;
+/* The CFSR flag table and faultKindName() are shared with faults.c (see faults.h),
+ * so a flag or fault name is defined once. The banner shows the first flag set in
+ * the table's diagnostic-priority order; the log line lists them all. */
 
-static const CfsrFlag s_cfsr_flags[] = {
-    /* MemManage (a bad pointer / MPU violation — the common game bug) */
-    {SCB_CFSR_DACCVIOL_Msk, "DACCVIOL"},
-    {SCB_CFSR_IACCVIOL_Msk, "IACCVIOL"},
-    {SCB_CFSR_MSTKERR_Msk, "MSTKERR"},
-    {SCB_CFSR_MUNSTKERR_Msk, "MUNSTKERR"},
-    {SCB_CFSR_MLSPERR_Msk, "MLSPERR"},
-    /* BusFault */
-    {SCB_CFSR_PRECISERR_Msk, "PRECISERR"},
-    {SCB_CFSR_IMPRECISERR_Msk, "IMPRECISERR"},
-    {SCB_CFSR_IBUSERR_Msk, "IBUSERR"},
-    {SCB_CFSR_UNSTKERR_Msk, "UNSTKERR"},
-    {SCB_CFSR_STKERR_Msk, "STKERR"},
-    {SCB_CFSR_LSPERR_Msk, "LSPERR"},
-    /* UsageFault */
-    {SCB_CFSR_UNDEFINSTR_Msk, "UNDEFINSTR"},
-    {SCB_CFSR_INVSTATE_Msk, "INVSTATE"},
-    {SCB_CFSR_INVPC_Msk, "INVPC"},
-    {SCB_CFSR_NOCP_Msk, "NOCP"},
-    {SCB_CFSR_UNALIGNED_Msk, "UNALIGNED"},
-    {SCB_CFSR_DIVBYZERO_Msk, "DIVBYZERO"},
-};
-#define CFSR_FLAG_COUNT (sizeof(s_cfsr_flags) / sizeof(s_cfsr_flags[0]))
-
-static const char *faultKindName(uint8_t kind)
-{
-    switch (kind)
-    {
-    case FAULT_MEMMANAGE:
-        return "MEMMANAGE";
-    case FAULT_BUS:
-        return "BUSFAULT";
-    case FAULT_USAGE:
-        return "USAGEFAULT";
-    default:
-        return "HARDFAULT";
-    }
-}
-
-/* First CFSR flag set, in the priority order above, or NULL if none. */
+/* First CFSR flag set, in the shared priority order, or NULL if none. */
 static const char *primaryFlag(uint32_t cfsr)
 {
-    for (uint32_t i = 0U; i < CFSR_FLAG_COUNT; i++)
+    for (uint32_t i = 0U; i < g_cfsr_flag_count; i++)
     {
-        if (cfsr & s_cfsr_flags[i].mask)
+        if (cfsr & g_cfsr_flags[i].mask)
         {
-            return s_cfsr_flags[i].name;
+            return g_cfsr_flags[i].name;
         }
     }
     return NULL;
@@ -154,11 +110,11 @@ int crashReportFormatLine(char *buf, uint32_t size)
         return 0;
     }
     uint32_t off = (uint32_t)n;
-    for (uint32_t i = 0U; i < CFSR_FLAG_COUNT && off < size - 1U; i++)
+    for (uint32_t i = 0U; i < g_cfsr_flag_count && off < size - 1U; i++)
     {
-        if (s_report.cfsr & s_cfsr_flags[i].mask)
+        if (s_report.cfsr & g_cfsr_flags[i].mask)
         {
-            int m = snprintf(buf + off, size - off, " %s", s_cfsr_flags[i].name);
+            int m = snprintf(buf + off, size - off, " %s", g_cfsr_flags[i].name);
             if (m < 0)
             {
                 break;

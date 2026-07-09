@@ -1,14 +1,14 @@
 #include "renderer.h"
-#include "string.h"
+#include <string.h>
 #include "ILI9341.h"
 #include "sysclock.h"
-#include "stdio.h"
+#include <stdio.h>
 #include "logger.h"
 #include "font_utils.h" /* fontGlyphW/H, fontGet, fontScale, fontSize (rendererDrawText) */
 
 /* The renderer is the per-frame hot path, so it is compiled optimised even in
  * debug builds; the rest of the firmware stays at -Og for debuggability. */
-#pragma GCC optimize("O3")
+#pragma GCC optimize("O3") 
 
 /* Placement of the hot compositor functions: (I-cached) FLASH, not .RamFunc.
  * Measured +40% on TestRenderer (Min/Avg/Max 41/65/125 -> 58/92/166) once the

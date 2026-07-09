@@ -68,7 +68,7 @@ static const char *signalBars(int8_t rssi)
 
 static void renderList(int count, int selected, int top, const char *saved_ssid, bool saved_valid)
 {
-    const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool cursor_on = menuCursorVisible();
     uint16_t n = 0U;
 
     rendererClear();
@@ -83,7 +83,7 @@ static void renderList(int count, int selected, int top, const char *saved_ssid,
     {
         snprintf(status, sizeof(status), "no saved network");
     }
-    n = menuDrawText(n, &font5x5, 60, 70, g_menu_pal_footer, status);
+    menuDrawText(&font5x5, 60, 70, g_menu_pal_footer, status);
 
     for (int i = 0; i < WIFI_VISIBLE_ROWS && (top + i) < count; i++)
     {
@@ -95,17 +95,17 @@ static void renderList(int count, int selected, int top, const char *saved_ssid,
 
         if (sel && cursor_on)
         {
-            n = menuDrawText(n, &font8x8, 42, y, g_menu_pal_accent, ">");
+            menuDrawText(&font8x8, 42, y, g_menu_pal_accent, ">");
         }
-        n = menuDrawText(n, &font8x8, 60, y, pal, ap->ssid);
+        menuDrawText(&font8x8, 60, y, pal, ap->ssid);
 
         char meta[12];
         snprintf(meta, sizeof(meta), "%s%s", signalBars(ap->rssi), (ap->enc != NP_ENC_OPEN) ? " #" : "");
         const int16_t mx = (int16_t)(rendererGetWidthPixels() - 60 - (int16_t)menuTextWidth(font8x8.size, meta));
-        n = menuDrawText(n, &font8x8, mx, y, (ap->enc != NP_ENC_OPEN) ? g_menu_pal_footer : g_menu_pal_accent, meta);
+        menuDrawText(&font8x8, mx, y, (ap->enc != NP_ENC_OPEN) ? g_menu_pal_footer : g_menu_pal_accent, meta);
     }
 
-    n = menuDrawFooter(n, "UP/DOWN   A connect   B back");
+    menuDrawFooter("UP/DOWN   A connect   B back");
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();
 }

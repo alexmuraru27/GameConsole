@@ -147,6 +147,10 @@ void kernelRunGame(const GameBinaryHeader *header,
     s_game_hung = false;
     s_game_active = true;
 
+    /* Drive the liveness deadline off the 1 ms SysTick without the timebase having
+     * to know about the kernel (idempotent; the hook no-ops outside a game). */
+    sysclockSetTickHook(kernelGameDeadlineTick);
+
     LOGGER_LOG_INFO(LOGGER_KERNEL, "launching game: init=0x%08lX update=0x%08lX render=0x%08lX guard=0x%08lX",
                     (unsigned long)(header->init & ~0x1U), (unsigned long)(header->update & ~0x1U),
                     (unsigned long)(header->render & ~0x1U), (unsigned long)header->stack_guard);

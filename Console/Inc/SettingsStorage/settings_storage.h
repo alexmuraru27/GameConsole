@@ -1,8 +1,8 @@
 #ifndef __SETTINGS_STORAGE_H
 #define __SETTINGS_STORAGE_H
 
-#include "stdbool.h"
-#include "stdint.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include "ff.h"                  /* FF_LFN_BUF — the loader's filename buffer size */
 #include "settings_interface.h" /* SettingsStorageStatus, SETTINGS_GAME_MAX_DATA */
 

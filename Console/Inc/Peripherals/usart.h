@@ -1,5 +1,5 @@
-#ifndef __USART_COMM_H
-#define __USART_COMM_H
+#ifndef __USART_H
+#define __USART_H
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -47,4 +47,4 @@ void usartFlushRx(void);
 /* Read one byte, blocking up to timeout_ms. Returns the byte (0..255) or -1 on timeout. */
 int usartReadByte(uint32_t timeout_ms);
 
-#endif /* __USART_COMM_H */
+#endif /* __USART_H */

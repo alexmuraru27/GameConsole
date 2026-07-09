@@ -1,7 +1,7 @@
 #ifndef __BUZZER_H
 #define __BUZZER_H
 #include <stdint.h>
-#include "stdbool.h"
+#include <stdbool.h>
 
 // in hertz
 #define NOTE_PAUSE 0U

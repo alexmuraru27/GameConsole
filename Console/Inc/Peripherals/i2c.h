@@ -1,7 +1,7 @@
 #ifndef __I2C_H
 #define __I2C_H
 #include <stdint.h>
-#include "stdbool.h"
+#include <stdbool.h>
 
 typedef enum
 {

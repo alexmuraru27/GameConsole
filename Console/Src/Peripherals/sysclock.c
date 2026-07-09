@@ -1,10 +1,17 @@
 #include "sysclock.h"
-#include "scheduler.h"
-#include "stdbool.h"
+#include <stdbool.h>
 #include "stm32f407xx.h"
 
 static volatile uint32_t s_timing_delay = 0U;
 static volatile uint32_t s_system_time = 0U;
+
+/* Optional per-tick hook (see sysclockSetTickHook). NULL until the kernel arms it. */
+static void (*s_tick_hook)(uint32_t) = 0;
+
+void sysclockSetTickHook(void (*hook)(uint32_t))
+{
+    s_tick_hook = hook;
+}
 
 #if !defined(SYS_TICK_SECOND_DIV)
 #define SYS_TICK_SECOND_DIV ((uint32_t)1000U)
@@ -28,8 +35,12 @@ static volatile uint32_t s_system_time = 0U;
 void SysTick_Handler(void)
 {
     s_system_time++;
-    /* Enforce the running game callback's time budget (no-op outside a game). */
-    kernelGameDeadlineTick(s_system_time);
+    /* Enforce the running game callback's time budget (the kernel registers a hook;
+     * no-op before any game runs or outside a game). */
+    if (s_tick_hook != 0)
+    {
+        s_tick_hook(s_system_time);
+    }
 }
 
 void delay(const uint32_t sys_time_delta)
@@ -72,55 +83,10 @@ uint32_t getSysTicksInSecond()
 
 static void sysTickClockConfig()
 {
-    uint32_t system_core_clock = HSI_CLOCK_VALUE;
-    const uint32_t sys_clk_source = (RCC->CFGR & RCC_CFGR_SWS);
-
-    switch (sys_clk_source)
-    {
-    case RCC_CFGR_SWS_HSI:
-    {
-        // HSI used as system clock source
-        system_core_clock = HSI_CLOCK_VALUE;
-        break;
-    }
-    case RCC_CFGR_SWS_HSE:
-    {
-        // HSE used as system clock source
-        system_core_clock = HSE_CLOCK_VALUE;
-        break;
-    }
-    case RCC_CFGR_SWS_PLL:
-    {
-
-        // PLL used as system clock source
-        const uint32_t pllm = RCC->PLLCFGR & RCC_PLLCFGR_PLLM;
-        const bool is_pll_source_hse = ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) == RCC_PLLCFGR_PLLSRC_HSE);
-
-        // PLL_VCO = (HSE_CLOCK_VALUE or HSI_CLOCK_VALUE / PLL_M) * PLL_N
-        const uint32_t pllvco = ((is_pll_source_hse ? HSE_CLOCK_VALUE : HSI_CLOCK_VALUE) / pllm) *
-                                ((RCC->PLLCFGR & RCC_PLLCFGR_PLLN) >> RCC_PLLCFGR_PLLN_Pos);
-
-        // In catalog Pllp can be 2/4/6/8 based on register values 0/1/2/3, hence we need to do some multiplications
-        const uint32_t pllp = (((RCC->PLLCFGR & RCC_PLLCFGR_PLLP) >> RCC_PLLCFGR_PLLP_Pos) + 1) * 2;
-
-        // SYSCLK = PLL_VCO / PLL_P
-        system_core_clock = pllvco / pllp;
-        break;
-    }
-    default:
-        break;
-    }
-
-    // Compute SysTick frequency
-    const uint8_t AHB_PRESC_TABLE[16] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 6, 7, 8, 9};
-
-    // Frequency based on AHB prescaling table
-    // In our case this should be 0 because we set the HPRE to 0
-    // But let's keep a more generic implementation as it is in the default library
-    system_core_clock >>= AHB_PRESC_TABLE[((RCC->CFGR & RCC_CFGR_HPRE) >> RCC_CFGR_HPRE_Pos)];
-
-    // Divide sec by 1000 to get SysTick at 1ms
-    SysTick_Config(system_core_clock / SYS_TICK_SECOND_DIV);
+    /* The clock tree is fixed (pllSystemClockConfig runs first and sets SYSCLK to
+     * SYSCLK_HZ with AHB /1), so the SysTick reload is simply SYSCLK_HZ per second
+     * divided down to the 1 ms tick — no need to reverse-engineer it from RCC. */
+    SysTick_Config(SYSCLK_HZ / SYS_TICK_SECOND_DIV);
 }
 
 static void flashMemoryLatencyConfig(void)

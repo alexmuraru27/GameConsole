@@ -13,6 +13,24 @@ typedef enum
     FAULT_USAGE = 3,
 } FaultKind;
 
+/* Human name for a FaultKind ("MEMMANAGE"/"BUSFAULT"/"USAGEFAULT"/"HARDFAULT").
+ * Shared by the SWO decode (faults.c) and the persisted crash report. */
+const char *faultKindName(FaultKind kind);
+
+/* One CFSR sub-flag: its status-register mask and printable name. */
+typedef struct
+{
+    uint32_t mask;
+    const char *name;
+} CfsrFlag;
+
+/* The CFSR sub-flags, ordered most-diagnostic-first (MemManage before Bus before
+ * Usage; within a group the likeliest game bug first). One table shared by every
+ * consumer: faults.c's full SWO dump, and crash_report.c's primary-flag banner +
+ * full log line. `g_cfsr_flag_count` is its length. */
+extern const CfsrFlag g_cfsr_flags[];
+extern const uint32_t g_cfsr_flag_count;
+
 /* Enable the configurable faults (MemManage/Bus/Usage) so an MPU violation, bus
  * error, or undefined instruction surfaces as its own fault — correctly named —
  * instead of escalating into a generic forced HardFault. Also traps divide-by-zero.

@@ -1,8 +1,8 @@
 #ifndef __ASSET_LOADER_H
 #define __ASSET_LOADER_H
 
-#include "stdint.h"
-#include "stdbool.h"
+#include <stdint.h>
+#include <stdbool.h>
 #include "asset_interface.h"
 
 /* Return codes shared by every asset-loader entry point. */

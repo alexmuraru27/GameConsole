@@ -56,6 +56,15 @@ typedef enum
 #define MENU_ROW_H 20
 #define MENU_FOOTER_Y 222
 
+/* Blinking selection cursor: the ">" chevron is shown while menuCursorVisible()
+ * is true, and sits MENU_CURSOR_DX px left of the row it marks. One period for
+ * every screen (the keyboard caret keeps its own, see keyboard.c). */
+#define MENU_BLINK_MS 450U
+#define MENU_CURSOR_DX 18
+
+/* True on the "on" half of the blink period — gate the selection chevron on this. */
+bool menuCursorVisible(void);
+
 /* Build the shared assets (the underline tile). Call once at boot. */
 void menuCommonInit(void);
 
@@ -65,15 +74,19 @@ void menuResetSurface(void);
 /* Pixel width of `text` rendered in the given font size. */
 uint16_t menuTextWidth(FontSize size, const char *text);
 
-/* Emit a string as one sprite per glyph; returns the next free index. */
-uint16_t menuDrawText(uint16_t idx, const Font *font, int16_t x, int16_t y,
-                      const uint16_t *palette, const char *text);
+/* Draw `text` at (x,y) in the given font, tinted palette[1]. Routes through the
+ * renderer's console-side text path, so it consumes no g_menu_ui slot and takes
+ * no sprite index (unlike the bar/gauge emitters below). */
+void menuDrawText(const Font *font, int16_t x, int16_t y,
+                  const uint16_t *palette, const char *text);
 
-/* Centered, scaled title + cyan underline at the top of the screen. */
+/* Centered, scaled title + cyan underline at the top of the screen. The title
+ * text is slot-free, but the underline is a real bar sprite, so this still
+ * threads the g_menu_ui index (pass 0 first, use the return for later sprites). */
 uint16_t menuDrawTitle(uint16_t idx, const char *text);
 
-/* Centered footer hint at MENU_FOOTER_Y (font5x5). */
-uint16_t menuDrawFooter(uint16_t idx, const char *text);
+/* Centered footer hint at MENU_FOOTER_Y (font5x5). Text only — no sprite index. */
+void menuDrawFooter(const char *text);
 
 /* A horizontal solid bar `width` px wide at (x,y), in `palette`'s ink.
  * One tile row tall (MENU_BAR_H px); stack rows for a thicker bar. */
@@ -108,5 +121,29 @@ MenuNav menuPollNav(void);
 /* Pixel width of a `total`-cell gauge (for right-aligning it on a row). */
 uint16_t menuGaugeWidth(uint8_t total);
 uint16_t menuDrawGauge(uint16_t idx, int16_t x, int16_t y, uint8_t total, uint8_t filled);
+
+/* ------------------------------------------------------------------ *
+ *  Shared modal / progress vocabulary, used by the download and
+ *  firmware-flash screens (download_ui.c, flash_ui.c) so the bar, the
+ *  centering, and the wait-for-back loop live in one place.
+ * ------------------------------------------------------------------ */
+
+/* Left X to horizontally center `text` (in `size`) on screen. */
+int16_t menuCenterX(FontSize size, const char *text);
+
+/* Draw `text` horizontally centered on row y, tinted palette[1]. */
+void menuDrawTextCentered(const Font *font, int16_t y, const uint16_t *palette, const char *text);
+
+/* A stacked progress bar at (x,y): `rows` MENU_BAR_H-tall rows, each a dim track
+ * with an accent fill proportional to done/total, `w` px wide. Returns next idx. */
+uint16_t menuDrawProgressBar(uint16_t idx, int16_t x, int16_t y, uint16_t w, uint8_t rows,
+                             uint32_t done, uint32_t total);
+
+/* One-frame modal: centered `line` under `title` (no input). */
+void menuModalInfo(const char *title, const char *line, const uint16_t *palette);
+
+/* Modal: centered `line` under `title` + a "back" footer; blocks until Special
+ * Button 2. */
+void menuModalWaitBack(const char *title, const char *line, const uint16_t *palette);
 
 #endif /* __MENU_COMMON_H */

@@ -1,6 +1,7 @@
 #include "timer.h"
 #include "joystick.h"
 #include "buzzer.h"
+#include "sysclock.h"
 #include "stm32f407xx.h"
 #include "logger.h"
 
@@ -38,9 +39,9 @@ void timer3Disable(void)
 
 void timer3Trigger(uint32_t frequency_hz)
 {
-    // calculate PWM period for frequency: cycles = (84000000U / frequency_hz )
+    // calculate PWM period for frequency: cycles = (APB1_TIMER_CLK_HZ / frequency_hz)
     // cycles per period
-    uint32_t arr = 84000000U / frequency_hz;
+    uint32_t arr = APB1_TIMER_CLK_HZ / frequency_hz;
     // ensure valid period (arr should be at least 2)
     if (arr < 2)
         arr = 2;
@@ -50,7 +51,7 @@ void timer3Trigger(uint32_t frequency_hz)
     {
         // TIM3 ARR is 16-bit
         psc++;
-        arr = 84000000U / (frequency_hz * (psc + 1));
+        arr = APB1_TIMER_CLK_HZ / (frequency_hz * (psc + 1));
     }
 
     TIM3->PSC = psc;

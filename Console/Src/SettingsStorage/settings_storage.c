@@ -405,25 +405,69 @@ SettingsStorageStatus settingsStorageClear(void)
 
 /* ------------------------------------------------------------------ console */
 
+/* The console blob (ConsoleSettingsEntity) and every game slot (GameDataEntity) are
+ * the same 2 KB record — {version, data_size, data[], crc16} — so these two helpers
+ * are the single encode / verify path for both, keeping the CRC + version invariant
+ * in one place. The working buffer is a GameDataEntity, but its byte layout is
+ * identical to ConsoleSettingsEntity (both are one slot; see the static_asserts), so
+ * the bytes written/read are the same either way. `max` is the entity's data
+ * capacity (SETTINGS_CONSOLE_MAX_DATA / SETTINGS_GAME_MAX_DATA — equal by layout). */
+static SettingsStorageStatus entityWrite(uint16_t addr, uint16_t version,
+                                         const uint8_t *data, uint16_t size, uint16_t max)
+{
+    if (data == NULL || size > max)
+    {
+        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
+    }
+    GameDataEntity entity;
+    memset(&entity, 0, sizeof(entity));
+    entity.version = version;
+    entity.data_size = size;
+    memcpy(entity.data, data, size);
+    entity.crc16 = structCrc(&entity, sizeof(entity));
+    return eepromWrite(addr, &entity, sizeof(entity));
+}
+
+static SettingsStorageStatus entityRead(uint16_t addr, uint16_t expected_version,
+                                        uint8_t *buffer, uint16_t *size, uint16_t max)
+{
+    GameDataEntity entity;
+    const SettingsStorageStatus st = eepromRead(addr, &entity, sizeof(entity));
+    if (st != SETTINGS_STORAGE_STATUS_OK)
+    {
+        return st;
+    }
+    if (structCrc(&entity, sizeof(entity)) != entity.crc16)
+    {
+        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
+    }
+    if (entity.version != expected_version)
+    {
+        return SETTINGS_STORAGE_STATUS_VERSION_MISMATCH;
+    }
+    if (entity.data_size > max)
+    {
+        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
+    }
+    if (*size < entity.data_size)
+    {
+        *size = entity.data_size;
+        return SETTINGS_STORAGE_STATUS_BUFFER_TOO_SMALL;
+    }
+    memcpy(buffer, entity.data, entity.data_size);
+    *size = entity.data_size;
+    return SETTINGS_STORAGE_STATUS_OK;
+}
+
 SettingsStorageStatus settingsStorageConsoleWrite(const uint16_t struct_version, const uint8_t *const data, const uint16_t size)
 {
     if (!s_initialized)
     {
         return SETTINGS_STORAGE_STATUS_NOT_INITIALIZED;
     }
-    if (data == NULL || size > SETTINGS_CONSOLE_MAX_DATA)
-    {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
-    }
 
-    ConsoleSettingsEntity entity;
-    memset(&entity, 0, sizeof(entity));
-    entity.version = struct_version;
-    entity.data_size = size;
-    memcpy(entity.data, data, size);
-    entity.crc16 = structCrc(&entity, sizeof(entity));
-
-    const SettingsStorageStatus st = eepromWrite(ADDR_CONSOLE_SETTINGS, &entity, sizeof(entity));
+    const SettingsStorageStatus st =
+        entityWrite(ADDR_CONSOLE_SETTINGS, struct_version, data, size, SETTINGS_CONSOLE_MAX_DATA);
     if (st == SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_DEBUG(LOGGER_SETTINGS, "console write %u B v%u", size, struct_version);
@@ -442,33 +486,7 @@ SettingsStorageStatus settingsStorageConsoleRead(const uint16_t expected_struct_
         return SETTINGS_STORAGE_STATUS_INVALID_ARG;
     }
 
-    ConsoleSettingsEntity entity;
-    const SettingsStorageStatus st = eepromRead(ADDR_CONSOLE_SETTINGS, &entity, sizeof(entity));
-    if (st != SETTINGS_STORAGE_STATUS_OK)
-    {
-        return st;
-    }
-    if (structCrc(&entity, sizeof(entity)) != entity.crc16)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (entity.version != expected_struct_version)
-    {
-        return SETTINGS_STORAGE_STATUS_VERSION_MISMATCH;
-    }
-    if (entity.data_size > SETTINGS_CONSOLE_MAX_DATA)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (*size < entity.data_size)
-    {
-        *size = entity.data_size;
-        return SETTINGS_STORAGE_STATUS_BUFFER_TOO_SMALL;
-    }
-
-    memcpy(buffer, entity.data, entity.data_size);
-    *size = entity.data_size;
-    return SETTINGS_STORAGE_STATUS_OK;
+    return entityRead(ADDR_CONSOLE_SETTINGS, expected_struct_version, buffer, size, SETTINGS_CONSOLE_MAX_DATA);
 }
 
 SettingsStorageStatus settingsStorageConsoleDelete(void)
@@ -576,13 +594,7 @@ SettingsStorageStatus settingsStorageGameWrite(const char *const game_name, cons
 
     const uint32_t seq = s_header.write_seq;
 
-    GameDataEntity data_entity;
-    memset(&data_entity, 0, sizeof(data_entity));
-    data_entity.version = struct_version;
-    data_entity.data_size = size;
-    memcpy(data_entity.data, data, size);
-    data_entity.crc16 = structCrc(&data_entity, sizeof(data_entity));
-    st = eepromWrite(slotAddr(index), &data_entity, sizeof(data_entity));
+    st = entityWrite(slotAddr(index), struct_version, data, size, SETTINGS_GAME_MAX_DATA);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
@@ -643,33 +655,7 @@ SettingsStorageStatus settingsStorageGameRead(const char *const game_name, const
         return SETTINGS_STORAGE_STATUS_NOT_FOUND; /* reserved but never written */
     }
 
-    GameDataEntity data_entity;
-    st = eepromRead(slotAddr(index), &data_entity, sizeof(data_entity));
-    if (st != SETTINGS_STORAGE_STATUS_OK)
-    {
-        return st;
-    }
-    if (structCrc(&data_entity, sizeof(data_entity)) != data_entity.crc16)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (data_entity.version != expected_struct_version)
-    {
-        return SETTINGS_STORAGE_STATUS_VERSION_MISMATCH;
-    }
-    if (data_entity.data_size > SETTINGS_GAME_MAX_DATA)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (*size < data_entity.data_size)
-    {
-        *size = data_entity.data_size;
-        return SETTINGS_STORAGE_STATUS_BUFFER_TOO_SMALL;
-    }
-
-    memcpy(buffer, data_entity.data, data_entity.data_size);
-    *size = data_entity.data_size;
-    return SETTINGS_STORAGE_STATUS_OK;
+    return entityRead(slotAddr(index), expected_struct_version, buffer, size, SETTINGS_GAME_MAX_DATA);
 }
 
 SettingsStorageStatus settingsStorageGameDelete(const char *const game_name)

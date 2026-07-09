@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "stm32f4xx.h"
 #include "timer.h"
-#include "stddef.h"
+#include <stddef.h>
 #include "logger.h"
 
 #define SOUND_TRACKS 5
@@ -26,17 +26,13 @@ uint8_t buzzerGetMaxTracks()
     return SOUND_TRACKS;
 }
 
+static bool clearTrack(const uint8_t track_number);
+
 void buzzerInit(void)
 {
     for (uint8_t track_id = 0U; track_id < SOUND_TRACKS; track_id++)
     {
-        s_track_data_queue[track_id].is_looped = false;
-        s_track_data_queue[track_id].is_playing = false;
-        s_track_data_queue[track_id].notes_data = NULL;
-        s_track_data_queue[track_id].notes = 0U;
-        s_track_data_queue[track_id].on_done_flag = NULL;
-        s_track_data_queue[track_id].note_idx = 0U;
-        s_track_data_queue[track_id].ms_counter = 0U;
+        clearTrack(track_id);
     }
     LOGGER_LOG_INFO(LOGGER_BUZZER, "init: %u tracks", (unsigned)SOUND_TRACKS);
 }
@@ -105,12 +101,13 @@ static void updatePWM(uint8_t track_id)
         return;
     }
 
-    if (s_track_data_queue[track_id].note_idx >= s_track_data_queue[track_id].notes)
+    TrackData *const t = &s_track_data_queue[track_id];
+    if (t->note_idx >= t->notes)
     {
-        if (s_track_data_queue[track_id].is_looped)
+        if (t->is_looped)
         {
             signalDone(track_id);
-            s_track_data_queue[track_id].note_idx = 0U;
+            t->note_idx = 0U;
         }
         else
         {
@@ -119,7 +116,7 @@ static void updatePWM(uint8_t track_id)
         }
     }
 
-    s_track_data_queue[track_id].ms_counter = 0U;
+    t->ms_counter = 0U;
     buzzerRefreshOutput();
 }
 
@@ -172,21 +169,22 @@ void buzzerInterruptHandler(void)
     // We play certain notes for more than 1ms,so 1ms should be more than enough distance between notes
     for (uint8_t track_id = 0U; track_id < SOUND_TRACKS; track_id++)
     {
-        if (!s_track_data_queue[track_id].is_playing)
+        TrackData *const t = &s_track_data_queue[track_id];
+        if (!t->is_playing)
         {
             continue;
         }
 
-        if (s_track_data_queue[track_id].note_idx >= s_track_data_queue[track_id].notes)
+        if (t->note_idx >= t->notes)
         {
             buzzerStop(track_id);
             continue;
         }
 
-        s_track_data_queue[track_id].ms_counter++;
-        if (s_track_data_queue[track_id].ms_counter >= s_track_data_queue[track_id].notes_data[s_track_data_queue[track_id].note_idx * 2U + 1U])
+        t->ms_counter++;
+        if (t->ms_counter >= t->notes_data[t->note_idx * 2U + 1U])
         {
-            s_track_data_queue[track_id].note_idx++;
+            t->note_idx++;
             updatePWM(track_id);
         }
     }
@@ -196,12 +194,13 @@ bool buzzerPlayWithFlag(const uint8_t track_number, const bool is_looped, const 
 {
     if (track_number < SOUND_TRACKS && notes_data != NULL && notes != 0U)
     {
+        TrackData *const t = &s_track_data_queue[track_number];
         clearTrack(track_number);
-        s_track_data_queue[track_number].notes_data = notes_data;
-        s_track_data_queue[track_number].notes = notes;
-        s_track_data_queue[track_number].on_done_flag = on_done_flag;
-        s_track_data_queue[track_number].is_looped = is_looped;
-        s_track_data_queue[track_number].is_playing = true;
+        t->notes_data = notes_data;
+        t->notes = notes;
+        t->on_done_flag = on_done_flag;
+        t->is_looped = is_looped;
+        t->is_playing = true;
         updatePWM(track_number);
         LOGGER_LOG_DEBUG(LOGGER_BUZZER, "play track %u: %u notes, loop=%d", (unsigned)track_number, (unsigned)notes, (int)is_looped);
         return true;

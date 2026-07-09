@@ -13,7 +13,7 @@ void faultsInit(void)
     __ISB();
 }
 
-static const char *faultName(FaultKind kind)
+const char *faultKindName(FaultKind kind)
 {
     switch (kind)
     {
@@ -28,13 +28,29 @@ static const char *faultName(FaultKind kind)
     }
 }
 
-static void printFlag(uint32_t cfsr, uint32_t mask, const char *name)
-{
-    if (cfsr & mask)
-    {
-        printf(" %s", name);
-    }
-}
+const CfsrFlag g_cfsr_flags[] = {
+    /* MemManage (a bad pointer / MPU violation — the common game bug) */
+    {SCB_CFSR_DACCVIOL_Msk, "DACCVIOL"},
+    {SCB_CFSR_IACCVIOL_Msk, "IACCVIOL"},
+    {SCB_CFSR_MSTKERR_Msk, "MSTKERR"},
+    {SCB_CFSR_MUNSTKERR_Msk, "MUNSTKERR"},
+    {SCB_CFSR_MLSPERR_Msk, "MLSPERR"},
+    /* BusFault */
+    {SCB_CFSR_PRECISERR_Msk, "PRECISERR"},
+    {SCB_CFSR_IMPRECISERR_Msk, "IMPRECISERR"},
+    {SCB_CFSR_IBUSERR_Msk, "IBUSERR"},
+    {SCB_CFSR_UNSTKERR_Msk, "UNSTKERR"},
+    {SCB_CFSR_STKERR_Msk, "STKERR"},
+    {SCB_CFSR_LSPERR_Msk, "LSPERR"},
+    /* UsageFault */
+    {SCB_CFSR_UNDEFINSTR_Msk, "UNDEFINSTR"},
+    {SCB_CFSR_INVSTATE_Msk, "INVSTATE"},
+    {SCB_CFSR_INVPC_Msk, "INVPC"},
+    {SCB_CFSR_NOCP_Msk, "NOCP"},
+    {SCB_CFSR_UNALIGNED_Msk, "UNALIGNED"},
+    {SCB_CFSR_DIVBYZERO_Msk, "DIVBYZERO"},
+};
+const uint32_t g_cfsr_flag_count = sizeof(g_cfsr_flags) / sizeof(g_cfsr_flags[0]);
 
 uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
 {
@@ -43,7 +59,7 @@ uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
      * thread (the game). Clear => the kernel/handler faulted on the MSP. */
     const bool from_psp = (exc_return & 0x4U) != 0U;
 
-    printf("\n=== %s FAULT ===\n", faultName(kind));
+    printf("\n=== %s FAULT ===\n", faultKindName(kind));
     printf("ctx =%s (EXC_RETURN=0x%08lX)\n", from_psp ? "PSP/thread" : "MSP/handler", (unsigned long)exc_return);
     printf("PC  =0x%08lX\n", (unsigned long)frame[6]);
     printf("LR  =0x%08lX\n", (unsigned long)frame[5]);
@@ -51,26 +67,13 @@ uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
     printf("CFSR=0x%08lX HFSR=0x%08lX\n", (unsigned long)cfsr, (unsigned long)SCB->HFSR);
 
     printf("flags:");
-    /* MemManage (MMFSR, CFSR bits 0-7) */
-    printFlag(cfsr, SCB_CFSR_IACCVIOL_Msk, "IACCVIOL");
-    printFlag(cfsr, SCB_CFSR_DACCVIOL_Msk, "DACCVIOL");
-    printFlag(cfsr, SCB_CFSR_MUNSTKERR_Msk, "MUNSTKERR");
-    printFlag(cfsr, SCB_CFSR_MSTKERR_Msk, "MSTKERR");
-    printFlag(cfsr, SCB_CFSR_MLSPERR_Msk, "MLSPERR");
-    /* BusFault (BFSR, CFSR bits 8-15) */
-    printFlag(cfsr, SCB_CFSR_IBUSERR_Msk, "IBUSERR");
-    printFlag(cfsr, SCB_CFSR_PRECISERR_Msk, "PRECISERR");
-    printFlag(cfsr, SCB_CFSR_IMPRECISERR_Msk, "IMPRECISERR");
-    printFlag(cfsr, SCB_CFSR_UNSTKERR_Msk, "UNSTKERR");
-    printFlag(cfsr, SCB_CFSR_STKERR_Msk, "STKERR");
-    printFlag(cfsr, SCB_CFSR_LSPERR_Msk, "LSPERR");
-    /* UsageFault (UFSR, CFSR bits 16-31) */
-    printFlag(cfsr, SCB_CFSR_UNDEFINSTR_Msk, "UNDEFINSTR");
-    printFlag(cfsr, SCB_CFSR_INVSTATE_Msk, "INVSTATE");
-    printFlag(cfsr, SCB_CFSR_INVPC_Msk, "INVPC");
-    printFlag(cfsr, SCB_CFSR_NOCP_Msk, "NOCP");
-    printFlag(cfsr, SCB_CFSR_UNALIGNED_Msk, "UNALIGNED");
-    printFlag(cfsr, SCB_CFSR_DIVBYZERO_Msk, "DIVBYZERO");
+    for (uint32_t i = 0U; i < g_cfsr_flag_count; i++)
+    {
+        if (cfsr & g_cfsr_flags[i].mask)
+        {
+            printf(" %s", g_cfsr_flags[i].name);
+        }
+    }
     printf("\n");
 
     if (cfsr & SCB_CFSR_MMARVALID_Msk)

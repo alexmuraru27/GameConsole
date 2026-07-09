@@ -4,8 +4,8 @@
 #include "watchdog.h"
 #include "logger.h"
 
-/* USART1 lives on APB2; PCLK2 is SYSCLK/2 = 84 MHz (see systemClockConfig). */
-#define USART1_PCLK_HZ 84000000U
+/* USART1 lives on APB2; its clock is PCLK2 (see the clock tree in sysclock.h). */
+#define USART1_PCLK_HZ PCLK2_HZ
 
 /*
  * USART1 (ESP-01 link) driven over DMA2:

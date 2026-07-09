@@ -2,7 +2,7 @@
 #define __RENDERER_H
 
 #include <stdint.h>
-#include "stdbool.h"
+#include <stdbool.h>
 #include "renderer_interface.h" /* RENDERER_WIDTH/HEIGHT, SpriteFlags, Layer, Sprite */
 #include "font_interface.h"     /* FontSize (rendererDrawText) */
 

@@ -5,7 +5,6 @@
 #include "sdio.h"
 #include "logger.h"
 
-#define CMD41 41 // SD_SEND_OP_COND (ACMD)
 
 void sdioInit(void)
 {

@@ -80,7 +80,7 @@ static MenuTransition rootUpdate(void)
 static void rootRender(void)
 {
     const int16_t screen_w = (int16_t)rendererGetWidthPixels();
-    const bool cursor_on = ((getSysTime() / 450U) & 1U) == 0U;
+    const bool cursor_on = menuCursorVisible();
     const bool sd_present = loaderMediaPresent();
     uint16_t n = 0U;
 
@@ -102,12 +102,12 @@ static void rootRender(void)
 
         if (selected && cursor_on)
         {
-            n = menuDrawText(n, &font8x8, (int16_t)(x - 18), y, g_menu_pal_accent, ">");
+            menuDrawText(&font8x8, (int16_t)(x - MENU_CURSOR_DX), y, g_menu_pal_accent, ">");
         }
-        n = menuDrawText(n, &font8x8, x, y, palette, label);
+        menuDrawText(&font8x8, x, y, palette, label);
     }
 
-    n = menuDrawFooter(n, "UP/DOWN browse   A select");
+    menuDrawFooter("UP/DOWN browse   A select");
 
     rendererSubmitLayer(LAYER_UI, g_menu_ui, n);
     rendererRender();
@@ -144,7 +144,7 @@ static void applyTransition(MenuTransition transition)
     case MENU_STAY:
         break;
     case MENU_GOTO_ROOT:
-        enterScreen(SCREEN_ROOT);
+        enterScreen(SCREEN_ROOT); 
         break;
     case MENU_GOTO_GAMES:
         enterScreen(SCREEN_GAMES);
