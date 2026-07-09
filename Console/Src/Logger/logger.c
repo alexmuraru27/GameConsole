@@ -1,9 +1,10 @@
-#include "logger.h"
+#include "Logger/logger.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "sysclock.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
 
 static char loggerLevelChar(LoggerLevel level)
 {

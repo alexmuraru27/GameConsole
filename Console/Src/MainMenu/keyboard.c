@@ -1,14 +1,15 @@
-#include "keyboard.h"
+#include "MainMenu/keyboard.h"
 
 #include <string.h>
 
-#include "menu_common.h"
-#include "renderer.h"
-#include "buzzer.h"
-#include "sysclock.h"
-#include "fonts.h"
-#include "joystick.h"
-#include "watchdog.h"
+#include "MainMenu/menu_common.h"
+#include "Renderer/renderer.h"
+#include "Devices/buzzer.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Fonts/fonts.h"
+#include "Devices/joystick.h"
+#include "Peripherals/watchdog.h"
 
 /*
  * Character rows 0..5 plus a bottom action row (index 6). Letter rows (1..3)

@@ -1,4 +1,4 @@
-#include "syscall_validate.h"
+#include "Kernel/syscall_validate.h"
 
 /* Region bounds come from the linker script (common.ld) as absolute symbols, so
  * the trust boundary tracks the real memory map instead of hard-coded addresses.

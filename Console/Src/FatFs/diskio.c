@@ -4,8 +4,8 @@
 #include "ff.h"
 #include "diskio.h"
 #include "diskio_integration.h"
-#include "sysclock.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Logger/logger.h"
 
 #define MAX_RETRIES 3
 static uint8_t s_card_initialized = 0;

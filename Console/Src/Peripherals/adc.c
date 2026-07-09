@@ -1,7 +1,8 @@
-#include "adc.h"
+#include "Peripherals/adc.h"
 #include <stm32f407xx.h>
-#include "sysclock.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 
 #define ADC_BUFFER_SIZE 4U
 volatile uint16_t g_adc_buffer[ADC_BUFFER_SIZE] = {0U};

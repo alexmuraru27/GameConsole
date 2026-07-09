@@ -1,6 +1,6 @@
-#include "rng.h"
+#include "Peripherals/rng.h"
 #include <stm32f407xx.h>
-#include "logger.h"
+#include "Logger/logger.h"
 
 /* Bound on the DRDY spin. The RNG emits a new 32-bit word every ~40 RNG-clock
  * periods, so DRDY is set within a few dozen loop iterations; this cap only

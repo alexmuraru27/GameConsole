@@ -1,10 +1,10 @@
-#include "renderer.h"
+#include "Renderer/renderer.h"
+#include "Renderer/renderer_internal.h" /* shared text glyph state (renderer_text.c owns the logic) */
 #include <string.h>
-#include "ILI9341.h"
-#include "sysclock.h"
+#include "Devices/ILI9341.h"
+#include "Peripherals/sysclock.h"
 #include <stdio.h>
-#include "logger.h"
-#include "font_utils.h" /* fontGlyphW/H, fontGet, fontScale, fontSize (rendererDrawText) */
+#include "Logger/logger.h"
 
 /* The renderer is the per-frame hot path, so it is compiled optimised even in
  * debug builds; the rest of the firmware stays at -Og for debuggability. */
@@ -32,7 +32,6 @@
  * glyph storage of its own. These glyph sprites join the per-layer z-sort below
  * alongside the game's submitted sprites. TEXT_SPRITE_CAP bounds the on-screen
  * glyph count per frame (across all layers). */
-#define TEXT_SPRITE_CAP 256U
 
 #define RENDERER_SCANLINES 16U
 #define RENDERER_SCANLINE_BUF_SIZE (RENDERER_SCANLINES * RENDERER_WIDTH)
@@ -125,41 +124,18 @@ typedef struct
 static TileCacheSlot s_tile_cache[TILE_CACHE_SLOTS];
 static uint8_t s_tile_cache_count;
 
-/* ---- Console-side text drawing (rendererDrawText) ----
+/* ---- Console-side text glyph state (logic lives in renderer_text.c) ----
  * A frame's text glyphs live here, one Sprite each, tagged with their layer; the
- * z-sort folds them into the matching layer's run. Rebuilt every frame (reset in
- * rendererClear/rendererRender), so a game re-issues its text like its sprites. */
-static Sprite s_text_sprites[TEXT_SPRITE_CAP];
-static uint8_t s_text_layer[TEXT_SPRITE_CAP]; /* Layer of each glyph in s_text_sprites */
-static uint16_t s_text_count;
-
-/* Text is single-tint, so each drawText call needs a {transparent, ink, ink, ink}
- * palette. They are pooled and de-duplicated by colour within a frame (a HUD uses
- * only a few colours), and each must outlive compositing — hence console-owned. */
-#define TEXT_PALETTE_CAP 16U
-static uint16_t s_text_palettes[TEXT_PALETTE_CAP][4];
-static uint16_t s_text_palette_count;
-
-/* Scaled-glyph cache: a glyph at scale > 1 is unpacked/re-packed by fontScale into
- * a slot here once and reused across frames (the expensive part of scaled text).
- * Keyed by (char, font, scale); the slot is sized for the largest supported glyph
- * (FONT_8x8 at RENDERER_TEXT_MAX_SCALE = 32x32 2bpp = 256 B). A slot touched in the
- * current frame is never evicted, so pointers handed out this frame stay valid
- * until rendererRender composites them. Scale 1 is not cached — fontGet returns the
- * glyph straight out of flash. */
-#define GLYPH_CACHE_SLOTS 10U
-#define GLYPH_CACHE_SLOT_BYTES 256U
-typedef struct
-{
-    uint8_t bits[GLYPH_CACHE_SLOT_BYTES];
-    uint32_t used_frame; /* frame counter when last drawn (eviction guard + LRU) */
-    uint8_t ch;
-    uint8_t font;
-    uint8_t scale;
-    bool valid;
-} GlyphCacheSlot;
-static GlyphCacheSlot s_glyph_cache[GLYPH_CACHE_SLOTS];
-static uint32_t s_frame_counter; /* bumped once per rendererRender */
+ * z-sort folds them into the matching layer's run. These are DEFINED here (not in
+ * renderer_text.c) so the hot z-sort / rendererRender read them same-TU and their
+ * codegen is unchanged by the split; renderer_text.c writes them via
+ * renderer_internal.h. Rebuilt every frame (reset in rendererClear/rendererRender). */
+Sprite s_text_sprites[TEXT_SPRITE_CAP];
+uint8_t s_text_layer[TEXT_SPRITE_CAP]; /* Layer of each glyph in s_text_sprites */
+uint16_t s_text_count;
+uint16_t s_text_palettes[TEXT_PALETTE_CAP][4]; /* pooled {0,ink,ink,ink} tints */
+uint16_t s_text_palette_count;
+uint32_t s_frame_counter; /* bumped once per rendererRender; the glyph cache's LRU key */
 
 void rendererInit(void)
 {
@@ -252,125 +228,6 @@ void rendererSubmitLayer(Layer layer, const Sprite *sprites, uint16_t count)
     }
     s_layer_sprites[layer] = sprites;
     s_active_sprites[layer] = count;
-}
-
-/* Find (or add) the single-tint palette {transparent, color, color, color} for a
- * drawText call, de-duplicated by colour within the frame. If the small pool is
- * full (many distinct text colours in one frame), reuse the last entry. */
-static const uint16_t *textPalette(uint16_t color)
-{
-    for (uint16_t i = 0U; i < s_text_palette_count; i++)
-    {
-        if (s_text_palettes[i][1] == color)
-        {
-            return s_text_palettes[i];
-        }
-    }
-    uint16_t slot = (s_text_palette_count < TEXT_PALETTE_CAP) ? s_text_palette_count++ : (TEXT_PALETTE_CAP - 1U);
-    s_text_palettes[slot][0] = 0U; /* index 0 is transparent */
-    s_text_palettes[slot][1] = color;
-    s_text_palettes[slot][2] = color;
-    s_text_palettes[slot][3] = color;
-    return s_text_palettes[slot];
-}
-
-/* Return a scaled glyph's 2bpp bitmap, unpacking it into a cache slot on first use
- * and reusing it thereafter. NULL only if every slot is already in use this frame
- * (pathological: > GLYPH_CACHE_SLOTS distinct scaled glyphs in one frame) — the
- * caller then skips that glyph. Only called for scale > 1. */
-static const uint8_t *glyphCacheGet(uint8_t ch, FontSize font, uint8_t scale)
-{
-    for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
-    {
-        GlyphCacheSlot *s = &s_glyph_cache[i];
-        if (s->valid && s->ch == ch && s->font == (uint8_t)font && s->scale == scale)
-        {
-            s->used_frame = s_frame_counter;
-            return s->bits;
-        }
-    }
-    /* Miss: take a free slot, else the least-recently-used slot not touched this
-     * frame (evicting an in-use slot would dangle a pointer already handed out). */
-    GlyphCacheSlot *victim = NULL;
-    for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
-    {
-        if (!s_glyph_cache[i].valid)
-        {
-            victim = &s_glyph_cache[i];
-            break;
-        }
-    }
-    if (victim == NULL)
-    {
-        uint32_t oldest = 0xFFFFFFFFU;
-        for (uint8_t i = 0U; i < GLYPH_CACHE_SLOTS; i++)
-        {
-            GlyphCacheSlot *s = &s_glyph_cache[i];
-            if (s->used_frame != s_frame_counter && s->used_frame <= oldest)
-            {
-                oldest = s->used_frame;
-                victim = s;
-            }
-        }
-    }
-    if (victim == NULL || fontSize(font, scale) > GLYPH_CACHE_SLOT_BYTES)
-    {
-        return NULL;
-    }
-    fontScale(ch, font, scale, victim->bits);
-    victim->ch = ch;
-    victim->font = (uint8_t)font;
-    victim->scale = scale;
-    victim->valid = true;
-    victim->used_frame = s_frame_counter;
-    return victim->bits;
-}
-
-void rendererDrawText(Layer layer, int16_t x, int16_t y, uint8_t z, FontSize font,
-                      uint8_t scale, uint16_t color, const char *text)
-{
-    if (layer >= LAYER_COUNT || text == NULL || (unsigned)font > (unsigned)FONT_8x8)
-    {
-        return; /* font bound guards the fontGlyphW/fontGet table lookups */
-    }
-    if (scale == 0U)
-    {
-        scale = 1U;
-    }
-    if (scale > RENDERER_TEXT_MAX_SCALE)
-    {
-        scale = RENDERER_TEXT_MAX_SCALE;
-    }
-    const uint16_t glyph_w = (uint16_t)(fontGlyphW(font) * scale);
-    const uint16_t glyph_h = (uint16_t)(fontGlyphH(font) * scale);
-    const int16_t advance = (int16_t)((fontGlyphW(font) + 1U) * scale);
-    const uint16_t *pal = textPalette(color);
-
-    for (const char *s = text; *s != '\0'; s++, x = (int16_t)(x + advance))
-    {
-        const uint8_t ch = (uint8_t)*s;
-        if (ch <= 0x20U || ch > 0x7EU) /* skip space (and non-printables): draws nothing */
-        {
-            continue;
-        }
-        if (s_text_count >= TEXT_SPRITE_CAP)
-        {
-            break; /* pool full: drop the rest (bounded) */
-        }
-        const uint8_t *pixels;
-        if (scale == 1U)
-        {
-            fontGet(ch, font, &pixels); /* straight from flash — no cache needed */
-        }
-        else if ((pixels = glyphCacheGet(ch, font, scale)) == NULL)
-        {
-            continue; /* cache exhausted this frame */
-        }
-        s_text_layer[s_text_count] = (uint8_t)layer;
-        s_text_sprites[s_text_count] = (Sprite){.x = x, .y = y, .w = glyph_w, .h = glyph_h,
-                                                .z = z, .flags = 0U, .pixels = pixels, .palette = pal};
-        s_text_count++;
-    }
 }
 
 /* Counting sort each layer by z ascending, scattering straight into the flat
@@ -1170,77 +1027,3 @@ uint16_t rendererGetHeightPixels(void)
     return RENDERER_HEIGHT;
 }
 
-/* Pixel Forge's 64-color system palette (pixelforge/palette.py) as RGB565.
- * Assets store palette entries as indices into this table; this is where they
- * become panel colors. Generated from the same source as the editor. */
-static const uint16_t s_system_palette[64] = {
-    0x630C,
-    0x0173,
-    0x0898,
-    0x3818,
-    0x6013,
-    0x7809,
-    0x7800,
-    0x60C0,
-    0x39A0,
-    0x0A60,
-    0x02C0,
-    0x02C0,
-    0x0249,
-    0x0000,
-    0x0000,
-    0x0000,
-    0xAD55,
-    0x033E,
-    0x31FF,
-    0x70DF,
-    0xA85E,
-    0xC871,
-    0xC903,
-    0xAA20,
-    0x7360,
-    0x3380,
-    0x0500,
-    0x04E3,
-    0x0451,
-    0x0000,
-    0x0000,
-    0x0000,
-    0xFFFF,
-    0x4DBF,
-    0x847F,
-    0xCB5F,
-    0xFADF,
-    0xFAFC,
-    0xFB8D,
-    0xFCC0,
-    0xCE00,
-    0x8700,
-    0x4FA0,
-    0x2F8D,
-    0x2EDC,
-    0x4A69,
-    0x0000,
-    0x0000,
-    0xFFFF,
-    0xBFFF,
-    0xCE9F,
-    0xEE3F,
-    0xFDFF,
-    0xFDFE,
-    0xFE38,
-    0xFEB3,
-    0xEF30,
-    0xCF90,
-    0xBFD3,
-    0xAFD8,
-    0xAF9E,
-    0xBDD7,
-    0x0000,
-    0x0000,
-};
-
-uint16_t rendererSystemColor(uint8_t system_index)
-{
-    return s_system_palette[system_index & 0x3FU];
-}

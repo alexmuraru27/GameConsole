@@ -1,10 +1,11 @@
-#include "esp_flasher_port.h"
-#include "esp01.h"
+#include "Flasher/esp_flasher_port.h"
+#include "Devices/esp01.h"
 
 #include <stddef.h>
 
-#include "usart.h"
-#include "sysclock.h"
+#include "Peripherals/usart.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
 
 /* Bootstrap timing — generous holds; flashing is a one-shot modal operation. */
 #define ESP_RESET_HOLD_MS 100U

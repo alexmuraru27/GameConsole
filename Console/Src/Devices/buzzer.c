@@ -1,10 +1,10 @@
-#include "buzzer.h"
+#include "Devices/buzzer.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include "stm32f4xx.h"
-#include "sysclock.h" /* APB1_TIMER_CLK_HZ for the PWM period */
+#include "Peripherals/sysclock.h" /* APB1_TIMER_CLK_HZ for the PWM period */
 #include <stddef.h>
-#include "logger.h"
+#include "Logger/logger.h"
 
 /* ---- TIM3_CH2 PWM output stage (PB5) ----
  * The buzzer's single square-wave voice. Owned here (not in the generic timer

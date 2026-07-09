@@ -1,10 +1,10 @@
-#include "download_ui.h"
+#include "MainMenu/download_ui.h"
 
 #include <stdio.h>
 
-#include "menu_common.h"
-#include "renderer.h"
-#include "fonts.h"
+#include "MainMenu/menu_common.h"
+#include "Renderer/renderer.h"
+#include "Fonts/fonts.h"
 
 #define DL_BAR_X 40
 #define DL_BAR_Y 120

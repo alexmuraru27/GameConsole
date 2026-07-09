@@ -1,6 +1,6 @@
 // Font utility implementations.
-#include "font_utils.h"
-#include "fonts.h"
+#include "Fonts/font_utils.h"
+#include "Fonts/fonts.h"
 #include <string.h>
 
 /* ------------------------------------------------------------------ */

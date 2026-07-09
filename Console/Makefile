@@ -82,6 +82,8 @@ Src/Fonts/font5x5.c \
 Src/Fonts/font8x8.c \
 Src/Fonts/font_utils.c \
 Src/Renderer/renderer.c \
+Src/Renderer/renderer_palette.c \
+Src/Renderer/renderer_text.c \
 Src/Kernel/faults.c \
 Src/Kernel/crash_report.c \
 Src/Kernel/syscall.c \
@@ -108,28 +110,17 @@ startup.s
 C_DEFS =  \
 -DSTM32F407xx
 
-# C includes
+# C includes. Console headers are included subdir-qualified (e.g.
+# "Renderer/renderer.h"), so a single -IInc covers all of Inc/'s subsystem folders —
+# no per-subsystem -I and no basename-collision risk. -IInc/FatFs stays because the
+# vendored FatFs sources (ff.c/ffunicode.c) include "ff.h"/"diskio.h" unqualified.
 C_INCLUDES =  \
 -IInc \
--IInc/Peripherals \
--IInc/Devices \
--IInc/Network \
 -IInc/FatFs \
--IInc/Crc \
--IInc/Renderer \
--IInc/Loader \
--IInc/Multiplayer \
--IInc/MainMenu \
--IInc/Swo \
--IInc/Logger \
--IInc/SettingsStorage \
--IInc/Kernel \
--IInc/Flasher \
 -I$(ESP_FLASHER_DIR)/include \
 -I$(ESP_FLASHER_DIR)/private_include \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include \
--IInc/Fonts \
 -I../Shared \
 -I../Shared/Api \
 -I../Shared/Syscall \

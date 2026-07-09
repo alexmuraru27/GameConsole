@@ -1,10 +1,10 @@
-#include "os_flasher.h"
-#include "flash_ll.h"
-#include "flash_map.h"
-#include "crc.h"
+#include "Flasher/os_flasher.h"
+#include "Flasher/flash_ll.h"
+#include "Flasher/flash_map.h"
+#include "Crc/crc.h"
 #include "game_console.h"
-#include "watchdog.h"
-#include "logger.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
 #include "ff.h"
 #include <string.h>
 #include <stddef.h>

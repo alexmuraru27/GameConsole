@@ -1,10 +1,10 @@
-#include "server_config.h"
-#include "downloader.h" /* downloaderGetServerAddr/SetServerAddr prototypes */
+#include "Network/server_config.h"
+#include "Network/downloader.h" /* downloaderGetServerAddr/SetServerAddr prototypes */
 
 #include <string.h>
 
 #include "network_protocol.h" /* NP_URL_MAX */
-#include "logger.h"
+#include "Logger/logger.h"
 #include "sd_layout.h"
 #include "ff.h"
 

@@ -1,12 +1,12 @@
-#include "esp_flasher.h"
+#include "Flasher/esp_flasher.h"
 
 #include <string.h>
 
-#include "esp_flasher_port.h"
+#include "Flasher/esp_flasher_port.h"
 #include "esp_loader.h"
 #include "ff.h"
-#include "watchdog.h"
-#include "logger.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
 
 /* Block size handed to the bootloader per write. 1 KB is the upstream default
  * and a comfortable fit for the ESP8266 ROM/stub receive buffer. */

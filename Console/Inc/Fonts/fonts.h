@@ -5,8 +5,8 @@
 #define __FONTS_H
 
 #include "font_interface.h"
-#include "font3x5.h"
-#include "font5x5.h"
-#include "font8x8.h"
+#include "Fonts/font3x5.h"
+#include "Fonts/font5x5.h"
+#include "Fonts/font8x8.h"
 
 #endif /* __FONTS_H */

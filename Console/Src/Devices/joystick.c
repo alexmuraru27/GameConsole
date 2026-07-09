@@ -1,7 +1,9 @@
-#include "joystick.h"
-#include "adc.h"
-#include "sysclock.h"
-#include "logger.h"
+#include "Devices/joystick.h"
+#include <stm32f407xx.h>
+#include "Peripherals/adc.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 #include <stdio.h>
 
 // Button bits (within s_btn_data). This bit order matches the field order of the

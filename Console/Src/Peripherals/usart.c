@@ -1,8 +1,9 @@
-#include "usart.h"
+#include "Peripherals/usart.h"
 #include <stm32f407xx.h>
-#include "sysclock.h"
-#include "watchdog.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
 
 /* USART1 lives on APB2; its clock is PCLK2 (see the clock tree in sysclock.h). */
 #define USART1_PCLK_HZ PCLK2_HZ

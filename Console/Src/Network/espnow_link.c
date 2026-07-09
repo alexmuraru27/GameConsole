@@ -1,6 +1,6 @@
-#include "espnow_link.h"
-#include "network_internal.h"
-#include "logger.h"
+#include "Network/espnow_link.h"
+#include "Network/network_internal.h"
+#include "Logger/logger.h"
 
 #include <string.h>
 

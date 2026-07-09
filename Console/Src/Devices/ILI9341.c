@@ -1,9 +1,10 @@
-#include "ILI9341.h"
+#include "Devices/ILI9341.h"
 #include "stm32f407xx.h"
-#include "sysclock.h"
-#include "gpio.h"
-#include "dma.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/gpio.h"
+#include "Peripherals/dma.h"
+#include "Logger/logger.h"
 
 // FSMC Bank1 Sub-bank1 (NE1, PD7):
 //   Command: A16=0 -> CPU address 0x60000000

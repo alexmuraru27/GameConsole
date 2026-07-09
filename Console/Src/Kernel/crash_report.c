@@ -1,6 +1,7 @@
-#include "crash_report.h"
-#include "faults.h"   /* FaultKind names */
-#include "sysclock.h" /* getSysTime */
+#include "Kernel/crash_report.h"
+#include "Peripherals/systime.h"
+#include "Kernel/faults.h"   /* FaultKind names */
+#include "Peripherals/sysclock.h" /* getSysTime */
 #include <stm32f407xx.h>
 #include <stdio.h>
 #include <string.h>

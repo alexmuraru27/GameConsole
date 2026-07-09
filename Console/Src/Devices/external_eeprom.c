@@ -1,8 +1,9 @@
-#include "external_eeprom.h"
-#include "i2c.h"
-#include "sysclock.h"
+#include "Devices/external_eeprom.h"
+#include "Peripherals/i2c.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
 #include <stddef.h>
-#include "logger.h"
+#include "Logger/logger.h"
 
 static uint32_t s_device_address = 0U;
 

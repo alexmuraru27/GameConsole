@@ -1,8 +1,9 @@
-#include "i2c.h"
+#include "Peripherals/i2c.h"
 #include <stm32f407xx.h>
 #include <stddef.h>
-#include "sysclock.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 
 #define I2C_CCR_VALUE 0x23U                     // Calculated for 400kHz with 42MHz APB1
 #define I2C_TRISE_VALUE 14U                     // Rise time for fast mode

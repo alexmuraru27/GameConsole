@@ -1,8 +1,9 @@
-#include "menu_common.h"
-#include "font_utils.h"
-#include "joystick.h"
-#include "buzzer.h"
-#include "sysclock.h"
+#include "MainMenu/menu_common.h"
+#include "Fonts/font_utils.h"
+#include "Devices/joystick.h"
+#include "Devices/buzzer.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
 #include "Util/utils.h"
 #include <string.h>
 

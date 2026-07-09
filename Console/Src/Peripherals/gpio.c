@@ -1,7 +1,7 @@
-#include "gpio.h"
+#include "Peripherals/gpio.h"
 #include <stm32f407xx.h>
-#include "sysclock.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Logger/logger.h"
 
 static void initGpioEsp01()
 {

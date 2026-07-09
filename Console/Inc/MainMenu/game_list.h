@@ -1,7 +1,7 @@
 #ifndef __GAME_LIST_H
 #define __GAME_LIST_H
 
-#include "menu_common.h"
+#include "MainMenu/menu_common.h"
 
 /* The game picker screen: lists the SD-card .bin games, browses with up/down, and
  * launches the highlighted one with a tap of Special Button 1. Holding Special

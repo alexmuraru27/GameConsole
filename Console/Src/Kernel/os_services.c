@@ -1,4 +1,4 @@
-#include "os_services.h"
+#include "Kernel/os_services.h"
 
 /* Provider registered by the app layer (MainMenu's keyboard). NULL until wired in;
  * a game that traps osTextInput before then simply gets a "cancelled" result. */

@@ -1,7 +1,7 @@
-#include "console_settings_storage.h"
-#include "settings_storage.h"
-#include "backlight.h" /* BACKLIGHT_DEFAULT_PERCENT for the default brightness */
-#include "logger.h"
+#include "SettingsStorage/console_settings_storage.h"
+#include "SettingsStorage/settings_storage.h"
+#include "Devices/backlight.h" /* BACKLIGHT_DEFAULT_PERCENT for the default brightness */
+#include "Logger/logger.h"
 #include <stddef.h>
 #include <string.h>
 

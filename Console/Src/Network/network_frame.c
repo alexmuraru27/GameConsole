@@ -1,11 +1,13 @@
-#include "network.h"
-#include "network_internal.h"
+#include "Network/network.h"
+#include <stm32f407xx.h>
+#include "Network/network_internal.h"
 
 #include <string.h>
 
-#include "usart.h"
-#include "sysclock.h"
-#include "logger.h"
+#include "Peripherals/usart.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 
 /*
  * Frame transport for the ESP-01S link — the shared byte/frame machinery that both

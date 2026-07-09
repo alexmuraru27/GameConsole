@@ -1,24 +1,25 @@
-#include "syscall.h"
+#include "Kernel/syscall.h"
 #include "syscall_numbers.h"
 
 #include <stddef.h>
 #include <stm32f407xx.h>
 
-#include "sysclock.h"
-#include "rng.h"
-#include "buzzer.h"
-#include "joystick.h"
-#include "renderer.h"
-#include "asset_loader.h"
-#include "settings_storage.h"
-#include "fonts.h"
-#include "font_utils.h"
-#include "game_loader.h"
-#include "mp_session.h"
-#include "scheduler.h"
-#include "os_services.h"
-#include "syscall_validate.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/rng.h"
+#include "Devices/buzzer.h"
+#include "Devices/joystick.h"
+#include "Renderer/renderer.h"
+#include "Loader/asset_loader.h"
+#include "SettingsStorage/settings_storage.h"
+#include "Fonts/fonts.h"
+#include "Fonts/font_utils.h"
+#include "Loader/game_loader.h"
+#include "Multiplayer/mp_session.h"
+#include "Kernel/scheduler.h"
+#include "Kernel/os_services.h"
+#include "Kernel/syscall_validate.h"
+#include "Logger/logger.h"
 
 /* Reject a syscall whose pointer/argument validation failed: log it on the kernel
  * channel and return `ret` to the game. Used at the ~15 guard sites in the switch

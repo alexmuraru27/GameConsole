@@ -1,14 +1,14 @@
-#include "flash_ui.h"
+#include "MainMenu/flash_ui.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "menu_common.h"
-#include "renderer.h"
-#include "buzzer.h"
-#include "fonts.h"
-#include "downloader.h"
-#include "logger.h"
+#include "MainMenu/menu_common.h"
+#include "Renderer/renderer.h"
+#include "Devices/buzzer.h"
+#include "Fonts/fonts.h"
+#include "Network/downloader.h"
+#include "Logger/logger.h"
 
 /* Progress-bar geometry. */
 #define BAR_X 40

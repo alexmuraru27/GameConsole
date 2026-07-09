@@ -1,7 +1,9 @@
 #include "diskio_integration.h"
-#include "sdio.h"
-#include "sysclock.h"
-#include "logger.h"
+#include <stm32f407xx.h>
+#include "Peripherals/sdio.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 #include <stdbool.h>
 
 /* SDIO register/protocol magic, named. */

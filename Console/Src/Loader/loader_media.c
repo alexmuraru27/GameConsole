@@ -1,7 +1,9 @@
-#include "loader_media.h"
+#include "Loader/loader_media.h"
+#include <stm32f407xx.h>
+#include "Peripherals/systime.h"
 #include "diskio_integration.h" /* diskMarkUninitialized */
-#include "sysclock.h"           /* getSysTime */
-#include "logger.h"
+#include "Peripherals/sysclock.h"           /* getSysTime */
+#include "Logger/logger.h"
 #include "sd_layout.h"
 #include "ff.h"
 #include <stddef.h> /* NULL */

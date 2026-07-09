@@ -12,7 +12,7 @@ typedef enum
     LOGGER_LEVEL_DEBUG,
 } LoggerLevel;
 
-#include "logger_config.h"
+#include "Logger/logger_config.h"
 
 /* Core sink: format one line and emit it. Prefer the LOGGER_LOG_* macros. */
 void loggerLog(LoggerLevel level, const char *channel, const char *fmt, ...)

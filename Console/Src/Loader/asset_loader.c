@@ -1,7 +1,7 @@
-#include "asset_loader.h"
+#include "Loader/asset_loader.h"
 #include "pak_format.h"
-#include "crc.h"
-#include "logger.h"
+#include "Crc/crc.h"
+#include "Logger/logger.h"
 #include "ff.h"
 #include <stddef.h>
 

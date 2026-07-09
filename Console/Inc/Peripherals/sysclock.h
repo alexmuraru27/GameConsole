@@ -1,7 +1,8 @@
 #ifndef __SYS_CLOCK_CONFIG_H
 #define __SYS_CLOCK_CONFIG_H
 #include <stdint.h>
-#include <stm32f407xx.h>
+/* The everyday delay/getSysTime timebase moved to systime.h (a light header that
+ * doesn't drag in the CMSIS device header); this one owns the clock-tree bring-up. */
 
 /* The clock tree programmed by systemClockConfig(): HSE 8 MHz → PLL → 168 MHz
  * SYSCLK, AHB /1, APB1 /4, APB2 /2. Every driver's timing math is a consequence
@@ -21,12 +22,5 @@ void systemClockConfig(void);
  * millisecond count (or NULL to clear). Lets a higher layer (the kernel's game
  * liveness deadline) run on the tick without the timebase depending on it. */
 void sysclockSetTickHook(void (*hook)(uint32_t sys_time));
-
-void delay(uint32_t sys_time_delta);
-/* Short (sub-millisecond) busy-wait off the DWT cycle counter — for peripheral
- * stabilization and bit-bang timing the 1 ms SysTick delay() can't express. */
-void delayUs(uint32_t us);
-uint32_t getSysTime(void);
-uint32_t getSysTicksInSecond();
 
 #endif /* __SYS_CLOCK_CONFIG_H */

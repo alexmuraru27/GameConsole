@@ -1,6 +1,6 @@
-#include "watchdog.h"
+#include "Peripherals/watchdog.h"
 #include <stm32f407xx.h>
-#include "logger.h"
+#include "Logger/logger.h"
 
 /* IWDG key-register magic values (RM0090 sec. 21.4.1). */
 #define IWDG_KEY_RELOAD 0x0000AAAAU /* refresh the down-counter (the "kick")        */

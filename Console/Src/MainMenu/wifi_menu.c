@@ -1,18 +1,18 @@
-#include "wifi_menu.h"
+#include "MainMenu/wifi_menu.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "menu_common.h"
-#include "renderer.h"
-#include "buzzer.h"
-#include "sysclock.h"
-#include "fonts.h"
-#include "logger.h"
-#include "network.h"
-#include "keyboard.h"
-#include "download_ui.h"
-#include "console_settings_storage.h"
+#include "MainMenu/menu_common.h"
+#include "Renderer/renderer.h"
+#include "Devices/buzzer.h"
+#include "Peripherals/sysclock.h"
+#include "Fonts/fonts.h"
+#include "Logger/logger.h"
+#include "Network/network.h"
+#include "MainMenu/keyboard.h"
+#include "MainMenu/download_ui.h"
+#include "SettingsStorage/console_settings_storage.h"
 
 #define WIFI_MAX_APS 16
 #define WIFI_VISIBLE_ROWS 8

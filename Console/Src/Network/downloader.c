@@ -1,16 +1,17 @@
-#include "downloader.h"
+#include "Network/downloader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "network.h"
+#include "Network/network.h"
 #include "network_protocol.h"
-#include "server_config.h"
-#include "crc.h"
-#include "sysclock.h"
-#include "watchdog.h"
-#include "logger.h"
+#include "Network/server_config.h"
+#include "Crc/crc.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
 #include "sd_layout.h"
 #include "ff.h"
 

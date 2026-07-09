@@ -1,8 +1,8 @@
-#include "timer.h"
-#include "joystick.h"
-#include "buzzer.h"
+#include "Peripherals/timer.h"
+#include "Devices/joystick.h"
+#include "Devices/buzzer.h"
 #include "stm32f407xx.h"
-#include "logger.h"
+#include "Logger/logger.h"
 
 void TIM6_DAC_IRQHandler()
 {

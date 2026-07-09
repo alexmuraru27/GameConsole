@@ -1,11 +1,12 @@
-#include "mp_session.h"
-#include "espnow_link.h"
+#include "Multiplayer/mp_session.h"
+#include "Network/espnow_link.h"
 #include "network_protocol.h"
-#include "loader.h"
+#include "Loader/loader.h"
 #include "ff.h"
-#include "console_settings_storage.h"
-#include "sysclock.h"
-#include "logger.h"
+#include "SettingsStorage/console_settings_storage.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Logger/logger.h"
 
 #include <string.h>
 #include <stdio.h>

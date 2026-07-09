@@ -1,10 +1,10 @@
 #include <stm32f407xx.h>
-#include "sysclock.h"
+#include "Peripherals/sysclock.h"
 #include "game_console.h"
-#include "main_menu.h"
-#include "watchdog.h"
-#include "logger.h"
-#include "flash_map.h"
+#include "MainMenu/main_menu.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
+#include "Flasher/flash_map.h"
 
 void SystemInit(void)
 {

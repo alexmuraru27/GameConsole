@@ -1,10 +1,11 @@
-#include "scheduler.h"
-#include "syscall.h"
+#include "Kernel/scheduler.h"
+#include "Kernel/syscall.h"
 #include "syscall_numbers.h"
-#include "mpu.h"
-#include "sysclock.h"
-#include "watchdog.h"
-#include "logger.h"
+#include "Kernel/mpu.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/watchdog.h"
+#include "Logger/logger.h"
 
 #include <stddef.h>
 #include <stm32f407xx.h>

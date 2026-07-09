@@ -1,9 +1,10 @@
 #include "stm32f4xx.h"
 #include <string.h>
 #include <stdint.h>
-#include "sysclock.h"
-#include "sdio.h"
-#include "logger.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Peripherals/sdio.h"
+#include "Logger/logger.h"
 
 
 void sdioInit(void)

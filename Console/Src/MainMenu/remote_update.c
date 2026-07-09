@@ -1,19 +1,20 @@
-#include "remote_update.h"
+#include "MainMenu/remote_update.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#include "menu_common.h"
-#include "renderer.h"
-#include "buzzer.h"
-#include "sysclock.h"
-#include "fonts.h"
-#include "logger.h"
-#include "network.h"
-#include "downloader.h"
-#include "download_ui.h"
-#include "keyboard.h"
-#include "console_settings_storage.h"
+#include "MainMenu/menu_common.h"
+#include "Renderer/renderer.h"
+#include "Devices/buzzer.h"
+#include "Peripherals/sysclock.h"
+#include "Peripherals/systime.h"
+#include "Fonts/fonts.h"
+#include "Logger/logger.h"
+#include "Network/network.h"
+#include "Network/downloader.h"
+#include "MainMenu/download_ui.h"
+#include "MainMenu/keyboard.h"
+#include "SettingsStorage/console_settings_storage.h"
 #include "sd_layout.h"
 
 #define RU_MAX_ENTRIES 32

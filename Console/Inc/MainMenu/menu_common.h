@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "renderer.h"
-#include "fonts.h"
+#include "Renderer/renderer.h"
+#include "Fonts/fonts.h"
 
 /* ------------------------------------------------------------------ *
  *  Shared infrastructure for the console menu screens: the slate+cyan

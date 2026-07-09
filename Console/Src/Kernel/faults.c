@@ -1,6 +1,6 @@
-#include "faults.h"
-#include "scheduler.h"
-#include "crash_report.h"
+#include "Kernel/faults.h"
+#include "Kernel/scheduler.h"
+#include "Kernel/crash_report.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stm32f407xx.h>

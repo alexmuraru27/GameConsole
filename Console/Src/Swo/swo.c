@@ -1,5 +1,6 @@
-#include "swo.h"
-#include "logger.h"
+#include "Swo/swo.h"
+#include <stm32f407xx.h>
+#include "Logger/logger.h"
 
 void swoInit(uint32_t swoFreqHz)
 {

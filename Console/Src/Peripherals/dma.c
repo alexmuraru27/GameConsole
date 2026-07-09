@@ -1,8 +1,8 @@
-#include "dma.h"
-#include "adc.h"
+#include "Peripherals/dma.h"
+#include "Peripherals/adc.h"
 #include <stm32f407xx.h>
 #include <stdbool.h>
-#include "logger.h"
+#include "Logger/logger.h"
 
 static bool s_fsmc_dma_active = false;
 

@@ -1,7 +1,7 @@
-#include "settings_storage.h"
-#include "external_eeprom.h"
-#include "crc.h"
-#include "logger.h"
+#include "SettingsStorage/settings_storage.h"
+#include "Devices/external_eeprom.h"
+#include "Crc/crc.h"
+#include "Logger/logger.h"
 #include <assert.h>
 #include <string.h>
 #include <stddef.h>

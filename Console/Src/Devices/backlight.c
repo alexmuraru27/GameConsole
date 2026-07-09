@@ -1,6 +1,6 @@
-#include "backlight.h"
+#include "Devices/backlight.h"
 #include "stm32f407xx.h"
-#include "logger.h"
+#include "Logger/logger.h"
 
 /*
  * Backlight PWM on PA3 / TIM9_CH2. TIM9 runs off the 168 MHz APB2 timer clock

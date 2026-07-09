@@ -35,6 +35,7 @@ ASM_SOURCES =  \
 C_DEFS = -DSTM32F407xx
 
 C_INCLUDES =  \
+-I../Console/Inc \
 -I../Console/Inc/Flasher \
 -I../Console/Inc/Crc \
 -I../Console/Inc/Logger \

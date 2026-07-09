@@ -1,7 +1,7 @@
-#include "mpu.h"
+#include "Kernel/mpu.h"
 #include <stm32f407xx.h>
 #include "mpu_armv7.h"
-#include "logger.h"
+#include "Logger/logger.h"
 
 /* GAME_RAM / CCM arena bounds come from common.ld. */
 extern uint32_t __game_ram_start;

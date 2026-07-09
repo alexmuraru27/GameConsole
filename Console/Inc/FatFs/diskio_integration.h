@@ -3,7 +3,7 @@
 
 #define DRIVE_SD 0
 #include <stdint.h>
-#include "sdio.h"
+#include "Peripherals/sdio.h"
 
 #define SD_CARD_SDSC 0U
 #define SD_CARD_SDHC 1U

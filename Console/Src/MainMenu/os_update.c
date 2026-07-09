@@ -1,13 +1,13 @@
-#include "os_update.h"
+#include "MainMenu/os_update.h"
 
 #include <stdio.h>
 
-#include "menu_common.h"
-#include "logger.h"
-#include "loader.h"
-#include "loader_media.h"
-#include "flash_ui.h"
-#include "os_flasher.h"
+#include "MainMenu/menu_common.h"
+#include "Logger/logger.h"
+#include "Loader/loader.h"
+#include "Loader/loader_media.h"
+#include "MainMenu/flash_ui.h"
+#include "Flasher/os_flasher.h"
 #include "sd_layout.h"
 #include "ff.h"
 
