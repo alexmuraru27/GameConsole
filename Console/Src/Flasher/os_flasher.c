@@ -7,6 +7,7 @@
 #include "logger.h"
 #include "ff.h"
 #include <string.h>
+#include <stddef.h>
 
 /*
  * Application side of OS self-flashing. We write only the staging region (sectors
@@ -60,6 +61,84 @@ static bool programChunk(uint32_t flash_addr, const uint8_t *data, uint32_t n)
     return true;
 }
 
+/* Erase the whole staging region (header + image area). Kicks the watchdog before
+ * each sector — a 128 KB erase masks interrupts for up to ~4 s. */
+static OsFlashStatus eraseStagingRegion(void)
+{
+    LOGGER_LOG_INFO(LOGGER_FLASHER, "erasing staging sectors %lu..%lu",
+                    (unsigned long)STAGING_SECTOR_FIRST, (unsigned long)STAGING_SECTOR_LAST);
+    for (uint32_t s = STAGING_SECTOR_FIRST; s <= STAGING_SECTOR_LAST; s++)
+    {
+        watchdogKick();
+        if (!flashLlEraseSector(s))
+        {
+            LOGGER_LOG_ERROR(LOGGER_FLASHER, "staging sector %lu erase failed", (unsigned long)s);
+            return OS_FLASH_WRITE_FAIL;
+        }
+        LOGGER_LOG_DEBUG(LOGGER_FLASHER, "  erased staging sector %lu", (unsigned long)s);
+    }
+    return OS_FLASH_OK;
+}
+
+/* Stream the open `file` (`total` bytes) into the erased staging image area in
+ * STAGE_CHUNK reads, programming each chunk and accumulating a CRC-32 of the bytes
+ * read off the card. Feeds the watchdog per chunk and reports progress via `cb`.
+ * On success returns the finalized read CRC in *out_crc. Assumes flash is unlocked. */
+static OsFlashStatus streamImageIntoStaging(FIL *file, uint32_t total, uint32_t *out_crc,
+                                            OsFlashProgressCb cb, void *ctx)
+{
+    LOGGER_LOG_INFO(LOGGER_FLASHER, "streaming image -> staging 0x%08lX (%u B chunks)",
+                    (unsigned long)STAGING_IMAGE_ADDR, (unsigned)STAGE_CHUNK);
+
+    uint32_t crc = CRC32_INIT;
+    uint32_t done = 0U;
+    while (done < total)
+    {
+        watchdogKick(); /* per-chunk SD read + flash program: feed the watchdog */
+        UINT got = 0U;
+        if (f_read(file, s_buf, STAGE_CHUNK, &got) != FR_OK)
+        {
+            return OS_FLASH_READ_FAIL;
+        }
+        if (got == 0U)
+        {
+            return OS_FLASH_READ_FAIL; /* short file vs. f_size */
+        }
+        if (!programChunk(STAGING_IMAGE_ADDR + done, s_buf, got))
+        {
+            LOGGER_LOG_ERROR(LOGGER_FLASHER, "program failed at offset %lu", (unsigned long)done);
+            return OS_FLASH_WRITE_FAIL;
+        }
+
+        crc = crc32_update(crc, s_buf, got);
+        done += got;
+        LOGGER_LOG_DEBUG(LOGGER_FLASHER, "  staged %lu/%lu B (%lu%%)",
+                         (unsigned long)done, (unsigned long)total, (unsigned long)(done * 100U / total));
+        if (cb != NULL)
+        {
+            cb(done, total, ctx);
+        }
+    }
+
+    *out_crc = crc32_final(crc);
+    return OS_FLASH_OK;
+}
+
+/* Read the staged image back and confirm the flash holds exactly what we streamed
+ * (`expected_crc`). Catches a bad program; the caller separately checks the read CRC
+ * against the intended image to catch a bad SD read. */
+static OsFlashStatus verifyStagedImage(uint32_t total, uint32_t expected_crc)
+{
+    const uint32_t staged_crc = crc32_calculate((const uint8_t *)STAGING_IMAGE_ADDR, total);
+    if (staged_crc != expected_crc)
+    {
+        LOGGER_LOG_ERROR(LOGGER_FLASHER, "staging readback mismatch: wrote %08lX read %08lX",
+                         (unsigned long)expected_crc, (unsigned long)staged_crc);
+        return OS_FLASH_VERIFY_FAIL;
+    }
+    return OS_FLASH_OK;
+}
+
 OsFlashStatus osFlasherStage(const char *path, uint32_t *out_crc, uint32_t *out_size,
                              OsFlashProgressCb cb, void *ctx)
 {
@@ -86,66 +165,15 @@ OsFlashStatus osFlasherStage(const char *path, uint32_t *out_crc, uint32_t *out_
 
     LOGGER_LOG_INFO(LOGGER_FLASHER, "staging OS image '%s' (%lu B)", path, (unsigned long)total);
 
+    /* Erase + stream both run against internal flash with the running OS untouched
+     * (only staging is written), bracketed by one unlock/lock. */
     flashLlUnlock();
-
-    /* Wipe the whole staging region (header + image area) before writing. */
-    OsFlashStatus status = OS_FLASH_OK;
-    LOGGER_LOG_INFO(LOGGER_FLASHER, "erasing staging sectors %lu..%lu",
-                    (unsigned long)STAGING_SECTOR_FIRST, (unsigned long)STAGING_SECTOR_LAST);
-    for (uint32_t s = STAGING_SECTOR_FIRST; s <= STAGING_SECTOR_LAST; s++)
-    {
-        /* A 128 KB sector erase runs with interrupts masked for up to ~4 s; kick
-         * right before so the watchdog's window starts fresh for each one. */
-        watchdogKick();
-        if (!flashLlEraseSector(s))
-        {
-            LOGGER_LOG_ERROR(LOGGER_FLASHER, "staging sector %lu erase failed", (unsigned long)s);
-            status = OS_FLASH_WRITE_FAIL;
-            break;
-        }
-        LOGGER_LOG_DEBUG(LOGGER_FLASHER, "  erased staging sector %lu", (unsigned long)s);
-    }
-
+    uint32_t read_crc = 0U;
+    OsFlashStatus status = eraseStagingRegion();
     if (status == OS_FLASH_OK)
     {
-        LOGGER_LOG_INFO(LOGGER_FLASHER, "streaming image -> staging 0x%08lX (%u B chunks)",
-                        (unsigned long)STAGING_IMAGE_ADDR, (unsigned)STAGE_CHUNK);
+        status = streamImageIntoStaging(&file, total, &read_crc, cb, ctx);
     }
-
-    uint32_t crc = CRC32_INIT;
-    uint32_t done = 0U;
-    while (status == OS_FLASH_OK && done < total)
-    {
-        watchdogKick(); /* per-chunk SD read + flash program: feed the watchdog */
-        UINT got = 0U;
-        if (f_read(&file, s_buf, STAGE_CHUNK, &got) != FR_OK)
-        {
-            status = OS_FLASH_READ_FAIL;
-            break;
-        }
-        if (got == 0U)
-        {
-            status = OS_FLASH_READ_FAIL; /* short file vs. f_size */
-            break;
-        }
-
-        if (!programChunk(STAGING_IMAGE_ADDR + done, s_buf, got))
-        {
-            LOGGER_LOG_ERROR(LOGGER_FLASHER, "program failed at offset %lu", (unsigned long)done);
-            status = OS_FLASH_WRITE_FAIL;
-            break;
-        }
-
-        crc = crc32_update(crc, s_buf, got);
-        done += got;
-        LOGGER_LOG_DEBUG(LOGGER_FLASHER, "  staged %lu/%lu B (%lu%%)",
-                         (unsigned long)done, (unsigned long)total, (unsigned long)(done * 100U / total));
-        if (cb != NULL)
-        {
-            cb(done, total, ctx);
-        }
-    }
-
     flashLlLock();
     f_close(&file);
 
@@ -155,17 +183,11 @@ OsFlashStatus osFlasherStage(const char *path, uint32_t *out_crc, uint32_t *out_
         return status;
     }
 
-    /* Read the staged image back and confirm the flash holds exactly what we read
-     * off the card. This catches a bad program; the caller separately checks the
-     * read CRC against the expected image to catch a bad read. */
-    LOGGER_LOG_INFO(LOGGER_FLASHER, "stream done (%lu B); verifying staging by readback", (unsigned long)done);
-    const uint32_t read_crc = crc32_final(crc);
-    const uint32_t staged_crc = crc32_calculate((const uint8_t *)STAGING_IMAGE_ADDR, total);
-    if (staged_crc != read_crc)
+    LOGGER_LOG_INFO(LOGGER_FLASHER, "stream done; verifying staging by readback");
+    status = verifyStagedImage(total, read_crc);
+    if (status != OS_FLASH_OK)
     {
-        LOGGER_LOG_ERROR(LOGGER_FLASHER, "staging readback mismatch: wrote %08lX read %08lX",
-                         (unsigned long)read_crc, (unsigned long)staged_crc);
-        return OS_FLASH_VERIFY_FAIL;
+        return status;
     }
 
     LOGGER_LOG_INFO(LOGGER_FLASHER, "staged + verified (%lu B, crc %08lX)",
@@ -192,10 +214,10 @@ OsFlashStatus osFlasherCommitAndReboot(uint32_t image_size, uint32_t image_crc32
     flashLlUnlock();
     /* Write the body first, then the magic last: a torn write leaves magic absent,
      * which the bootloader reads as "no pending update" (old OS boots untouched). */
-    bool ok = flashLlProgramWord(base + 4U, hdr.image_size);
-    ok = ok && flashLlProgramWord(base + 8U, hdr.image_crc32);
-    ok = ok && flashLlProgramWord(base + 12U, hdr.header_crc32);
-    ok = ok && flashLlProgramWord(base + 0U, hdr.magic);
+    bool ok = flashLlProgramWord(base + offsetof(OsStagingHeader, image_size), hdr.image_size);
+    ok = ok && flashLlProgramWord(base + offsetof(OsStagingHeader, image_crc32), hdr.image_crc32);
+    ok = ok && flashLlProgramWord(base + offsetof(OsStagingHeader, header_crc32), hdr.header_crc32);
+    ok = ok && flashLlProgramWord(base + offsetof(OsStagingHeader, magic), hdr.magic);
     flashLlLock();
 
     const OsStagingHeader *rb = (const OsStagingHeader *)base;

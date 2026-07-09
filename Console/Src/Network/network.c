@@ -74,15 +74,13 @@ static uint16_t npBuildFrame(uint8_t type, const uint8_t *payload, uint16_t len)
     s_tx[0] = NP_SYNC0;
     s_tx[1] = NP_SYNC1;
     s_tx[2] = type;
-    s_tx[3] = (uint8_t)(len & 0xFFU);
-    s_tx[4] = (uint8_t)(len >> 8U);
+    np_wr16(&s_tx[3], len);
     if (len > 0U && payload != NULL)
     {
         memcpy(&s_tx[NP_HEADER_SIZE], payload, len);
     }
     const uint16_t crc = np_crc16(&s_tx[2], (uint32_t)(1U + 2U + len)); /* type..payload */
-    s_tx[NP_HEADER_SIZE + len] = (uint8_t)(crc & 0xFFU);
-    s_tx[NP_HEADER_SIZE + len + 1U] = (uint8_t)(crc >> 8U);
+    np_wr16(&s_tx[NP_HEADER_SIZE + len], crc);
 
     return (uint16_t)(NP_FRAME_OVERHEAD + len);
 }
@@ -196,7 +194,7 @@ static int npReadRawFrame(uint16_t *out_len, uint32_t deadline)
     {
         return -1;
     }
-    const uint16_t len = (uint16_t)((uint16_t)s_rx[1] | ((uint16_t)s_rx[2] << 8U));
+    const uint16_t len = np_rd16(&s_rx[1]);
     if (len > NP_MAX_PAYLOAD || !npReadExact(&s_rx[3], len, deadline))
     {
         return -1;
@@ -207,7 +205,7 @@ static int npReadRawFrame(uint16_t *out_len, uint32_t deadline)
     {
         return -1;
     }
-    const uint16_t crc_rx = (uint16_t)((uint16_t)crc_bytes[0] | ((uint16_t)crc_bytes[1] << 8U));
+    const uint16_t crc_rx = np_rd16(crc_bytes);
     if (crc_rx != np_crc16(&s_rx[0], (uint32_t)(3U + len)))
     {
         LOGGER_LOG_WARN(LOGGER_NETWORK, "frame crc mismatch");
@@ -631,8 +629,8 @@ bool networkHttpOpen(const char *url, uint32_t *content_length, uint16_t *http_s
     }
 
     const uint8_t *p = &s_rx[3];
-    const uint16_t status = (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8U));
-    const uint32_t length = (uint32_t)p[2] | ((uint32_t)p[3] << 8U) | ((uint32_t)p[4] << 16U) | ((uint32_t)p[5] << 24U);
+    const uint16_t status = np_rd16(&p[0]);
+    const uint32_t length = np_rd32(&p[2]);
     if (http_status != NULL)
     {
         *http_status = status;
@@ -657,7 +655,8 @@ int networkHttpRead(uint8_t *buf, uint16_t max)
         max = NP_MAX_PAYLOAD;
     }
 
-    uint8_t req[2] = {(uint8_t)(max & 0xFFU), (uint8_t)(max >> 8U)};
+    uint8_t req[2];
+    np_wr16(req, max);
     uint8_t type;
     uint16_t len;
     if (!npTransact(NP_CMD_HTTP_READ, req, 2U, &type, &len, NP_TIMEOUT_HTTP_READ) || type != NP_RSP_HTTP_DATA)

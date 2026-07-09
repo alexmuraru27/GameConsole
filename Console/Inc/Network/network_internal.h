@@ -4,6 +4,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Little-endian field accessors for the wire protocol (the framing header, command
+ * payloads). One definition of the byte-shuffle so it isn't open-coded per field. */
+static inline uint16_t np_rd16(const uint8_t *p)
+{
+    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8U));
+}
+static inline uint32_t np_rd32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8U) | ((uint32_t)p[2] << 16U) | ((uint32_t)p[3] << 24U);
+}
+static inline void np_wr16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v & 0xFFU);
+    p[1] = (uint8_t)(v >> 8U);
+}
+
 /*
  * Internal seam between network.c (which owns the ESP-01 frame master: TX/RX
  * scratch, sync hunting, CRC) and other console drivers that speak the same

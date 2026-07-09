@@ -83,15 +83,15 @@ static void kernelInvokeGame(uint32_t callback)
     }
 
     /* Build the initial exception frame the invoke unstacks into the callback. */
-    uint32_t *frame = (uint32_t *)(GAME_STACK_TOP - 32U);
-    frame[0] = 0U;                  /* r0  */
-    frame[1] = 0U;                  /* r1  */
-    frame[2] = 0U;                  /* r2  */
-    frame[3] = 0U;                  /* r3  */
-    frame[4] = 0U;                  /* r12 */
-    frame[5] = s_game_frame_return; /* LR: the game-side return trampoline (Thumb bit kept) */
-    frame[6] = callback & ~0x1U;    /* PC  (Thumb state is in xPSR) */
-    frame[7] = 0x01000000U;         /* xPSR: T-bit set */
+    ExceptionFrame *frame = (ExceptionFrame *)(GAME_STACK_TOP - sizeof(ExceptionFrame));
+    frame->r0 = 0U;
+    frame->r1 = 0U;
+    frame->r2 = 0U;
+    frame->r3 = 0U;
+    frame->r12 = 0U;
+    frame->lr = s_game_frame_return; /* the game-side return trampoline (Thumb bit kept) */
+    frame->pc = callback & ~0x1U;    /* Thumb state is in xPSR, not PC bit 0 */
+    frame->xpsr = 0x01000000U;       /* T-bit set */
 
     s_game_psp = (uint32_t)frame;
     /* Arm the liveness deadline for this callback, then enter it. SysTick
@@ -217,7 +217,8 @@ static uint32_t kernelLeaveGame(void)
 /* Called from the SVC trampoline. Returns the EXC_RETURN the handler should use. */
 uint32_t svcHandlerMain(uint32_t *frame, uint32_t exc_return)
 {
-    const uint32_t id = frame[4]; /* r12 carries the syscall id */
+    ExceptionFrame *f = (ExceptionFrame *)frame;
+    const uint32_t id = f->r12; /* r12 carries the syscall id */
 
     switch (id)
     {
@@ -245,7 +246,7 @@ uint32_t svcHandlerMain(uint32_t *frame, uint32_t exc_return)
         return exc_return;
 
     default:
-        frame[0] = svcDispatch(id, frame); /* normal syscall; result -> caller r0 */
+        f->r0 = svcDispatch(id, frame); /* normal syscall; result -> caller r0 */
         return exc_return;
     }
 }

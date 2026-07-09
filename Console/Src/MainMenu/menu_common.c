@@ -1,6 +1,7 @@
 #include "menu_common.h"
 #include "font_utils.h"
 #include "joystick.h"
+#include "buzzer.h"
 #include "sysclock.h"
 #include "Util/utils.h"
 #include <string.h>
@@ -44,6 +45,39 @@ void menuResetSurface(void)
 bool menuCursorVisible(void)
 {
     return ((getSysTime() / MENU_BLINK_MS) & 1U) == 0U;
+}
+
+static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
+
+void menuBeepMove(void)
+{
+    buzzerPlay(0U, false, s_move_notes, 1U);
+}
+
+bool menuListStep(MenuListState *state, MenuNav nav, int count, int visible_rows)
+{
+    bool moved = false;
+    if (nav.up && state->selected > 0)
+    {
+        state->selected--;
+        moved = true;
+    }
+    else if (nav.down && state->selected < count - 1)
+    {
+        state->selected++;
+        moved = true;
+    }
+
+    /* Scroll the viewport to keep the selection on screen. */
+    if (state->selected < state->top)
+    {
+        state->top = state->selected;
+    }
+    else if (state->selected >= state->top + visible_rows)
+    {
+        state->top = state->selected - visible_rows + 1;
+    }
+    return moved;
 }
 
 static uint16_t glyphAdvance(FontSize size)

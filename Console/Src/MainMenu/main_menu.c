@@ -47,7 +47,6 @@ static const RootItem s_root_items[] = {
 
 static uint32_t s_root_selected;
 
-static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 static const uint16_t s_select_notes[] = {NOTE_E5, 40U, NOTE_A5, 60U};
 
 /* ---- Root menu ---- */
@@ -59,13 +58,13 @@ static MenuTransition rootUpdate(void)
     if (nav.down && (s_root_selected + 1U < ROOT_ITEM_COUNT))
     {
         s_root_selected++;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "root: highlight '%s'", s_root_items[s_root_selected].label);
     }
     else if (nav.up && (s_root_selected > 0U))
     {
         s_root_selected--;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "root: highlight '%s'", s_root_items[s_root_selected].label);
     }
     else if (nav.enter)

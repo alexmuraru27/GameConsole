@@ -5,6 +5,19 @@
 #include <stdbool.h>
 #include "header_interface.h"
 
+/* The 8-word exception frame the Cortex-M hardware stacks on exception entry (the
+ * basic frame, no FP context): r0-r3, r12, LR, return PC, xPSR — in that order.
+ * Cast the faulting/parked stack pointer to this to read or build the frame by
+ * field name instead of magic word indices. Layout-compatible with uint32_t[8]. */
+typedef struct
+{
+    uint32_t r0, r1, r2, r3;
+    uint32_t r12;
+    uint32_t lr;
+    uint32_t pc;
+    uint32_t xpsr;
+} ExceptionFrame;
+
 /*
  * The game/console context switch.
  *

@@ -2,9 +2,60 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "stm32f4xx.h"
-#include "timer.h"
+#include "sysclock.h" /* APB1_TIMER_CLK_HZ for the PWM period */
 #include <stddef.h>
 #include "logger.h"
+
+/* ---- TIM3_CH2 PWM output stage (PB5) ----
+ * The buzzer's single square-wave voice. Owned here (not in the generic timer
+ * module) so the whole driver — arbitration + the pin it drives — lives together. */
+
+static void timer3Init(void)
+{
+    // Defaults to 1ms
+    TIM3->CR1 = 0U;                                                                        // Reset control register
+    TIM3->PSC = (APB1_TIMER_CLK_HZ / 1000000U) - 1U;                                       // 1 MHz tick (1 µs)
+    TIM3->ARR = 1000U;                                                                     // Default period
+    TIM3->CCR2 = 500U;                                                                     // 50% duty cycle for Channel 2
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1); // PWM mode 1 for Channel 2
+    TIM3->CCER |= TIM_CCER_CC2E;                                                           // Enable channel 2 output
+}
+
+static void timer3Trigger(uint32_t frequency_hz)
+{
+    // calculate PWM period for frequency: cycles = (APB1_TIMER_CLK_HZ / frequency_hz)
+    uint32_t arr = APB1_TIMER_CLK_HZ / frequency_hz;
+    // ensure valid period (arr should be at least 2)
+    if (arr < 2)
+        arr = 2;
+    // adjust prescaler for low frequencies to improve precision
+    uint32_t psc = 0;
+    while (arr > 65535)
+    {
+        // TIM3 ARR is 16-bit
+        psc++;
+        arr = APB1_TIMER_CLK_HZ / (frequency_hz * (psc + 1));
+    }
+
+    TIM3->PSC = psc;
+    TIM3->ARR = arr - 1U;
+    TIM3->CCR2 = arr / 2U; // 50% duty (square wave)
+    // Restore PWM mode 1 (timer3Disable forces the output to inactive/low when idle)
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | (TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1);
+    TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+static void timer3Disable(void)
+{
+    // Stop the counter, then force the output compare to its inactive (low) level.
+    // Just clearing CEN freezes the counter and leaves PB5 driven at whatever the last
+    // comparison produced — which can be a constant 3.3V. The buzzer pin is AF push-pull,
+    // so that DC bias keeps current flowing through the passive buzzer and heats it up.
+    // OC2M = 0b100 (force inactive) drives OC2REF low independent of the counter, so with
+    // active-high polarity (CC2P = 0) PB5 is actively held at 0V while idle.
+    TIM3->CR1 &= ~TIM_CR1_CEN;
+    TIM3->CCMR1 = (TIM3->CCMR1 & ~TIM_CCMR1_OC2M) | TIM_CCMR1_OC2M_2;
+}
 
 #define SOUND_TRACKS 5
 typedef struct
@@ -30,6 +81,7 @@ static bool clearTrack(const uint8_t track_number);
 
 void buzzerInit(void)
 {
+    timer3Init(); /* bring up the TIM3_CH2 PWM output stage this driver owns */
     for (uint8_t track_id = 0U; track_id < SOUND_TRACKS; track_id++)
     {
         clearTrack(track_id);

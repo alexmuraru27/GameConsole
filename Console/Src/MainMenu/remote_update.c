@@ -35,7 +35,6 @@ typedef struct
 static DisplayRow s_rows[RU_MAX_ENTRIES];
 static int s_row_count;
 
-static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 
 /* ---- helpers ---- */
 
@@ -316,7 +315,7 @@ static void downloadRow(int row)
     if (st == DOWNLOAD_OK)
     {
         strcpy(s_status[row], "UpToDate");
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         downloadUiWait("UPDATES", "Download complete!", g_menu_pal_accent);
     }
     else
@@ -379,8 +378,7 @@ void remoteGamesRun(void)
         s_row_count++;
     }
 
-    int selected = 0;
-    int top = 0;
+    MenuListState list = {0, 0};
     for (;;)
     {
         const MenuNav nav = menuPollNav();
@@ -388,24 +386,12 @@ void remoteGamesRun(void)
         {
             return;
         }
-        if (nav.up && selected > 0)
+        if (menuListStep(&list, nav, s_row_count, RU_VISIBLE_ROWS))
         {
-            selected--;
-            buzzerPlay(0U, false, s_move_notes, 1U);
+            menuBeepMove();
         }
-        else if (nav.down && selected < s_row_count - 1)
-        {
-            selected++;
-            buzzerPlay(0U, false, s_move_notes, 1U);
-        }
-        if (selected < top)
-        {
-            top = selected;
-        }
-        else if (selected >= top + RU_VISIBLE_ROWS)
-        {
-            top = selected - RU_VISIBLE_ROWS + 1;
-        }
+        const int selected = list.selected;
+        const int top = list.top;
 
         if (nav.enter && s_row_count > 0)
         {

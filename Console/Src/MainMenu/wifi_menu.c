@@ -19,7 +19,6 @@
 
 static NetworkAp s_aps[WIFI_MAX_APS];
 
-static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 
 /* ---- credential persistence (console settings) ---- */
 
@@ -144,8 +143,7 @@ void wifiMenuRun(void)
     bool saved_valid;
     loadSaved(saved_ssid, saved_pass, &saved_valid);
 
-    int selected = 0;
-    int top = 0;
+    MenuListState list = {0, 0};
     for (;;)
     {
         const MenuNav nav = menuPollNav();
@@ -153,24 +151,12 @@ void wifiMenuRun(void)
         {
             return;
         }
-        if (nav.up && selected > 0)
+        if (menuListStep(&list, nav, count, WIFI_VISIBLE_ROWS))
         {
-            selected--;
-            buzzerPlay(0U, false, s_move_notes, 1U);
+            menuBeepMove();
         }
-        else if (nav.down && selected < count - 1)
-        {
-            selected++;
-            buzzerPlay(0U, false, s_move_notes, 1U);
-        }
-        if (selected < top)
-        {
-            top = selected;
-        }
-        else if (selected >= top + WIFI_VISIBLE_ROWS)
-        {
-            top = selected - WIFI_VISIBLE_ROWS + 1;
-        }
+        const int selected = list.selected;
+        const int top = list.top;
 
         if (nav.enter)
         {

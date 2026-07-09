@@ -80,6 +80,8 @@ Src/Renderer/renderer.c \
 Src/Kernel/faults.c \
 Src/Kernel/crash_report.c \
 Src/Kernel/syscall.c \
+Src/Kernel/syscall_validate.c \
+Src/Kernel/os_services.c \
 Src/Kernel/mpu.c \
 Src/Kernel/scheduler.c \
 $(ESP_FLASHER_DIR)/src/esp_loader.c \

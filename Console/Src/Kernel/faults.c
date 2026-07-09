@@ -54,6 +54,7 @@ const uint32_t g_cfsr_flag_count = sizeof(g_cfsr_flags) / sizeof(g_cfsr_flags[0]
 
 uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
 {
+    const ExceptionFrame *f = (const ExceptionFrame *)frame;
     const uint32_t cfsr = SCB->CFSR;
     /* EXC_RETURN bit 2 set => the faulting context was using the PSP, i.e. a
      * thread (the game). Clear => the kernel/handler faulted on the MSP. */
@@ -61,9 +62,9 @@ uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
 
     printf("\n=== %s FAULT ===\n", faultKindName(kind));
     printf("ctx =%s (EXC_RETURN=0x%08lX)\n", from_psp ? "PSP/thread" : "MSP/handler", (unsigned long)exc_return);
-    printf("PC  =0x%08lX\n", (unsigned long)frame[6]);
-    printf("LR  =0x%08lX\n", (unsigned long)frame[5]);
-    printf("PSR =0x%08lX\n", (unsigned long)frame[7]);
+    printf("PC  =0x%08lX\n", (unsigned long)f->pc);
+    printf("LR  =0x%08lX\n", (unsigned long)f->lr);
+    printf("PSR =0x%08lX\n", (unsigned long)f->xpsr);
     printf("CFSR=0x%08lX HFSR=0x%08lX\n", (unsigned long)cfsr, (unsigned long)SCB->HFSR);
 
     printf("flags:");
@@ -96,7 +97,7 @@ uint32_t faultReport(uint32_t *frame, uint32_t exc_return, FaultKind kind)
          * them on the crash banner and appends them to Crashes/crash.log, so the
          * fault can be decoded offline without a probe (tools/scripts/decode_crash.py).
          * MMFAR/BFAR must be read now, before the W1C below invalidates them. */
-        crashReportCaptureFault((uint8_t)kind, frame[6], frame[5], frame[7],
+        crashReportCaptureFault((uint8_t)kind, f->pc, f->lr, f->xpsr,
                                 cfsr, SCB->HFSR, SCB->MMFAR, SCB->BFAR);
         SCB->CFSR = cfsr;       /* write-1-to-clear the sticky fault bits */
         SCB->HFSR = SCB->HFSR;

@@ -28,6 +28,8 @@
 #include "font_utils.h"
 #include "faults.h"
 #include "syscall.h"
+#include "os_services.h"
+#include "keyboard.h"
 #include "mpu.h"
 #include "watchdog.h"
 #include <stdio.h>
@@ -162,6 +164,11 @@ void gameConsoleInit()
 
     peripheralsInit();
     devicesInit();
+
+    /* Wire the app's on-screen keyboard into the kernel's osTextInput service, so
+     * the kernel reaches it downward instead of including the menu UI. */
+    osServicesSetTextInput(keyboardModal);
+
     mpuInit(); /* arm MPU confinement before any game can run */
     beepNext();
     playBootSong();

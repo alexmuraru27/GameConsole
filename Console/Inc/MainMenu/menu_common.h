@@ -110,6 +110,21 @@ typedef struct
 
 MenuNav menuPollNav(void);
 
+/* Scrolling-list state: the highlighted item and the first visible row. */
+typedef struct
+{
+    int selected;
+    int top;
+} MenuListState;
+
+/* Apply an up/down nav to a list of `count` items showing `visible_rows` at once:
+ * move the (clamped) selection, then scroll the viewport to keep it visible.
+ * Returns true if the selection actually moved (so the caller can beep). */
+bool menuListStep(MenuListState *state, MenuNav nav, int count, int visible_rows);
+
+/* The standard selection-move beep (one short tick), shared by every list screen. */
+void menuBeepMove(void);
+
 /* ------------------------------------------------------------------ *
  *  A segmented level gauge (e.g. a brightness slider): `total` cells
  *  drawn left-to-right at (x,y), the first `filled` in the accent ink

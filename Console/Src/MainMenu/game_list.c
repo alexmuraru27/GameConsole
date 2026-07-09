@@ -42,7 +42,6 @@ static bool s_a_hold_fired = false; /* the hold threshold already fired for this
 static bool s_confirm_delete = false;
 
 /* Short navigation blips (kept in flash so the buzzer's stored pointer stays valid). */
-static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 static const uint16_t s_select_notes[] = {NOTE_E5, 40U, NOTE_A5, 60U};
 
 /* Display name for a binary index: filename with the extension stripped, capped. */
@@ -138,7 +137,7 @@ MenuTransition gameListUpdate(void)
         if (in.special2.pressed)
         {
             s_confirm_delete = false;
-            buzzerPlay(0U, false, s_move_notes, 1U);
+            menuBeepMove();
             LOGGER_LOG_INFO(LOGGER_MENU, "games: delete cancelled");
         }
         else if (in.special1.pressed)
@@ -166,13 +165,13 @@ MenuTransition gameListUpdate(void)
     if (nav.down && (s_selected + 1U < s_num_games))
     {
         s_selected++;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "games: highlight '%s'", s_names[s_selected]);
     }
     else if (nav.up && (s_selected > 0U))
     {
         s_selected--;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "games: highlight '%s'", s_names[s_selected]);
     }
 

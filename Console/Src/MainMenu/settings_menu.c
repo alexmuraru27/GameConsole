@@ -157,7 +157,6 @@ static uint8_t s_depth; /* current frame index: s_stack[s_depth] */
 #define ROW_CURSOR_DX MENU_CURSOR_DX /* cursor sits this far left of the label */
 #define ROW_RIGHT_PAD 60 /* right margin for a toggle's value column */
 
-static const uint16_t s_move_notes[] = {NOTE_A5, 24U};
 static const uint16_t s_toggle_notes[] = {NOTE_E5, 40U, NOTE_A5, 60U};
 
 /* Step a SETTING_NUMBER by +/- its step, clamped to [min,max]. Applies + persists
@@ -177,7 +176,7 @@ static void numberStep(const SettingNode *item, int dir)
     if ((uint8_t)next != cur)
     {
         item->num_set((uint8_t)next);
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
     }
 }
 
@@ -217,13 +216,13 @@ MenuTransition settingsMenuUpdate(void)
     if (nav.down && (frame->selected + 1U < category->child_count))
     {
         frame->selected++;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: highlight '%s'", category->children[frame->selected].label);
     }
     else if (nav.up && (frame->selected > 0U))
     {
         frame->selected--;
-        buzzerPlay(0U, false, s_move_notes, 1U);
+        menuBeepMove();
         LOGGER_LOG_DEBUG(LOGGER_MENU, "settings: highlight '%s'", category->children[frame->selected].label);
     }
     else if (nav.left && category->children[frame->selected].kind == SETTING_NUMBER)
