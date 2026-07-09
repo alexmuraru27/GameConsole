@@ -7,6 +7,7 @@
 #include "sysclock.h"
 #include "logger.h"
 #include "loader.h"
+#include "loader_media.h"
 #include "esp_flasher.h"
 #include "downloader.h"
 #include "flash_ui.h"

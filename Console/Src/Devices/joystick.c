@@ -1,6 +1,5 @@
 #include "joystick.h"
 #include "adc.h"
-#include "gpio.h"
 #include "sysclock.h"
 #include "logger.h"
 #include <stdio.h>
@@ -48,10 +47,32 @@ static InputState s_frame_state;
 static volatile uint16_t *s_buffer_addr = 0U;
 static bool s_initialized = false;
 
+/* Gather the 10 button GPIOs into a 10-bit active-high mask (pins are active-low
+ * with pull-ups; already inverted here). Bit layout matches the JOYSTICK_DATA_*_BTN_*
+ * positions used below: 0=R_Up 1=R_Right 2=R_Down 3=R_Left 4=L_Up 5=L_Right 6=L_Down
+ * 7=L_Left 8=Special1 9=Special2. Owned by the joystick driver (which defines the
+ * layout), not the generic pin setup. */
+static uint16_t readRawButtons(void)
+{
+    const uint32_t a = ~GPIOA->IDR;
+    const uint32_t b = ~GPIOB->IDR;
+    return (uint16_t)(
+        (((a >> 0U) & 1U) << 0U) |   // PA0  -> R_Up
+        (((a >> 1U) & 1U) << 1U) |   // PA1  -> R_Right
+        (((a >> 5U) & 1U) << 2U) |   // PA5  -> R_Down
+        (((a >> 6U) & 1U) << 3U) |   // PA6  -> R_Left
+        (((a >> 7U) & 1U) << 4U) |   // PA7  -> L_Up
+        (((a >> 8U) & 1U) << 5U) |   // PA8  -> L_Right
+        (((a >> 11U) & 1U) << 6U) |  // PA11 -> L_Down
+        (((a >> 12U) & 1U) << 7U) |  // PA12 -> L_Left
+        (((b >> 11U) & 1U) << 8U) |  // PB11 -> Special1
+        (((b >> 12U) & 1U) << 9U));  // PB12 -> Special2
+}
+
 /* Debounce the raw button GPIOs into s_btn_data. Runs in the TIM7 poll ISR. */
 static void readButtons(void)
 {
-    const uint32_t raw_all = gpioReadButtons();
+    const uint32_t raw_all = readRawButtons();
     for (uint8_t i = 0U; i < BTN_COUNT; ++i)
     {
         const uint8_t raw_bit = (raw_all >> i) & 1U;

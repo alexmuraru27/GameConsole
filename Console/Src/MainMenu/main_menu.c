@@ -3,6 +3,7 @@
 #include "game_list.h"
 #include "settings_menu.h"
 #include "loader.h"
+#include "loader_media.h"
 #include "renderer.h"
 #include "buzzer.h"
 #include "sysclock.h"

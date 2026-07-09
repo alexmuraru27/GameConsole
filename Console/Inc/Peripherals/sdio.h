@@ -1,6 +1,7 @@
 #ifndef __SDIO_H
 #define __SDIO_H
 #include <stdint.h>
+#include <stdbool.h>
 
 /*
  * SD Card Commands — Physical Layer Spec v3.01
@@ -59,4 +60,8 @@ void sdioRaiseClock(void);
 uint8_t sdioSendCommand(uint8_t cmd, uint32_t arg, uint8_t resp_type);
 uint8_t sdioSendRobustAcmd41(void);
 uint8_t sdSwitchTo4bitMode(uint32_t rca);
+
+/* SD card-detect (PD3, active-low): true when a card is seated. */
+bool sdCardPresent(void);
+
 #endif /* __SDIO_H */

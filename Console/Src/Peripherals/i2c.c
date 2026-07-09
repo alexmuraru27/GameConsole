@@ -1,7 +1,6 @@
 #include "i2c.h"
 #include <stm32f407xx.h>
 #include <stddef.h>
-#include "gpio.h"
 #include "sysclock.h"
 #include "logger.h"
 
@@ -11,12 +10,52 @@
 
 #define I2C_TIMEOUT_COUNT 1000000U
 
+/* Free a wedged I2C1 bus before the peripheral is brought up. If a slave was reset
+ * mid-byte (e.g. an MCU reset during an EEPROM read) it can hold SDA low, which
+ * blocks the master from ever generating a START. PB8=SCL, PB9=SDA are already
+ * open-drain with pull-ups (set up by gpioInit); we only flip MODER to GPIO output,
+ * bit-bang SCL until the slave releases SDA, drive a STOP, then hand the pins back
+ * to AF4. Open-drain: writing 1 releases the line (pulled high), 0 drives it low.
+ * Returns the number of recovery clock pulses (0 = bus was already free). */
+static uint8_t i2cBusRecovery(void)
+{
+    // Release both lines, then take SCL+SDA as GPIO outputs.
+    GPIOB->BSRR = GPIO_BSRR_BS8 | GPIO_BSRR_BS9;
+    GPIOB->MODER = (GPIOB->MODER & ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk)) |
+                   (1U << GPIO_MODER_MODE8_Pos) | (1U << GPIO_MODER_MODE9_Pos);
+
+    // Clock SCL until SDA (PB9) comes high, up to a full byte + ack (9 pulses).
+    uint8_t pulses = 0U;
+    while (pulses < 9U && (GPIOB->IDR & GPIO_IDR_ID9_Msk) == 0U)
+    {
+        GPIOB->BSRR = GPIO_BSRR_BR8; // SCL low
+        delayUs(5U);
+        GPIOB->BSRR = GPIO_BSRR_BS8; // SCL high
+        delayUs(5U);
+        pulses++;
+    }
+
+    // STOP: with SCL high, drive SDA low then release it (a low->high SDA edge
+    // while SCL is high) to leave the bus idle.
+    GPIOB->BSRR = GPIO_BSRR_BR9; // SDA low
+    delayUs(5U);
+    GPIOB->BSRR = GPIO_BSRR_BS8; // SCL high
+    delayUs(5U);
+    GPIOB->BSRR = GPIO_BSRR_BS9; // SDA high  => STOP
+    delayUs(5U);
+
+    // Hand PB8/PB9 back to AF4 (I2C1); OTYPER/PUPDR/AFR from gpioInit stay put.
+    GPIOB->MODER = (GPIOB->MODER & ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk)) |
+                   (2U << GPIO_MODER_MODE8_Pos) | (2U << GPIO_MODER_MODE9_Pos);
+    return pulses;
+}
+
 void i2cInit(void)
 {
     // Free the bus before configuring the peripheral: a slave left mid-byte by a
     // prior reset can hold SDA low and wedge every START. Recovery bit-bangs the
     // pins as GPIO (they're set up by gpioInit, which runs first), then restores AF.
-    const uint8_t recovery_pulses = gpioI2cBusRecovery();
+    const uint8_t recovery_pulses = i2cBusRecovery();
     if (recovery_pulses > 0U)
     {
         LOGGER_LOG_WARN(LOGGER_CORE, "I2C bus was stuck; freed with %u SCL pulse(s)",

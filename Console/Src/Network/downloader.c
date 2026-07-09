@@ -6,6 +6,7 @@
 
 #include "network.h"
 #include "network_protocol.h"
+#include "server_config.h"
 #include "crc.h"
 #include "sysclock.h"
 #include "watchdog.h"
@@ -13,30 +14,15 @@
 #include "sd_layout.h"
 #include "ff.h"
 
-/* Example address used for the auto-created server.txt and as the fallback.
- * Either "host:port" or a full "http://host:port" works (see makeUrl). */
-#define DEFAULT_SERVER_ADDR "192.168.100.29:25568"
-
-/* Written verbatim when server.txt is missing, so the format is self-evident.
- * Only the first line is parsed; the rest is a guiding comment. */
-#define SERVER_CFG_TEMPLATE DEFAULT_SERVER_ADDR \
-    "\n# Update server address. First line only; IP or hostname, optional http:// scheme:\n" \
-    "#   192.168.1.50:25568   |   myserver:25568   |   http://myserver.lan:25568\n" \
-    "# A hostname is resolved by the ESP via DNS (must be resolvable on your network).\n"
-
-#define SERVER_CFG_PATH SD_DIR_SETTINGS "/server.txt"
 #define MANIFEST_PATH "manifest.csv"                         /* remote URL path (GET) */
 #define MANIFEST_SAVE_PATH SD_DIR_MANIFESTS "/manifest.csv"  /* saved copy of the fetched manifest */
 #define DOWNLOADED_PATH SD_DIR_MANIFESTS "/downloaded.csv"   /* local record of what we've fetched */
 #define DOWNLOADED_MAX 48                                    /* cap for the read-modify-write buffer */
 
-#define URL_MAX NP_URL_MAX
 #define MANIFEST_BUF_MAX 4096U      /* whole manifest text (~50 entries)        */
 #define CHUNK_MAX NP_MAX_PAYLOAD    /* per HTTP read                            */
 #define SPEED_WINDOW_MS 500U        /* speed averaging window                   */
 
-static char s_base_url[URL_MAX];
-static char s_url[URL_MAX];
 static uint8_t s_chunk[CHUNK_MAX];
 static char s_manifest[MANIFEST_BUF_MAX + 1U];
 
@@ -57,107 +43,6 @@ const char *downloaderStatusString(DownloadStatus status)
     default:
         return "unknown";
     }
-}
-
-/* ---- URL helpers --------------------------------------------------- */
-
-/* Create server.txt with the example template if it isn't on the card yet, so
- * the user sees the expected format and can edit it (also via Settings). */
-static void ensureServerCfg(void)
-{
-    FILINFO info;
-    if (f_stat(SERVER_CFG_PATH, &info) == FR_OK)
-    {
-        return; /* already present */
-    }
-    FIL f;
-    if (f_open(&f, SERVER_CFG_PATH, FA_WRITE | FA_CREATE_NEW) == FR_OK)
-    {
-        UINT written = 0U;
-        const char *t = SERVER_CFG_TEMPLATE;
-        f_write(&f, t, (UINT)strlen(t), &written);
-        f_close(&f);
-        LOGGER_LOG_INFO(LOGGER_NETWORK, "created template %s", SERVER_CFG_PATH);
-    }
-}
-
-/* Base address from 0:/server.txt (first line, trimmed) else the default. */
-static const char *baseUrl(void)
-{
-    ensureServerCfg();
-
-    FIL f;
-    if (f_open(&f, SERVER_CFG_PATH, FA_READ) == FR_OK)
-    {
-        UINT n = 0U;
-        const FRESULT res = f_read(&f, s_base_url, sizeof(s_base_url) - 1U, &n);
-        f_close(&f);
-        if (res == FR_OK && n > 0U)
-        {
-            s_base_url[n] = '\0';
-            /* keep only the first line, trimmed at whitespace */
-            for (char *p = s_base_url; *p != '\0'; p++)
-            {
-                if (*p == '\r' || *p == '\n' || *p == ' ' || *p == '\t')
-                {
-                    *p = '\0';
-                    break;
-                }
-            }
-            if (s_base_url[0] != '\0')
-            {
-                return s_base_url;
-            }
-        }
-    }
-    return DEFAULT_SERVER_ADDR;
-}
-
-/* Compose "http://" (if absent) + base + "/" + path into s_url. */
-static const char *makeUrl(const char *path)
-{
-    const char *base = baseUrl();
-    s_url[0] = '\0';
-    if (strncmp(base, "http", 4) != 0)
-    {
-        strncat(s_url, "http://", sizeof(s_url) - 1U);
-    }
-    strncat(s_url, base, sizeof(s_url) - strlen(s_url) - 1U);
-    if (s_url[strlen(s_url) - 1U] != '/')
-    {
-        strncat(s_url, "/", sizeof(s_url) - strlen(s_url) - 1U);
-    }
-    strncat(s_url, path, sizeof(s_url) - strlen(s_url) - 1U);
-    return s_url;
-}
-
-void downloaderGetServerAddr(char *out, uint16_t out_size)
-{
-    if (out == NULL || out_size == 0U)
-    {
-        return;
-    }
-    strncpy(out, baseUrl(), out_size - 1U);
-    out[out_size - 1U] = '\0';
-}
-
-bool downloaderSetServerAddr(const char *addr)
-{
-    if (addr == NULL)
-    {
-        return false;
-    }
-    FIL f;
-    if (f_open(&f, SERVER_CFG_PATH, FA_WRITE | FA_CREATE_ALWAYS) != FR_OK)
-    {
-        return false;
-    }
-    UINT written = 0U;
-    const FRESULT r1 = f_write(&f, addr, (UINT)strlen(addr), &written);
-    const FRESULT r2 = f_write(&f, "\n", 1U, &written);
-    f_close(&f);
-    LOGGER_LOG_INFO(LOGGER_NETWORK, "server address set to '%s'", addr);
-    return r1 == FR_OK && r2 == FR_OK;
 }
 
 /* ---- Manifest ------------------------------------------------------ */
@@ -204,7 +89,7 @@ int downloaderFetchManifest(RemoteEntry *out, int max)
 
     uint32_t length = 0U;
     uint16_t status = 0U;
-    if (!networkHttpOpen(makeUrl(MANIFEST_PATH), &length, &status))
+    if (!networkHttpOpen(downloaderMakeUrl(MANIFEST_PATH), &length, &status))
     {
         LOGGER_LOG_WARN(LOGGER_NETWORK, "manifest fetch failed (http %u)", (unsigned)status);
         networkHttpClose();
@@ -263,7 +148,7 @@ DownloadStatus downloaderFetchFile(const RemoteEntry *entry, const char *sd_path
 
     uint32_t length = 0U;
     uint16_t status = 0U;
-    if (!networkHttpOpen(makeUrl(entry->path), &length, &status))
+    if (!networkHttpOpen(downloaderMakeUrl(entry->path), &length, &status))
     {
         networkHttpClose();
         return DOWNLOAD_NO_SERVER;

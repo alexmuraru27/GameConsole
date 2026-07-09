@@ -8,6 +8,7 @@
 #include "buzzer.h"
 #include "backlight.h"
 #include "gpio.h"
+#include "esp01.h"
 #include "dma.h"
 #include "ILI9341.h"
 #include "adc.h"
@@ -18,6 +19,7 @@
 #include <string.h>
 #include "asset_loader.h"
 #include "loader.h"
+#include "loader_media.h"
 #include "i2c.h"
 #include "external_eeprom.h"
 #include "settings_storage.h"

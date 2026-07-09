@@ -39,6 +39,7 @@ Src/Peripherals/watchdog.c \
 Src/Devices/ILI9341.c \
 Src/Devices/joystick.c \
 Src/Devices/buzzer.c \
+Src/Devices/esp01.c \
 Src/Devices/backlight.c \
 Src/Devices/external_eeprom.c \
 Src/FatFs/diskio.c \
@@ -61,12 +62,16 @@ Src/Flasher/esp_flasher_port.c \
 Src/Flasher/flash_ll.c \
 Src/Flasher/os_flasher.c \
 Src/Loader/loader.c \
+Src/Loader/loader_media.c \
+Src/Loader/crash_log.c \
 Src/Loader/game_loader.c \
 Src/Loader/asset_loader.c \
 Src/Crc/crc.c \
 Src/Network/network.c \
+Src/Network/network_frame.c \
 Src/Network/espnow_link.c \
 Src/Network/downloader.c \
+Src/Network/server_config.c \
 Src/Multiplayer/mp_session.c \
 Src/SettingsStorage/settings_storage.c \
 Src/SettingsStorage/console_settings_storage.c \

@@ -20,6 +20,20 @@ static inline void np_wr16(uint8_t *p, uint16_t v)
     p[1] = (uint8_t)(v >> 8U);
 }
 
+/* ------------------------------------------------------------------ *
+ *  Frame transport (network_frame.c) — the shared byte/frame layer the
+ *  WiFi/HTTP command API (network.c) builds on. npBegin re-asserts the
+ *  runtime baud and drains stale RX; npSendFrame/npTransact send a
+ *  command (and read one reply); npRxPayload returns the last reply's
+ *  payload (valid until the next transaction).
+ * ------------------------------------------------------------------ */
+void npBegin(void);
+void npDrainRx(uint32_t idle_ms, uint32_t max_ms);
+bool npSendFrame(uint8_t type, const uint8_t *payload, uint16_t len);
+bool npTransact(uint8_t cmd, const uint8_t *payload, uint16_t len,
+                uint8_t *rsp_type, uint16_t *rsp_len, uint32_t timeout_ms);
+const uint8_t *npRxPayload(void);
+
 /*
  * Internal seam between network.c (which owns the ESP-01 frame master: TX/RX
  * scratch, sync hunting, CRC) and other console drivers that speak the same

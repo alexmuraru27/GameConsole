@@ -5,6 +5,7 @@
 #include "menu_common.h"
 #include "logger.h"
 #include "loader.h"
+#include "loader_media.h"
 #include "flash_ui.h"
 #include "os_flasher.h"
 #include "sd_layout.h"

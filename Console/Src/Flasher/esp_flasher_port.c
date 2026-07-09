@@ -1,9 +1,9 @@
 #include "esp_flasher_port.h"
+#include "esp01.h"
 
 #include <stddef.h>
 
 #include "usart.h"
-#include "gpio.h"
 #include "sysclock.h"
 
 /* Bootstrap timing — generous holds; flashing is a one-shot modal operation. */

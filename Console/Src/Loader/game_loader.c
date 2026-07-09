@@ -1,6 +1,7 @@
 #include "game_loader.h"
 #include "ff.h"
 #include "loader.h"
+#include "crash_log.h"
 #include "asset_loader.h"
 #include "settings_storage.h"
 #include "logger.h"
@@ -220,7 +221,7 @@ static bool finalizeGameExit(void)
         }
         char line[256]; /* base line is ~170 chars before the CFSR flag names */
         crashReportFormatLine(line, sizeof(line));
-        loaderAppendCrashLog(line); /* persist to SD for offline decode */
+        crashLogAppend(line); /* persist to SD for offline decode */
         LOGGER_LOG_ERROR(LOGGER_LOADER, "game crashed; recovered to console");
     }
     else

@@ -198,3 +198,10 @@ uint8_t sdioSendRobustAcmd41(void)
     LOGGER_LOG_ERROR(LOGGER_SDIO, "ACMD41 timeout after %lu attempt(s)", (unsigned long)attempt);
     return SD_TIMEOUT;
 }
+
+/* SD card-detect (PD3, active-low): true when a card is seated. Part of the SD
+ * subsystem — the pin is configured by gpioInit, but its meaning lives here. */
+bool sdCardPresent(void)
+{
+    return (GPIOD->IDR & GPIO_IDR_ID3_Msk) == 0U;
+}
