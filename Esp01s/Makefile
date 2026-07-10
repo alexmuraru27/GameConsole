@@ -1,8 +1,11 @@
 include ../common.mk
 
-# PlatformIO CLI. Prefer one on PATH, else fall back to the core the VS Code
-# extension installs at ~/.platformio/penv/bin/pio. Override with PIO=<path>.
-PIO ?= $(shell command -v pio 2>/dev/null || echo $(HOME)/.platformio/penv/bin/pio)
+# PlatformIO CLI. Prefer the PlatformIO-managed core in its own virtualenv
+# (~/.platformio/penv, installed by the VS Code extension / official installer):
+# it bundles matching dependencies, so it can't break against system packages the
+# way a distro-packaged `pio` on PATH can — e.g. PlatformIO 4.x calling Click's
+# removed `resultcallback()`. Fall back to a `pio` on PATH. Override with PIO=<path>.
+PIO ?= $(shell test -x $(HOME)/.platformio/penv/bin/pio && echo $(HOME)/.platformio/penv/bin/pio || command -v pio 2>/dev/null)
 
 # PlatformIO build output for the [env:esp01s] environment.
 FIRMWARE = .pio/build/esp01s/firmware.bin
