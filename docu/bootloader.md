@@ -74,8 +74,8 @@ bootloader's table must sit at `0x08000000` and is always what runs first.
 
 So the bootloader's table only matters during its brief post-reset window; once the
 app is running, **all** interrupts go through the app's own table at `0x08004000`.
-(That's the reason the app had to move above the bootloader: two tables can't both
-own `0x08000000`.) The bootloader is therefore not self-updatable — see §9.
+(The app sits above the bootloader because two vector tables cannot both own
+`0x08000000`.) The bootloader is therefore not self-updatable — see §9.
 
 ---
 
@@ -203,7 +203,7 @@ The bootloader is a minimal separate target: it reuses the console's `startup.s`
 - **The bootloader is not self-updatable.** It lives in sector 0, which the self-flash never erases (so an interrupted update can't corrupt it). Changing the bootloader's code or vector table therefore needs an SWD reflash (`make -C Bootloader flash`).
 - **The OS image must fit the 240 KB app region.** Staging is 256 KB, so the app region is the binding limit. `osFlasherStage` rejects an oversized image (`OS_FLASH_TOO_BIG`), and the app link itself fails (region overflow) if the firmware ever grows past 240 KB — at which point the partition in `flash_map.h` / `linker/common.ld` must be rebalanced.
 - **A persistently failing flash chip reset-loops.** Once `applyStaging` has erased the app region, there is no old app to fall back to; if the readback never verifies (genuine hardware failure), the bootloader keeps resetting and re-applying from the intact staging. There is no retry cap — the assumption is that the staging copy is good and a stable supply will eventually let the apply complete. A dead flash needs servicing regardless.
-- **The last SWO log line before a bootloader reset can be truncated** (pending fix). `applyStaging` calls `NVIC_SystemReset()` while the SWO serializer may still be draining the final line — and the bootloader has no SysTick-based delay to cover the drain — so e.g. `…rebooting into new OS` can be cut off mid-byte before the next boot banner. Cosmetic only (the apply already completed and verified). A short drain before the reset (a busy-wait on the cycle counter, or polling the TPIU) would fix it; left out to keep the reset path minimal.
+- **The last SWO log line before a bootloader reset can be truncated.** `applyStaging` calls `NVIC_SystemReset()` while the SWO serializer may still be draining the final line — and the bootloader has no SysTick-based delay to cover the drain — so e.g. `…rebooting into new OS` can be cut off mid-byte before the next boot banner. Cosmetic only (the apply already completed and verified): the reset path is kept minimal rather than adding a drain before the reset.
 - **`getSysTime()` in the bootloader is a per-reset DWT-cycle timestamp** (there is no SysTick), so `[BOOT]` ticks restart at 0 on every boot/stage rather than being monotonic with the app.
 - **The bootloader runs at HSI 16 MHz** (it never starts the PLL). Flash erase/program timing is independent of the CPU clock, so this only makes the CRC and copy loop a few× slower than the app would at 168 MHz — negligible for a one-shot apply.
 

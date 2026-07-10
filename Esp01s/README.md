@@ -83,7 +83,3 @@ the flashing internals.
   variant it maps to GPIO1, which is also UART0 TX (owned by `Serial`), so it
   matches neither the physical LED nor a free pin. `wifi.cpp` drives GPIO2
   directly (it's the WiFi-status light).
-- **Heartbeat / aliveness check:** the firmware prints `blink N` once per second
-  on `Serial` (UART0, 921600). That TX line is wired to the console's USART1, so
-  **Settings → Test WiFi module** shows the received byte count and last line —
-  use it to confirm the ESP is running even if the LED is dead or miswired.

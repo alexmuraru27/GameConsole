@@ -4,7 +4,7 @@ The STM32F407VET6 provides **128 KB SRAM** at `0x20000000`, **64 KB CCM** at `0x
 
 ## SRAM regions
 
-Defined in `linker/common.ld`. There is no shared-RAM window: a game reaches the console only through SVC syscalls, so the old 2 KB `SHARED_RAM` was reclaimed into `CONSOLE_RAM`.
+Defined in `linker/common.ld`. There is no shared-RAM window: a game reaches the console only through SVC syscalls, so `CONSOLE_RAM` occupies the full 96 KB below `GAME_RAM`.
 
 | Region         | Origin     | Size | Perms | Purpose                                                                           |
 | -------------- | ---------- | ---- | ----- | --------------------------------------------------------------------------------- |
@@ -136,7 +136,7 @@ The [Asset Packer](../tools/packer/README.md) bundles loose binary assets from a
 
 ## EEPROM layout
 
-AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`). Managed by `settings_storage.c`, packed flat with no arbitrary padding. Both the console entity and each game entity are exactly **2048 B (2 KB)**. Every persisted record ends in a CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`).
+AT24C512 (64 KB) on I2C1 at 400 kHz (`0x50`), packed flat with no arbitrary padding. Both the console entity and each game entity are exactly **2048 B (2 KB)**. Every persisted record ends in a CRC-16-CCITT (polynomial `0x1021`, initial `0xFFFF`). The store is split across three files: `settings_storage.c` (public API + system-header state), `settings_directory.c` (the directory/slot mechanism and the 2 KB entity codec), and the private `Inc/SettingsStorage/settings_layout.h` (this on-EEPROM layout — the `#define`d region addresses, the packed `SystemHeader`/`GameDirectoryEntry`/`GameDataEntity`/`ConsoleSettingsEntity` structs, and the `static_assert`s that pin their sizes).
 
 | Offset | Size   | Content                                                                        |
 | ------ | ------ | ------------------------------------------------------------------------------ |

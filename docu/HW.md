@@ -9,7 +9,7 @@
   - [GPIO (Debug Pins)](#gpio-debug-pins)
   - [SD-CARD (Builtin)](#sd-card-builtin)
   - [I2C1 EEPROM Console Settings Storage](#i2c1-eeprom-console-settings-storage)
-  - [ESP01 - USART1 (Network Communication - Baud 115200)](#esp01---usart1-network-communication---baud-115200)
+  - [ESP01 - USART1 (Network Communication)](#esp01---usart1-network-communication)
 - [EEPROM address](#eeprom-address)
 
 ## Hardware needed
@@ -90,11 +90,15 @@ Hardware design resources  `projectRoot/docu/HW/`
 6. PC9 (DAT1 - AF12 PU)
 7. PD3 (SD CD(card detect) - PU)
 
+> **V2 PCB SD-card reliability note.** The V2 board is a 2-layer PCB with no ground plane and only a 100 nF decoupling cap at the microSD VDD (no bulk capacitance). Under sustained SDIO traffic the card browns out on write-current transients, so writes can verify warm yet read back corrupt cold, and boot reads intermittently time out (a clean boot ranges from ~2 s to 40 s+). This is a board-level power/ground-integrity limit, not firmware — no clock, bus-width, or timing setting fixes it. The fix is the next PCB revision: a solid ground plane and a 10 µF bulk cap in parallel with the 100 nF right at the card VDD pin, with short/wide VDD+GND back to the plane. Until then the firmware contains it as far as it can (download CRC + per-block read-back-verify-with-retry).
+
 ### I2C1 EEPROM Console Settings Storage
 1. PB8 (I2C1_SCL - AF4 PU)
 2. PB9 (I2C1_SDA - AF4 PU)
 
-### ESP01 - USART1 (Network Communication - Baud 115200)
+### ESP01 - USART1 (Network Communication)
+Runtime link runs at **923076 baud** (`NETWORK_UART_BAUD`); **115200** (`USART1_DEFAULT_BAUD`) is used only when reflashing the ESP-01 over its ROM bootloader.
+
 1. PA9 (TX - AF7) - USART1
 2. PA10 (RX - AF7) - USART1
 3. PB10 (EN - normal GPIO)
@@ -105,6 +109,7 @@ Hardware design resources  `projectRoot/docu/HW/`
 
 
 ### GPIO (Debug Pins)
+Board pads only — the firmware does not configure or drive these (`gpioInit` leaves them at their reset state).
 1. PB1 (Debug Pin 1)
 2. PB2 (Debug Pin 2)
 

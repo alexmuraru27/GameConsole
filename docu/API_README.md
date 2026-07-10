@@ -39,35 +39,42 @@ GameConsole is a modular embedded game console platform based on the STM32F407 m
   - Buzzer (sound)
   - Asset Loader (game data)
   - SDIO (storage)
-  - USART (debug)
+  - Network (ESP-01 on USART1; SWO/ITM carries debug trace)
 
 All modules are initialized in `gameConsoleInit()`.
 
 ---
 
 ## Main Loop
-The main application loop (see `main.c`) follows this structure:
+
+There are two distinct loops: the console's own menu loop, and the callback loop the OS runs on a loaded game.
+
+**Console menu loop** (`Console/Src/main.c`). After bring-up, `main()` runs the menu forever; selecting a game hands control to `gameLoaderLoadGame()`, which blocks for the game's lifetime and returns to the menu when the game exits or crashes:
 
 ```c
 int main(void) {
     gameConsoleInit();
-    // ... (test/init code)
+    mainMenuInit();
     while (1) {
-        update();   // Handle input, update game state
-        render();   // Draw frame
-        syncFrame(); // Maintain FPS
+        watchdogKick();
+        mainMenuUpdate();   // navigate menus, launch/download/flash actions
+        mainMenuRender();   // draw the current menu screen
     }
 }
 ```
 
-- **update()**: Reads joystick state, updates sprite positions.
-- **render()**: Renders the frame, handles sound triggers.
-- **syncFrame()**: Busy-waits to hold a fixed frame rate (GameXO targets 30 FPS; the console main loop is written for 60 FPS and only frame-syncs when `MAIN_SYNC_FPS` is defined).
+There is no `syncFrame()`/`MAIN_SYNC_FPS`; the console does not cap its menu loop.
+
+**Game callback loop** (OS-owned, run uncapped). A game is not a `main()` — it exposes three callbacks (`init`, `update`, `render`) via `DECLARE_GAME_HEADER`. The kernel runs `_game_start` (zero `.bss`, run ctors), calls `init` once, then loops `update`/`render` back to back every frame, servicing its own inter-frame work (network, input latch) at the seam. The OS does **not** pace the frame rate — a game that wants a fixed rate paces itself with `delay()`:
+
+- **update()**: reads input, advances game state.
+- **render()**: submits sprites/text and calls `rendererRender()`.
+- **frame pacing**: caller-side. GameXO holds ~60 FPS by sleeping out the rest of each frame budget (`TARGET_FRAME_MS = 1000/60`, `paceFrame()`); TestRenderer runs flat out to measure throughput. For frame-rate-independent movement a game scales by `getDeltaTimeUs()`.
 
 ---
 
 ## API Overview
-The Console API is exposed via a `ConsoleAPI` struct, making it accessible to loaded games and modules. Below is a summary of the main API groups and their functions.
+There is no shared `ConsoleAPI` struct. A loaded game runs unprivileged and reaches the console through **SVC syscalls**: the contract is the strongly-typed stubs in `Shared/Syscall/console_syscalls.h` (each stub loads a syscall id from `Shared/Syscall/syscall_numbers.h` into `r12`, args into `r0-r3`, and executes `svc #0`). The console dispatches them in `Console/Src/Kernel/syscall.c`, validating pointer arguments before running the real console function. The ABI is versioned (`CONSOLE_ABI_VERSION`, currently `8`); the loader refuses a game built against a different value. Below is a summary of the main API groups and their functions.
 
 ### System Time
 - `getSysTime()`: Returns system uptime in ms.
@@ -79,10 +86,10 @@ The Console API is exposed via a `ConsoleAPI` struct, making it accessible to lo
 
 
 ### Sound (Buzzer)
-- `buzzerGetMaxTracks()`: Get number of sound tracks.
-- `buzzerPlay(track, data, size)`: Play sound data.
-- `buzzerPlayWithFlag(...)`: Play with callback.
-- `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`: Control playback.
+- `buzzerGetMaxTracks()`: Number of software synth tracks.
+- `buzzerPlay(track, loop, notes, count)`: Play a `count`-note sequence (interleaved `{freq_hz, duration_ms}` pairs) on `track`, optionally looped.
+- `buzzerPlayWithFlag(track, loop, notes, count, on_done_flag)`: As above, and sets `*on_done_flag` when the sequence finishes.
+- `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`, `buzzerStopAll()`: Control playback.
 
 ### Input
 The whole pad is read in one trap:
@@ -92,13 +99,12 @@ The whole pad is read in one trap:
 - Edges are latched once per frame by the OS at the frame seam, so reading twice in a frame is stable. Types live in `Shared/Api/joystick_interface.h`.
 
 ### Renderer
-A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). Games do **not** init the renderer — the kernel resets it (drops layers, disables the background) when it launches a game, so a game starts from a clean slate. The frame-submission surface exposed through `ConsoleAPI`:
-- `rendererRender()`: Sort sprites by `z`, bin them into 16-line chunks, composite back-to-front, and DMA the frame to the ILI9341.
-
-The full sprite-submission surface is exposed through `ConsoleAPI`, so loaded games draw the same way the console does. The `Sprite`/`Layer`/`SpriteFlags` types live in the shared API (`Shared/Api/renderer_interface.h`):
+A scanline **sprite compositor** (full deep-dive in [`renderer.md`](renderer.md)). Games do **not** init the renderer — the kernel resets it (drops layers, disables the background) when it launches a game, so a game starts from a clean slate. The frame-submission surface is reached through syscalls; the `Sprite`/`Layer`/`SpriteFlags` types live in the shared API (`Shared/Api/renderer_interface.h`). Loaded games draw the same way the console does:
 - `rendererClear()`: drop all layers (start of a frame).
 - `rendererSetBackground(color)`: RGB565 fill where no sprite draws.
 - `rendererSubmitLayer(layer, sprites, count)`: submit a game-owned `Sprite[]` for `LAYER_BG/FG/UI`.
+- `rendererRender()`: Sort sprites by `z`, bin them into 16-line chunks, composite back-to-front, and DMA the frame to the ILI9341.
+- `rendererDrawText(layer, x, y, z, font, scale, color, text)`: expand a string into glyph sprites console-side in one syscall (folds into the layer's z-sort; re-issue every frame).
 - `rendererGetWidthPixels()` / `rendererGetHeightPixels()`: panel size (320x240).
 - `rendererSystemColor(index)`: map a Pixel Forge system-palette index (0-63) to RGB565 — used to turn a loaded `GfxAsset`'s index palette into a render-ready RGB565 palette.
 
@@ -108,8 +114,8 @@ Serves assets out of the `.pak` bound to the running game. The game loader opens
 - `assetLoaderGetAssetData(asset_id, *buffer, size)`: Copy the asset blob into a caller buffer (must be ≥ the asset size) and verify its CRC32.
 
 ### Settings
-Persistent per-game storage in the EEPROM, keyed by the running game's `.bin` name. No opt-in is needed: the loader binds a save slot for every game (the 1 KB slot is allocated lazily on the first `settingsWrite`), so the game never names a file. All three return a `SettingsStorageStatus` (`0` = `OK`; `NOT_FOUND` on first run, `STORAGE_FULL` when no slot is free, etc. — see `Shared/Api/settings_interface.h`).
-- `settingsWrite(version, *data, size)`: Persist up to `SETTINGS_GAME_MAX_DATA` (1018) bytes tagged with a struct version.
+Persistent per-game storage in the EEPROM, keyed by the running game's `.bin` name. No opt-in is needed: the loader binds a save slot for every game (the 2 KB slot is allocated lazily on the first `settingsWrite`), so the game never names a file. All three return a `SettingsStorageStatus` (`0` = `OK`; `NOT_FOUND` on first run, `STORAGE_FULL` when no slot is free, etc. — see `Shared/Api/settings_interface.h`).
+- `settingsWrite(version, *data, size)`: Persist up to `SETTINGS_GAME_MAX_DATA` (2042) bytes tagged with a struct version.
 - `settingsRead(expected_version, *buffer, *size)`: Load the save; `*size` is in=capacity / out=actual, and a version bump yields `VERSION_MISMATCH`.
 - `settingsClear()`: Delete this game's save.
 
@@ -135,7 +141,7 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 ### Renderer (renderer.c/h)
 - Scanline **sprite compositor** for the ILI9341 320×240 display. Games describe a frame as per-layer arrays of `Sprite` (indexed-color 2bpp/4bpp tiles with `x/y/w/h`, draw order `z`, flags, palette); the renderer z-sorts them, bins them into 16-line chunks, composites back-to-front, and DMA-streams each chunk to the panel while the next composites.
 - 64-color system palette (RGB565). Three layers: `LAYER_BG`, `LAYER_FG`, `LAYER_UI`.
-- Compiled `-O3` even in debug builds (it is the per-frame hot path); optimized from **24 → 76 FPS** on a full screen — see [`renderer.md`](renderer.md) for the full pipeline and optimization journey.
+- Compiled `-O3` even in debug builds (it is the per-frame hot path) with a scanline hot-path compositor — see [`renderer.md`](renderer.md) for the full pipeline.
 - Public functions:
   - `rendererInit()`: Build compositor tables, clear scanline buffers. **Console-owned, boot-time only** — called once from `devicesInit()`, not exposed to games.
   - `rendererResetState()`: Drop all layers + disable the background. The kernel calls it when it launches a game, so a game inherits a clean slate (not the menu's background).
@@ -184,8 +190,18 @@ The console's bitmap fonts (3x5, 5x5, 8x8) live once in console flash and are dr
 ---
 
 ## Initialization Sequence
-1. **peripheralsInit()**: Initializes SD card, DMA, GPIO, USART, Timer, LCD, ADC, Joystick, Buzzer, Renderer.
-2. **gameConsoleExposeApi()**: Populates the API struct and exposes it to loaded games.
+`gameConsoleInit()` (`Console/Src/game_console.c`) brings the console up in phases (each grouped so the persisted mute/brightness can be applied before any boot sound):
+
+1. **coreInit()**: SWO trace, fault decode (`faultsInit`), the SVC/PendSV syscall trap (`syscallInit`), GPIO, timers, buzzer, backlight PWM.
+2. **storageInit()**: I2C, external EEPROM, settings store (`settingsStorageInit`).
+3. **applyConsoleSettings()**: read the persisted `ConsoleSettings` and apply mute (`buzzerSetMute`) and backlight brightness (`backlightSetBrightness`) — **before** the boot beeps, so a muted console boots silent and a dimmed one comes up dim.
+4. **peripheralsInit()**: DMA, USART, network (ESP-01), ADC, RNG.
+5. **devicesInit()**: ILI9341 display, renderer (`rendererInit`), joystick, SD/FatFs mount.
+6. **osServicesSetTextInput(keyboardModal)**: wire the on-screen keyboard into the kernel's `osTextInput` service.
+7. **mpuInit()**: arm MPU confinement before any game can run.
+8. **playBootSong()**, then **watchdogInit()**: chime and arm the last-resort reset backstop.
+
+There is no API-exposure step — games reach the console through SVC syscalls, not a shared struct.
 
 ---
 
@@ -206,7 +222,7 @@ void update() {
 ## File Structure
 - `Console/Src/`: Main source files
 - `Console/Inc/`: Headers
-- `GameXO/`: Example game
+- `Apps/GameXO/`: Reference game (also `Apps/TestRenderer/`, `Apps/TestBuzzer/`)
 - `Shared/`, `Assets/` (`Music/`): Shared resources
 
 ---
@@ -231,8 +247,20 @@ The `Console` directory is organized into several submodules, each with its own 
 - **Purpose:** Asset and game loading from storage. Handles asset metadata, data transfer, and game selection.
 
 ### Peripherals
-- **Files:** `adc.[ch]`, `dma.[ch]`, `gpio.[ch]`, `sdio.[ch]`, `sysclock.[ch]`, `timer.[ch]`, `usart.[ch]`
-- **Purpose:** Abstraction for microcontroller peripherals. Used by higher-level modules for hardware access.
+- **Files:** `adc.[ch]`, `dma.[ch]`, `gpio.[ch]`, `sdio.[ch]`, `sysclock.[ch]`, `timer.[ch]`, `usart.[ch]`, `rng.[ch]`, `watchdog.[ch]`
+- **Purpose:** Abstraction for microcontroller peripherals. Used by higher-level modules for hardware access. `gpio.c` is table-driven (a static pin-config table configures every pin at init); code drives individual pins through the `gpio.h` accessors — `gpioSetPin`/`gpioClearPin`/`gpioWritePin`/`gpioReadPin`/`gpioSetPinMode` — using named pin constants (e.g. `GPIO_DISPLAY_RST`) rather than raw port/pin literals.
+
+### SettingsStorage
+- **Files:** `settings_storage.c` (public key/value API), `settings_directory.c` (the game-directory / entity read-write mechanism), `console_settings_storage.c` (the typed console-settings blob); layout in `Console/Inc/SettingsStorage/settings_layout.h`.
+- **Purpose:** CRC-16-protected EEPROM store — the flat directory + game save slots and the console settings entity.
+
+### Kernel
+- **Files:** `syscall.c` (SVC dispatch), `syscall_validate.c` (pointer/range validators for game arguments), `scheduler.c` (context switch / game loop), `mpu.c` (game confinement), `faults.c` + `crash_report.c` (fault decode + persisted crash record), `os_services.c` (kernel→UI service hooks).
+- **Purpose:** Game isolation — games run unprivileged and trap into the console through SVC. See [`kernel.md`](kernel.md).
+
+### Multiplayer
+- **Files:** `mp_session.c` (role/peer table, discovery, join handshake, heartbeat, mailboxes), `mp_wire.c` (the wire-command codec).
+- **Purpose:** ESP-NOW local multiplayer session logic (up to 4 consoles). See [`espnow.md`](espnow.md).
 
 ### FatFs
 - **Files:** `diskio.[ch]`, `diskio_integration.[ch]`, `ff.[ch]`, `ffconf.h`, `ffunicode.c`
@@ -247,7 +275,7 @@ Each submodule is designed for separation of concerns, making the codebase modul
 ## See Also
 - `game_console_api.h`: Full API definition
 - `main.c`: Main application logic
-- `game_console.c`: API exposure and initialization
+- `game_console.c`: console bring-up (`gameConsoleInit`) and reboot (`gameConsoleReboot`)
 
 ---
 
@@ -264,11 +292,12 @@ See `README.md` for license and authorship.
 - **Key Defines:** Musical note frequencies (e.g., `NOTE_C4`, `NOTE_D4`, ...).
 - **Key Functions:**
   - `buzzerInit()`: Initialize hardware.
-  - `buzzerPlay(track, data, size)`: Play a sequence of notes.
-  - `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`: Playback control.
+  - `buzzerPlay(track, loop, notes, count)`: Play a `count`-note sequence (interleaved `{freq_hz, duration_ms}` pairs), optionally looped.
+  - `buzzerPause(track)`, `buzzerResume(track)`, `buzzerStop(track)`, `buzzerStopAll()`: Playback control.
 - **Usage Example:**
   ```c
-  buzzerPlay(0, melody_data, melody_size);
+  static const uint16_t melody[] = { NOTE_C4, 200, NOTE_E4, 200, NOTE_G4, 400 };
+  buzzerPlay(0, false, melody, sizeof(melody) / sizeof(uint16_t) / 2U);
   buzzerPause(0);
   buzzerResume(0);
   buzzerStop(0);
@@ -292,18 +321,12 @@ See `README.md` for license and authorship.
   ```
 
 #### ILI9341 (LCD)
-- **Purpose:** Low-level LCD display driver.
-- **Key Defines:** Color constants (e.g., `ILI9341_BLACK`, `ILI9341_WHITE`), screen size.
-- **Key Functions:**
-  - `ili9341Init(rotation, width, height)`: Initialize display.
-  - `ili9341DrawPixel(x, y, color)`: Draw a pixel.
-  - `ili9341FillScreen(color)`: Fill areas.
-  - `ili9341DrawImage(x, y, w, h, data)`: Draw image.
-- **Usage Example:**
-  ```c
-  ili9341FillScreen(ILI9341_BLACK);
-  ili9341DrawPixel(10, 10, ILI9341_RED);
-  ```
+- **Purpose:** Low-level LCD display driver over the FSMC 16-bit parallel bus. Console-internal — games never call it directly; they draw through the renderer's sprite/text syscalls, and the renderer drives the panel.
+- **Key Defines:** Color constants (e.g., `ILI9341_BLACK`, `ILI9341_WHITE`), `ILI9341_WIDTH` (320) / `ILI9341_HEIGHT` (240).
+- **Key Functions (the whole public surface):**
+  - `ili9341Init(rotation, window_width, window_height)`: Initialize the panel.
+  - `ili9341FillScreen(color)`: Fill the whole screen with one RGB565 color.
+  - `ili9341DrawScanlines(lines, lines_offset, array_size, data)`: Blit a horizontal band of composited RGB565 pixels — the renderer's chunk-DMA output path.
 
 ### Renderer
 - **Purpose:** Scanline-based graphics engine for the ILI9341 display.
@@ -368,14 +391,14 @@ See `README.md` for license and authorship.
 
 # Renderer
 
-The renderer is a scanline **sprite compositor** for the ILI9341 320×240 display: games describe a frame as per-layer `Sprite` lists, and the renderer z-sorts them, bins them into 16-line chunks, composites back-to-front (painter's algorithm), and DMA-streams each chunk to the panel while the next composites. The complete ground-up explanation — frame pipeline, the inner pixel loop, and the **24 → 76 FPS** optimization journey — lives in **[`renderer.md`](renderer.md)**, which is the source of truth.
+The renderer is a scanline **sprite compositor** for the ILI9341 320×240 display: games describe a frame as per-layer `Sprite` lists, and the renderer z-sorts them, bins them into 16-line chunks, composites back-to-front (painter's algorithm), and DMA-streams each chunk to the panel while the next composites. The complete ground-up explanation — frame pipeline and the inner pixel loop — lives in **[`renderer.md`](renderer.md)**, which is the source of truth.
 
 Quick reference:
 - **Screen:** 320×240, RGB565
 - **System palette:** 64 fixed colors (below)
 - **Layers:** `LAYER_BG`, `LAYER_FG`, `LAYER_UI`
 - **Pixel formats:** 2bpp / 4bpp planar tiles; slot 0 transparent unless `SPRITE_OPAQUE`; `SPRITE_FLIP_H/V`
-- **Public API:** `rendererInit` (console boot only), `rendererResetState` (kernel, per game launch), `rendererClear`, `rendererSetBackground`, `rendererSubmitLayer`, `rendererRender`, `rendererGetWidthPixels`, `rendererGetHeightPixels`
+- **Public API:** `rendererInit` (console boot only), `rendererResetState` (kernel, per game launch), `rendererClear`, `rendererSetBackground`, `rendererSubmitLayer`, `rendererDrawText`, `rendererRender`, `rendererGetWidthPixels`, `rendererGetHeightPixels`, `rendererSystemColor`
 
 ## System Palette
 ![system_palette](system_palette.png)

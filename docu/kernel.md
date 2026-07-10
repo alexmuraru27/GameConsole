@@ -4,7 +4,7 @@ This console runs untrusted code. A game is a separate `.bin` loaded from the SD
 
 The mechanism is a small **microkernel**: the console is the kernel (privileged), the game is a user process (unprivileged), the **MPU** is the wall between them, and **SVC** is the only door through the wall. A crash on the game's side is caught, reported, and recovered from; a crash on the kernel's side is fatal.
 
-All of this lives in `Console/Src/Kernel/` (`syscall.c`, `scheduler.c`, `mpu.c`, `faults.c`) and `Shared/Syscall/` (the ABI both sides agree on).
+All of this lives in `Console/Src/Kernel/` (`syscall.c`, `syscall_validate.c`, `scheduler.c`, `mpu.c`, `faults.c`, `crash_report.c`, `os_services.c`) and `Shared/Syscall/` (the ABI both sides agree on).
 
 ---
 
@@ -59,7 +59,7 @@ The calling convention is deliberately simple, chosen so the four argument regis
    r0   =  return value      (written back by the kernel into the stacked frame)
 ```
 
-Calls with more than four register arguments (`buzzerPlayWithFlag`) bundle them into a struct in the game's own RAM and pass one pointer. `gameLog()` is formatted **game-side** into a bounded buffer and handed over as raw bytes + length — so no game-controlled format string ever reaches the kernel's `printf` (no `%s`/`%n` confused-deputy).
+Calls with more than four register arguments bundle them into a struct in the game's own RAM and pass one pointer — `SyscallBuzzerPlayArgs` for `buzzerPlay`, `SyscallDrawTextArgs` for `rendererDrawText` (both in `syscall_numbers.h`). `gameLog()` is formatted **game-side** into a bounded buffer and handed over as raw bytes + length — so no game-controlled format string ever reaches the kernel's `printf` (no `%s`/`%n` confused-deputy).
 
 ### A syscall round-trip
 
@@ -217,7 +217,7 @@ Identical session-ending exit path, reached from the fault handler instead of `S
 
 The MPU stops the *game* from touching console memory. But a game also hands the kernel pointers (sprite arrays, save buffers, asset destinations) and asks the **privileged** kernel to read or write them. Without checking, a malicious game could pass `&console_ram` and make the kernel scribble there on its behalf — a "confused deputy."
 
-So `svcDispatch` validates every pointer argument **before** the privileged side touches it (`syscall.c`):
+So before the privileged side touches any pointer argument, `svcDispatch` validates it through the range checks in `syscall_validate.c`:
 
 ```
  gameCanWrite(p, len) :  [p, p+len) lies wholly inside GAME_RAM  ∪ CCM arena
@@ -236,6 +236,8 @@ So `svcDispatch` validates every pointer argument **before** the privileged side
                     gameCanRead(s.palette, slots * 2)        ?
 ```
 
+String arguments — the `rendererDrawText` text, an `osTextInput` title — are pulled in a byte at a time by `gameCopyStringIn`, bounded so a missing terminator can't walk the kernel off the end of game RAM.
+
 A failed check rejects that one syscall (logs a warning, skips the work) rather than killing the game — safe, and gentler than a fault.
 
 ---
@@ -251,7 +253,7 @@ The four fault vectors share one naked trampoline → `faultReport()`, which pri
  ctx =PSP/thread (EXC_RETURN=0x…)     ← PSP = the game, MSP = the kernel
  PC  =0x…  LR  =0x…  PSR =0x…          ← stacked from the faulting frame
  CFSR=0x…  HFSR=0x…
- flags: DACCVIOL MMARVALID             ← the CFSR sub-bits, decoded by name
+ flags: DACCVIOL                       ← the CFSR sub-bits, decoded by name
  MMFAR=0x20000000                      ← the address that faulted
 ```
 
@@ -281,6 +283,10 @@ The crux of recoverability: the fault handler must **not** simply return — tha
 
 A fault that originated in the kernel (Handler mode, or Thread/MSP) is a real bug and halts — there is nothing safe to recover to.
 
+**Crash report.** Before it clears the sticky CFSR/HFSR, `faultReport()` calls `crashReportCaptureFault(...)` (`crash_report.c`) to copy the essentials — game name, fault kind, PC/LR/PSR, CFSR/HFSR, MMFAR/BFAR — into a small RAM `CrashReport` that survives the switch back to the console. On return the loader appends one line to `Crashes/crash.log` and the Games picker's banner shows the decoded cause (`PC 0x2001A3F4 DACCVIOL`); because games are RAM-linked those addresses map straight onto the game's `.elf`, so `tools/scripts/decode_crash.py` turns them into `file:line` with no probe.
+
+**Hangs (no fault).** A game stuck in an infinite loop inside its own code never faults. The kernel arms a liveness deadline around every callback (`GAME_CALLBACK_BUDGET_MS`, checked from SysTick in `kernelGameDeadlineTick`, `scheduler.c`); a callback that overruns it is marked a *hang* (in the same `CrashReport`) and abandoned through the **same** PendSV leave path a crash uses. The deadline covers a game wedged in its own code — it cannot preempt a game that wedges the kernel inside a long syscall, which shares PendSV's priority.
+
 ---
 
 ## 7. Interrupt priorities — why the switch lives at the bottom
@@ -293,12 +299,12 @@ The switch handlers and the syscall handler run at the **lowest** exception prio
      0        DMA / SDIO / I2C (default)      short completion ISRs
      1        TIM6  (buzzer, 1 ms)            audio timing must stay tight
      2        SysTick (1 ms tick)             getSysTime()/delay() depend on it
-    14        TIM7  (joystick, 50 ms)         least-urgent ISR, still preempts syscalls
+    14        TIM7  (joystick, 10 ms)         least-urgent ISR, still preempts syscalls
     15        SVC / PendSV                    syscalls + context switch — strictly lowest
    ── lower urgency ────────────────────────────────────────────────────
 ```
 
-The lesson is baked into this table: `SysTick_Config()` leaves the tick at priority 15, the same as SVC. A privileged syscall (running in the SVC handler) that called `delay()` would then busy-wait on a tick that could never preempt it — a deadlock. The fix is the rule above: **SVC and PendSV are strictly the lowest priority in the system, and nothing else shares their level** (`syscallInit()` raises SysTick to 2; `timer7Init` raises TIM7 to 14). The renderer's panel DMA wait polls a *hardware* flag, not an ISR, so it has no such dependency.
+The invariant behind the table: **SVC and PendSV are strictly the lowest priority in the system, and nothing else shares their level.** SysTick in particular must outrank SVC — `syscallInit()` raises the tick to priority 2 and `timer7Init` sets TIM7 to 14 — because a privileged syscall running in the SVC handler can busy-wait on the tick (an EEPROM write's `delay()`), and a tick left at SVC's own priority could never preempt it. The renderer's panel DMA wait polls a *hardware* flag, not an ISR, so it has no such dependency.
 
 ---
 
@@ -351,10 +357,13 @@ The lesson is baked into this table: `SysTick_Config()` leaves the tick at prior
 | `Shared/Syscall/syscall_numbers.h` | the ABI: `SyscallId` enum + `CONSOLE_ABI_VERSION` (both sides include it) |
 | `Shared/Syscall/console_syscalls.h` | typed game-facing prototypes |
 | `Shared/Syscall/console_syscalls.c` | the SVC stubs, compiled into every game |
-| `Console/Src/Kernel/syscall.c` | `svcDispatch` (the switch), pointer validators, `syscallInit` (priorities) |
-| `Console/Src/Kernel/scheduler.c` | `SVC_Handler`, `PendSV_Handler`, `kernelRunGame` (the OS-driven loop), the invoke/frame-done/leave context switch |
+| `Console/Src/Kernel/syscall.c` | `svcDispatch` (the switch), `syscallInit` (priorities) |
+| `Console/Src/Kernel/syscall_validate.c` | the pointer validators — `gameCanRead`/`gameCanWrite`, `gameCopyStringIn`, `spritesValid` |
+| `Console/Src/Kernel/scheduler.c` | `SVC_Handler`, `PendSV_Handler`, `kernelRunGame` (the OS-driven loop), the invoke/frame-done/leave context switch, the per-callback liveness deadline |
 | `Console/Src/Kernel/mpu.c` | enable + per-game region setup/teardown |
-| `Console/Src/Kernel/faults.c` | enable + decode the configurable faults; route game crashes to recovery |
+| `Console/Src/Kernel/faults.c` | enable + decode the configurable faults; capture the crash report; route game crashes to recovery |
+| `Console/Src/Kernel/crash_report.c` | the RAM `CrashReport` that survives the recoverable switch (fault or hang) |
+| `Console/Src/Kernel/os_services.c` | registry for kernel-side modal providers (e.g. the `osTextInput` keyboard) |
 | `Console/Src/Loader/game_loader.c` | validate header, copy the flat image, hand off to `kernelRunGame` |
 
 ---

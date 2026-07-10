@@ -84,9 +84,11 @@ Game state lives in globals (it persists across calls); locals do not.
    magic and ABI version before running it. The OS calls `gameInit` once, then loops
    `gameUpdate`/`gameRender`; `gameExit()` (or a crash) ends the session.
 
-5. **Build & deploy** — build with the Makefile, then copy `<game>.bin` and its
-   matching `<game>.pak` (same base name) to the SD card root. `make deploy` copies
-   the built `.bin` to the SD mount point set in `common.mk`.
+5. **Build & deploy** — build with the Makefile. To run a game, `<game>.bin` and its
+   matching `<game>.pak` (same base name) go in the SD card's `Games/` folder — copy them
+   there directly, or `make deploy` stages them into the update-server content tree
+   (`tools/update_server/content`, path from `common.mk`) so the console pulls them over
+   WiFi (Poll Updates). Both the `.bin` and the `.pak` are staged together.
 
 ---
 

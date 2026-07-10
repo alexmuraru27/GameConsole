@@ -38,7 +38,7 @@ the game-facing kernel API, and how GameXO uses it.
 
 ## 2. The big picture
 
-Five layers, three of them new (in **bold**). The guiding principle: **the ESP is
+Five layers (the three in **bold** implement multiplayer). The guiding principle: **the ESP is
 a dumb byte mover; all session intelligence lives on the console.**
 
 ```
@@ -69,7 +69,7 @@ a dumb byte mover; all session intelligence lives on the console.**
                       │  NP_CMD_MP_BEGIN / MP_END / MP_SERVICE
                       ▼
    ┌──────────────────────────────────────────────────────────────┐
-   │  ESP-01S firmware (**main.cpp** ESP-NOW handlers)             │
+   │  ESP-01S firmware (**espnow_link.cpp**, dispatched by main)   │
    │    init/deinit · auto-add peers · send batch · recv ring      │
    │    tags each inbound packet with its source MAC               │
    └──────────────────┬───────────────────────────────────────────┘
@@ -113,8 +113,8 @@ notices.
 
 ## 4. The transport: three UART commands
 
-`NETWORK_PROTOCOL_VERSION` was bumped **2 → 3** for these. Framing is unchanged:
-`0xA5 0x5A | type | len:u16 | payload | crc16` (see `network_protocol.h`).
+`NETWORK_PROTOCOL_VERSION` is **3** (`network_protocol.h`), covering these commands. Framing:
+`0xA5 0x5A | type | len:u16 | payload | crc16`.
 
 | Command | Payload | Response | Effect |
 |---|---|---|---|
@@ -146,7 +146,7 @@ updates or play. `MP_BEGIN`/`MP_END` bracket the mode.
 
 ## 5. The session protocol (console-side)
 
-Everything below lives in `mp_session.c`; the ESP never parses any of it.
+Everything below lives on the console; the ESP never parses any of it. The stateful session logic — role, peer table, handshake, liveness, mailboxes — is in `mp_session.c`; the byte format described here (the channel/SYS tags, the packet builders and beacon parser, and a bounds-checked `MpReader`) is isolated in `mp_wire.c` / `mp_wire.h`.
 
 Every ESP-NOW packet begins with a **1-byte channel tag**:
 
@@ -159,15 +159,15 @@ A `MP_CH_SYS` packet's second byte is the SYS type:
 
 | SYS type | Direction | Body |
 |---|---|---|
-| `BEACON` | host → broadcast (~200 ms) | `game_id, player_count, name` |
-| `JOIN_REQ` | client → host | `name` |
+| `BEACON` | host → broadcast (~200 ms) | `gid_len, game_id, player_count, name_len, name` |
+| `JOIN_REQ` | client → host | `name_len, name` |
 | `JOIN_ACCEPT` | host → client | `assigned_index, <roster>` |
 | `JOIN_REJECT` | host → client | `reason` (e.g. roster full) |
 | `ROSTER` | host → all (on change) | `<roster>` |
 | `HEARTBEAT` | any → broadcast (~500 ms) | — |
 | `BYE` | any → broadcast (on leave) | — |
 
-`<roster> = count, count × { index, mac[6], name }`. A client adopts a roster
+`<roster> = count, count × { index, mac[6], name_len, name }`. A client adopts a roster
 wholesale, so every console agrees on who is in the game, at which index, with what
 name — and any console can address any other by **index** (the OS maps index → MAC).
 
@@ -257,8 +257,8 @@ Tuning lives in `mp_session.c`: `MP_BEACON_MS`, `MP_HEARTBEAT_MS`, `MP_TIMEOUT_M
 ## 9. The game-facing kernel API
 
 Games never see MACs or the wire protocol. They drive the whole session through 13
-SVC syscalls (`console_syscalls.h`; dispatched and pointer-validated in
-`syscall.c`). The console ABI was bumped **3 → 4** for these.
+SVC syscalls (`console_syscalls.h`; dispatched in `syscall.c`, pointer-validated in
+`syscall_validate.c`), part of console ABI version `CONSOLE_ABI_VERSION`.
 
 ```c
 MpRole   mpGetRole(void);                 // NONE / HOST / CLIENT

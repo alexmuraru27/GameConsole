@@ -1,6 +1,6 @@
 # GameConsole
 
-An embedded game console platform for the STM32F407VET6, with a [scanline sprite compositor](docu/renderer.md), SD card game loader, and a shared ConsoleAPI bridge that lets game binaries call into the firmware without linking against it.
+An embedded game console platform for the STM32F407VET6, with a [scanline sprite compositor](docu/renderer.md), SD card game loader, and a syscall-based ConsoleAPI that lets game binaries call into the firmware without linking against it.
 
 **Development board:** [STM32F407VET6 F4VE V2.0](https://stm32-base.org/boards/STM32F407VET6-STM32-F4VE-V2.0.html)
 
@@ -11,7 +11,7 @@ An embedded game console platform for the STM32F407VET6, with a [scanline sprite
 Requires `arm-none-eabi-gcc` and `openocd` on PATH.
 
 ```bash
-make all       # build Console firmware + the Apps (GameXO + TestRenderer)
+make all       # build Console firmware + the Apps (GameXO + TestRenderer + TestBuzzer)
 make flash     # flash firmware via OpenOCD/STLink
 make flashswo  # flash and start SWO trace output
 make deploy    # stage the apps' .bin/.pak (+ OS/ESP images) into the update-server tree

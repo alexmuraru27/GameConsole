@@ -9,7 +9,7 @@ bottom.
 - **Glue source:** [`Console/Src/Flasher/esp_flasher.c`](../Console/Src/Flasher/esp_flasher.c),
   [`esp_flasher_port.c`](../Console/Src/Flasher/esp_flasher_port.c) (+ headers in `Console/Inc/Flasher/`)
 - **UART driver:** [`Console/Src/Peripherals/usart.c`](../Console/Src/Peripherals/usart.c)
-- **Bootstrap pins:** [`Console/Src/Peripherals/gpio.c`](../Console/Src/Peripherals/gpio.c) (`esp01Set*`)
+- **Bootstrap pins:** [`Console/Src/Devices/esp01.c`](../Console/Src/Devices/esp01.c) (`esp01Set*`; the pins themselves are configured by `gpioInit`)
 - **UI flow:** [`Console/Src/MainMenu/wifi_update.c`](../Console/Src/MainMenu/wifi_update.c)
 - **Vendored library:** [`tools/esp-serial-flasher`](../tools/esp-serial-flasher) (git submodule, v2.0.0)
 - **Hardware:** STM32F407VET6 host ↔ ESP-01 (ESP8266) on USART1
@@ -26,9 +26,10 @@ plays the role of the host
 flasher — driving the ESP into its ROM download mode and streaming the new image
 over USART1, with a progress bar on screen.
 
-> **Scope.** This is the *flashing pipeline* only. Producing `ESP01.bin` (an
-> Arduino/PlatformIO build of the ESP firmware) and the runtime network protocol
-> over USART1 are separate, later work. The `network.c` stack is still a stub.
+> **Scope.** This document covers the *flashing pipeline* only. Producing `ESP01.bin`
+> (an Arduino/PlatformIO build of the ESP firmware) is a separate build (`make esp`),
+> and the runtime network protocol over USART1 is its own stack (`network.c`, see
+> `docu/espnow.md`); both share the USART1 pins but not the flashing baud.
 
 ---
 
@@ -124,8 +125,9 @@ The ESP-01 link and its strap pins (see [`docu/HW.md`](HW.md)):
 > the firmware owns the LED. Holding either as a push-pull output would fight the
 > firmware (a freshly-flashed blinky wouldn't blink).
 
-Pin knowledge lives in `gpio.c`, which exposes three intention-named helpers so
-the flasher never pokes registers directly:
+The bootstrap helpers live in `esp01.c` (the pins themselves are configured by
+`gpioInit`) and drive the lines through the `gpio.h` pin accessors, so the flasher
+never pokes registers directly:
 
 ```c
 void esp01SetEnable(bool enabled);   /* EN  high = enabled            */
@@ -154,28 +156,30 @@ to boot the freshly-flashed firmware.
 
 ## 5. The USART1 driver
 
-`usart.c` was a no-op stub; it is now a small polled 8N1 driver. USART1 is on
-**APB2 (PCLK2 = SYSCLK/2 = 84 MHz)**. With 16× oversampling the baud register is
-simply `BRR = PCLK2 / baud` (rounded), because that encoding already packs the
-12.4 fixed-point `USARTDIV`:
+`usart.c` is a register-level 8N1 USART1 driver over **DMA2**: RX is a
+continuously-running circular DMA ring (Stream 2, ch 4) draining `USART1->DR` into a
+2 KB buffer, and TX is per-transfer DMA (Stream 7, ch 4). USART1 is on **APB2
+(PCLK2 = SYSCLK/2 = 84 MHz)**. With 16× oversampling the baud register is simply
+`BRR = PCLK2 / baud` (rounded), because that encoding already packs the 12.4
+fixed-point `USARTDIV`:
 
 ```c
 USART1->BRR = (USART1_PCLK_HZ + baud / 2U) / baud;   /* 84 MHz / 115200 ≈ 729 */
 ```
 
-The clock is enabled centrally in `peripheralsClockEnable()`
-(`sysclock.c`) alongside the other peripherals; the pins are set up in
-`initGpioEsp01()`. I/O is blocking with a millisecond deadline derived from
-`getSysTime()`:
+The clock is enabled centrally in `peripheralsClockEnable()` (`sysclock.c`) alongside
+the other peripherals; the pins are configured by `gpioInit`. The flasher drives the
+same driver a byte at a time, with a millisecond deadline derived from `getSysTime()`:
 
-- `usartWriteBytes()` spins on `TXE` per byte, then waits for `TC` so a following
-  strap-pin toggle can't truncate the last frame.
-- `usartReadByte()` spins on `RXNE`, returning the byte or `-1` on timeout. The
+- `usartWriteBytes()` sends the bytes over TX DMA, then waits for the shift register
+  to empty (`TC`) so a following strap-pin toggle can't truncate the last frame.
+- `usartReadByte()` consumes one byte from the RX DMA ring — it waits for the ring's
+  head to advance past its tail and returns the byte, or `-1` at its deadline. The
   port's `read` charges each byte the remaining budget of the whole-read timeout.
 
-Polling (not DMA/interrupts) is the right call here: flashing is a one-shot modal
-operation, the frames are short, and the ESP only talks in response to our
-commands — there is no free-running stream to keep up with.
+The continuously-running RX ring is what keeps the driver from dropping bytes at the
+high runtime baud even when an ISR briefly stalls the consumer; the flasher, a
+one-shot modal request/response at 115200, just reads byte-by-byte on top of it.
 
 ---
 
@@ -252,12 +256,6 @@ kind in `settings_menu.c`:
 
 When entered, the menu calls `item->action()` (which blocks for the flash's
 lifetime) and then `menuResetSurface()` to restore the settings screen.
-
-A sibling action, **Test WiFi module** (`wifiTestRun()` in the same module),
-resets the ESP, switches USART1 to the runtime baud (921600), and listens to the
-ESP's UART heartbeat — showing the received byte count and last line on screen.
-It's the quick "is the ESP actually running?" check, independent of the on-board
-LED (which on the ESP-01S is GPIO2; see `Esp01s/README.md`).
 
 > Rendering happens *between* `flash_write` calls, never during one, so it can't
 > disturb protocol timing. The buzzer/joystick ISRs keep running throughout; the
