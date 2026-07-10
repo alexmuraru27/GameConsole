@@ -1,4 +1,5 @@
 #include "Multiplayer/mp_session.h"
+#include "Multiplayer/mp_wire.h"
 #include "Network/espnow_link.h"
 #include "network_protocol.h"
 #include "Loader/loader.h"
@@ -30,8 +31,7 @@
  * peers must share it; there is no AP to negotiate one. */
 #define MP_CHANNEL 1U
 
-#define MP_GAME_ID_MAX 24U /* advertised game identity (the .bin basename, lcased) */
-#define MP_MAX_HOSTS 8U    /* discovered-host list capacity in join/browse mode    */
+#define MP_MAX_HOSTS 8U /* discovered-host list capacity in join/browse mode (MP_GAME_ID_MAX is in mp_wire.h) */
 
 /* Session cadence + timeouts (ms). */
 #define MP_BEACON_MS 200U          /* host advertises this often                    */
@@ -50,22 +50,8 @@
 
 #define STM32_UID_BASE 0x1FFF7A10U /* 96-bit unique device id (for the default name) */
 
-/* CHANNEL tags. */
-#define MP_CH_SYS 0U
-#define MP_CH_APP 1U
-
-/* SYS message types (second byte of a MP_CH_SYS packet). */
-enum
-{
-    MP_SYS_BEACON = 0,      /* host -> broadcast: {gid_len,gid,player_count,name_len,name} */
-    MP_SYS_JOIN_REQ = 1,    /* client -> host:    {name_len, name}                        */
-    MP_SYS_JOIN_ACCEPT = 2, /* host -> client:    {assigned_index, <roster>}              */
-    MP_SYS_JOIN_REJECT = 3, /* host -> client:    {reason}                                */
-    MP_SYS_ROSTER = 4,      /* host -> all:       {<roster>}                              */
-    MP_SYS_HEARTBEAT = 5,   /* any -> broadcast:  {}                                      */
-    MP_SYS_BYE = 6,         /* any -> broadcast:  {}  (graceful leave)                    */
-};
-/* <roster> = {count, count x {index, mac[6], name_len, name}} */
+/* The CHANNEL tags, SYS message types and the roster/beacon byte format live in
+ * mp_wire.h — this module is their sole user on the console side. */
 
 static const uint8_t MP_BROADCAST_MAC[NP_MP_MAC_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -309,85 +295,61 @@ static bool svcOutAdd(uint8_t *n_out, const uint8_t *mac, const uint8_t *data, u
     return true;
 }
 
-/* ---- wire builders (all start with the CHANNEL + SYS-type bytes) ---- */
+/* ---- wire builders ---- *
+ * The byte layout lives in mp_wire.c; these thin wrappers just feed it this
+ * module's live session state (the peer table, our name / game id), so the
+ * handlers and the per-frame pump below stay unchanged. */
 
-static uint8_t buildRosterBody(uint8_t *buf, uint8_t w)
+/* Snapshot the used peers into the wire's roster view, in ascending index order
+ * (so the emitted bytes match the old in-place s_peers walk exactly). */
+static uint8_t rosterView(MpWirePeer out[MP_MAX_PLAYERS])
 {
-    buf[w++] = playerCount();
+    uint8_t n = 0U;
     for (uint8_t i = 0U; i < MP_MAX_PLAYERS; i++)
     {
-        if (!s_peers[i].used)
+        if (s_peers[i].used)
         {
-            continue;
+            out[n].index = i;
+            out[n].mac = s_peers[i].mac;
+            out[n].name = s_peers[i].name;
+            n++;
         }
-        buf[w++] = i;
-        macCopy(&buf[w], s_peers[i].mac);
-        w += NP_MP_MAC_LEN;
-        const uint8_t nl = (uint8_t)strnlen(s_peers[i].name, MP_NAME_MAX);
-        buf[w++] = nl;
-        memcpy(&buf[w], s_peers[i].name, nl);
-        w += nl;
     }
-    return w;
+    return n;
 }
 
 static uint8_t buildBeacon(uint8_t *buf)
 {
-    uint8_t w = 0U;
-    buf[w++] = MP_CH_SYS;
-    buf[w++] = MP_SYS_BEACON;
-    const uint8_t gl = (uint8_t)strnlen(s_game_id, MP_GAME_ID_MAX);
-    buf[w++] = gl;
-    memcpy(&buf[w], s_game_id, gl);
-    w += gl;
-    buf[w++] = playerCount();
-    const uint8_t nl = (uint8_t)strnlen(s_self_name, MP_NAME_MAX);
-    buf[w++] = nl;
-    memcpy(&buf[w], s_self_name, nl);
-    w += nl;
-    return w;
+    return mpWireBuildBeacon(buf, s_game_id, playerCount(), s_self_name);
 }
 
 static uint8_t buildRoster(uint8_t *buf)
 {
-    buf[0] = MP_CH_SYS;
-    buf[1] = MP_SYS_ROSTER;
-    return buildRosterBody(buf, 2U);
+    MpWirePeer view[MP_MAX_PLAYERS];
+    const uint8_t n = rosterView(view);
+    return mpWireBuildRoster(buf, view, n);
 }
 
 static uint8_t buildJoinAccept(uint8_t *buf, uint8_t assigned_index)
 {
-    buf[0] = MP_CH_SYS;
-    buf[1] = MP_SYS_JOIN_ACCEPT;
-    buf[2] = assigned_index;
-    return buildRosterBody(buf, 3U);
+    MpWirePeer view[MP_MAX_PLAYERS];
+    const uint8_t n = rosterView(view);
+    return mpWireBuildJoinAccept(buf, assigned_index, view, n);
 }
 
 static uint8_t buildJoinReject(uint8_t *buf, uint8_t reason)
 {
-    buf[0] = MP_CH_SYS;
-    buf[1] = MP_SYS_JOIN_REJECT;
-    buf[2] = reason;
-    return 3U;
+    return mpWireBuildJoinReject(buf, reason);
 }
 
 static uint8_t buildJoinReq(uint8_t *buf)
 {
-    uint8_t w = 0U;
-    buf[w++] = MP_CH_SYS;
-    buf[w++] = MP_SYS_JOIN_REQ;
-    const uint8_t nl = (uint8_t)strnlen(s_self_name, MP_NAME_MAX);
-    buf[w++] = nl;
-    memcpy(&buf[w], s_self_name, nl);
-    w += nl;
-    return w;
+    return mpWireBuildJoinReq(buf, s_self_name);
 }
 
 static uint8_t buildSimple(uint8_t *buf, uint8_t sys_type)
 {
-    buf[0] = MP_CH_SYS;
-    buf[1] = sys_type;
-    return 2U;
+    return mpWireBuildSimple(buf, sys_type);
 }
 
 /* ---- inbound handlers ---- */
@@ -410,27 +372,16 @@ static void handleBeacon(const uint8_t *mac, const uint8_t *body, uint8_t blen, 
     {
         return; /* only collect hosts while browsing (pre-join) */
     }
-    uint8_t off = 0U;
-    if (off >= blen)
-    {
-        return;
-    }
-    const uint8_t gl = body[off++];
-    if ((uint16_t)(off + gl) > blen)
+    const MpBeaconFields b = mpWireParseBeacon(body, blen);
+    if (!b.ok)
     {
         return;
     }
     /* Only surface hosts of the SAME game (both sides lower-case the .bin name). */
-    if (gl != strnlen(s_game_id, MP_GAME_ID_MAX) || memcmp(&body[off], s_game_id, gl) != 0)
+    if (b.game_id_len != strnlen(s_game_id, MP_GAME_ID_MAX) ||
+        memcmp(b.game_id, s_game_id, b.game_id_len) != 0)
     {
         return;
-    }
-    off += gl;
-    const uint8_t pc = (off < blen) ? body[off++] : 1U;
-    uint8_t nl = (off < blen) ? body[off++] : 0U;
-    if ((uint16_t)(off + nl) > blen)
-    {
-        nl = (uint8_t)(blen - off);
     }
 
     int slot = findHostByMac(mac);
@@ -451,8 +402,8 @@ static void handleBeacon(const uint8_t *mac, const uint8_t *body, uint8_t blen, 
     }
     s_hosts[slot].used = true;
     macCopy(s_hosts[slot].mac, mac);
-    copyName(s_hosts[slot].name, &body[off], nl);
-    s_hosts[slot].player_count = pc;
+    copyName(s_hosts[slot].name, b.name, b.name_len);
+    s_hosts[slot].player_count = b.player_count;
     s_hosts[slot].last_seen_ms = now;
 }
 
@@ -508,30 +459,31 @@ static void adoptRoster(const uint8_t *p, uint8_t len, uint32_t now)
     memcpy(old, s_peers, sizeof(old));
     memset(s_peers, 0, sizeof(s_peers));
 
-    uint8_t off = 0U;
-    if (off >= len)
+    MpReader r;
+    mpReaderInit(&r, p, len);
+    uint8_t count;
+    if (!mpReadU8(&r, &count))
     {
-        return;
+        return; /* no count byte: leave the table cleared, self slot unset (as before) */
     }
-    const uint8_t count = p[off++];
     for (uint8_t e = 0U; e < count; e++)
     {
-        if (off >= len)
-        {
-            break;
-        }
-        const uint8_t idx = p[off++];
-        if ((uint16_t)(off + NP_MP_MAC_LEN + 1U) > len)
+        uint8_t idx;
+        if (!mpReadU8(&r, &idx))
         {
             break;
         }
         uint8_t mac[NP_MP_MAC_LEN];
-        macCopy(mac, &p[off]);
-        off += NP_MP_MAC_LEN;
-        uint8_t nl = p[off++];
-        if ((uint16_t)(off + nl) > len)
+        /* Need the 6-byte MAC plus the following name-length byte. */
+        if (mpReaderRemaining(&r) < NP_MP_MAC_LEN + 1U || !mpReadBytes(&r, mac, NP_MP_MAC_LEN))
         {
-            nl = (uint8_t)(len - off);
+            break;
+        }
+        const uint8_t *name;
+        uint8_t nl;
+        if (!mpReadNameRef(&r, &name, &nl))
+        {
+            break;
         }
         if (idx < MP_MAX_PLAYERS)
         {
@@ -539,7 +491,7 @@ static void adoptRoster(const uint8_t *p, uint8_t len, uint32_t now)
             peer->used = true;
             peer->index = idx;
             macCopy(peer->mac, mac);
-            copyName(peer->name, &p[off], nl);
+            copyName(peer->name, name, nl);
             int oi = -1;
             for (uint8_t k = 0U; k < MP_MAX_PLAYERS; k++)
             {
@@ -560,7 +512,6 @@ static void adoptRoster(const uint8_t *p, uint8_t len, uint32_t now)
                 peer->last_seen_ms = now;
             }
         }
-        off += nl;
     }
     setSelfSlot(now); /* our own slot is always present and alive */
 }

@@ -73,7 +73,9 @@ Src/Network/espnow_link.c \
 Src/Network/downloader.c \
 Src/Network/server_config.c \
 Src/Multiplayer/mp_session.c \
+Src/Multiplayer/mp_wire.c \
 Src/SettingsStorage/settings_storage.c \
+Src/SettingsStorage/settings_directory.c \
 Src/SettingsStorage/console_settings_storage.c \
 Src/Swo/swo.c \
 Src/Logger/logger.c \

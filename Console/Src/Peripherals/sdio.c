@@ -4,6 +4,7 @@
 #include "Peripherals/sysclock.h"
 #include "Peripherals/systime.h"
 #include "Peripherals/sdio.h"
+#include "Peripherals/gpio.h"
 #include "Logger/logger.h"
 
 
@@ -204,5 +205,5 @@ uint8_t sdioSendRobustAcmd41(void)
  * subsystem — the pin is configured by gpioInit, but its meaning lives here. */
 bool sdCardPresent(void)
 {
-    return (GPIOD->IDR & GPIO_IDR_ID3_Msk) == 0U;
+    return !gpioReadPin(GPIOD, GPIO_SD_DETECT); // active-low: pin low = card seated
 }

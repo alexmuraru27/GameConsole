@@ -1,101 +1,17 @@
 #include "SettingsStorage/settings_storage.h"
+#include "SettingsStorage/settings_layout.h"
 #include "Devices/external_eeprom.h"
-#include "Crc/crc.h"
 #include "Logger/logger.h"
-#include <assert.h>
 #include <string.h>
 #include <stddef.h>
 
 /*
- * On-EEPROM layout (AT24C512, 64 KB, uint16 addressing) — see docu/memory.md.
- * Packed flat with no arbitrary padding; every entity is exactly 2 KB.
- *
- *   0x0000   256 B    SystemHeader  (magic/version, game count, write seq, CRC)
- *   0x0100  2117 B    Game directory (29 × GameDirectoryEntry, 73 B each)
- *   0x0945  2048 B    Console settings entity
- *   0x1145    58 KB   Game data (29 slots × 2048 B each)
- *   0xF945   1.7 KB   (unused tail — not enough for another full slot)
- *
- * Directory entry i <-> game data slot i (same index, different regions).
- * Every persisted struct ends in a crc16 (CCITT) over all preceding bytes.
+ * Public settings-storage API: the console blob, the keyed game saves, the
+ * management/introspection calls, and the current-game binding. It owns the one
+ * piece of mutable module state — the in-RAM system header (game count + write
+ * sequence) and the init flag — and drives the directory / entity mechanism in
+ * settings_directory.c. The on-EEPROM layout lives in settings_layout.h.
  */
-
-#define SETTINGS_MAGIC_VERSION 0x5333U /* "S3" — 2 KB entities, 29 slots */
-
-/* Number of game save slots and the usable-data payload per entity.
- * Both entities are exactly 2048 B (= 6 B header/CRC + 2042 B data). */
-#define SETTINGS_GAME_SLOTS     29U
-#define SETTINGS_CONSOLE_MAX_DATA 2042U
-
-/* These are verified by static_assert below. */
-#define EEPROM_TOTAL_SIZE     65536U
-#define DIRECTORY_ENTRY_SIZE  73U      /* == sizeof(GameDirectoryEntry) */
-
-#define ADDR_SYS_HEADER       0x0000U
-#define SYS_HEADER_REGION_SIZE 0x0100U /* 256 B */
-
-#define ADDR_DIRECTORY        0x0100U
-/* 29 × 73 = 2117 B (0x0845); ADDR_CONSOLE_SETTINGS = 0x0100 + 2117 = 0x0945 */
-
-#define ADDR_CONSOLE_SETTINGS (ADDR_DIRECTORY + SETTINGS_GAME_SLOTS * DIRECTORY_ENTRY_SIZE)
-#define CONSOLE_ENTITY_SIZE   2048U
-
-#define ADDR_GAMES            (ADDR_CONSOLE_SETTINGS + CONSOLE_ENTITY_SIZE)
-#define GAME_SLOT_SIZE        2048U
-
-typedef enum
-{
-    SLOT_STATE_FREE = 0U,
-    SLOT_STATE_ACTIVE = 1U,
-} SlotState;
-
-typedef struct
-{
-    uint16_t magic_version; /* SETTINGS_MAGIC_VERSION */
-    uint16_t game_count;    /* active game entries (advisory; directory is source of truth) */
-    uint32_t write_seq;     /* next sequence number to hand out (monotonic) */
-    uint16_t crc16;
-} __attribute__((packed)) SystemHeader;
-
-typedef struct
-{
-    char name[SETTINGS_GAME_NAME_MAX]; /* game key, NUL-padded */
-    uint8_t state;                     /* SlotState */
-    uint8_t reserved;
-    uint32_t write_seq; /* last-write order; 0 == created but no data yet */
-    uint16_t crc16;
-} __attribute__((packed)) GameDirectoryEntry;
-
-typedef struct
-{
-    uint16_t version;
-    uint16_t data_size;
-    uint8_t data[SETTINGS_GAME_MAX_DATA];
-    uint16_t crc16;
-} __attribute__((packed)) GameDataEntity;
-
-typedef struct
-{
-    uint16_t version;
-    uint16_t data_size;
-    uint8_t data[SETTINGS_CONSOLE_MAX_DATA];
-    uint16_t crc16;
-} __attribute__((packed)) ConsoleSettingsEntity;
-
-static_assert(DIRECTORY_ENTRY_SIZE == sizeof(GameDirectoryEntry),
-              "DIRECTORY_ENTRY_SIZE must match the packed struct size");
-static_assert(sizeof(GameDataEntity) == GAME_SLOT_SIZE,
-              "GameDataEntity must be exactly one 2 KB slot");
-static_assert(sizeof(ConsoleSettingsEntity) == CONSOLE_ENTITY_SIZE,
-              "ConsoleSettingsEntity must be exactly 2 KB");
-static_assert(sizeof(SystemHeader) <= SYS_HEADER_REGION_SIZE,
-              "SystemHeader overflows its region");
-static_assert(SETTINGS_GAME_SLOTS * GAME_SLOT_SIZE + ADDR_GAMES <= EEPROM_TOTAL_SIZE,
-              "game slots overflow the EEPROM");
-static_assert(ADDR_CONSOLE_SETTINGS == ADDR_DIRECTORY + SETTINGS_GAME_SLOTS * DIRECTORY_ENTRY_SIZE,
-              "console address must follow the directory exactly");
-static_assert(ADDR_GAMES == ADDR_CONSOLE_SETTINGS + CONSOLE_ENTITY_SIZE,
-              "game data must follow the console entity exactly");
 
 static SystemHeader s_header;
 static bool s_initialized = false;
@@ -104,170 +20,34 @@ static char s_bound_name[SETTINGS_GAME_NAME_MAX];
 
 /* ------------------------------------------------------------------ helpers */
 
-static uint16_t dirEntryAddr(const uint16_t index)
-{
-    return (uint16_t)(ADDR_DIRECTORY + index * sizeof(GameDirectoryEntry));
-}
-
-static uint16_t slotAddr(const uint16_t index)
-{
-    return (uint16_t)(ADDR_GAMES + index * GAME_SLOT_SIZE);
-}
-
-/* crc16 over a struct's bytes excluding its trailing crc16 field. */
-static uint16_t structCrc(const void *const obj, const size_t size)
-{
-    return crc16_calculate((const uint8_t *)obj, (uint32_t)(size - sizeof(uint16_t)));
-}
-
-static SettingsStorageStatus eepromRead(const uint16_t addr, void *const buf, const uint16_t len)
-{
-    return (externalEepromRead(addr, (uint8_t *)buf, len) == 0U)
-               ? SETTINGS_STORAGE_STATUS_OK
-               : SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
-}
-
-static SettingsStorageStatus eepromWrite(const uint16_t addr, const void *const buf, const uint16_t len)
-{
-    return (externalEepromWrite(addr, (const uint8_t *)buf, len) == 0U)
-               ? SETTINGS_STORAGE_STATUS_OK
-               : SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
-}
-
-/* Reduce a .bin name to a storage key: drop the extension, lowercase, truncate.
- * Lets "GameXO.bin", "GAMEXO.BIN" and "gamexo" all map to the same save. */
-static void normalizeName(const char *const name, char out[SETTINGS_GAME_NAME_MAX])
-{
-    memset(out, 0, SETTINGS_GAME_NAME_MAX);
-    if (name == NULL)
-    {
-        return;
-    }
-
-    size_t len = strlen(name);
-    const char *const dot = strrchr(name, '.');
-    if (dot != NULL)
-    {
-        len = (size_t)(dot - name);
-    }
-    if (len > SETTINGS_GAME_NAME_MAX - 1U)
-    {
-        len = SETTINGS_GAME_NAME_MAX - 1U;
-    }
-
-    for (size_t i = 0U; i < len; i++)
-    {
-        char c = name[i];
-        if (c >= 'A' && c <= 'Z')
-        {
-            c = (char)(c - 'A' + 'a');
-        }
-        out[i] = c;
-    }
-}
-
 static SettingsStorageStatus writeHeader(void)
 {
-    s_header.crc16 = structCrc(&s_header, sizeof(s_header));
-    return eepromWrite(ADDR_SYS_HEADER, &s_header, sizeof(s_header));
+    s_header.crc16 = settingsStructCrc(&s_header, sizeof(s_header));
+    return settingsEepromWrite(ADDR_SYS_HEADER, &s_header, sizeof(s_header));
 }
 
-static SettingsStorageStatus readDirEntry(const uint16_t index, GameDirectoryEntry *const entry)
+/* Normalize a game name into a storage key and reject an empty result. Every
+ * game-keyed entry point shares this prologue. */
+static SettingsStorageStatus normalizeKeyChecked(const char *const game_name, char out[SETTINGS_GAME_NAME_MAX])
 {
-    return eepromRead(dirEntryAddr(index), entry, sizeof(*entry));
+    settingsNormalizeName(game_name, out);
+    return (out[0] == '\0') ? SETTINGS_STORAGE_STATUS_INVALID_ARG : SETTINGS_STORAGE_STATUS_OK;
 }
 
-static SettingsStorageStatus writeDirEntry(const uint16_t index, GameDirectoryEntry *const entry)
+/* Free slot `index`, decrement the (clamped) game count, and persist the header.
+ * The shared commit tail of game-delete and evict-oldest. */
+static SettingsStorageStatus freeSlotAndCommit(const uint16_t index)
 {
-    entry->crc16 = structCrc(entry, sizeof(*entry));
-    return eepromWrite(dirEntryAddr(index), entry, sizeof(*entry));
-}
-
-/* A slot is occupied only by a valid, ACTIVE directory entry. A FREE or
- * crc-broken entry is treated as empty (the broken one is reclaimed on write
- * and freed by cleanup). */
-static bool entryOccupied(const GameDirectoryEntry *const entry)
-{
-    return (entry->state == SLOT_STATE_ACTIVE) && (structCrc(entry, sizeof(*entry)) == entry->crc16);
-}
-
-/* Locate an occupied entry by normalized key. Optionally returns the entry and index. */
-static SettingsStorageStatus findEntry(const char *const key, GameDirectoryEntry *const entry_out, uint16_t *const index_out)
-{
-    GameDirectoryEntry entry;
-    for (uint16_t i = 0U; i < SETTINGS_GAME_SLOTS; i++)
-    {
-        const SettingsStorageStatus st = readDirEntry(i, &entry);
-        if (st != SETTINGS_STORAGE_STATUS_OK)
-        {
-            return st;
-        }
-        if (entryOccupied(&entry) && strncmp(entry.name, key, SETTINGS_GAME_NAME_MAX) == 0)
-        {
-            if (entry_out != NULL)
-            {
-                *entry_out = entry;
-            }
-            if (index_out != NULL)
-            {
-                *index_out = i;
-            }
-            return SETTINGS_STORAGE_STATUS_OK;
-        }
-    }
-    return SETTINGS_STORAGE_STATUS_NOT_FOUND;
-}
-
-static SettingsStorageStatus findFreeSlot(uint16_t *const index_out)
-{
-    GameDirectoryEntry entry;
-    for (uint16_t i = 0U; i < SETTINGS_GAME_SLOTS; i++)
-    {
-        const SettingsStorageStatus st = readDirEntry(i, &entry);
-        if (st != SETTINGS_STORAGE_STATUS_OK)
-        {
-            return st;
-        }
-        if (!entryOccupied(&entry))
-        {
-            *index_out = i;
-            return SETTINGS_STORAGE_STATUS_OK;
-        }
-    }
-    return SETTINGS_STORAGE_STATUS_STORAGE_FULL;
-}
-
-/* Free a slot: mark its directory entry FREE and wipe the data slot. */
-static SettingsStorageStatus freeSlot(const uint16_t index)
-{
-    GameDirectoryEntry entry;
-    memset(&entry, 0, sizeof(entry));
-    entry.state = SLOT_STATE_FREE;
-    const SettingsStorageStatus st = writeDirEntry(index, &entry);
+    const SettingsStorageStatus st = settingsDirFreeSlot(index);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
     }
-    if (externalEepromClearRange(slotAddr(index), GAME_SLOT_SIZE) != 0U)
+    if (s_header.game_count > 0U)
     {
-        return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
+        s_header.game_count--;
     }
-    return SETTINGS_STORAGE_STATUS_OK;
-}
-
-/* Count occupied slots by scanning the directory (authoritative). */
-static uint16_t countGames(void)
-{
-    GameDirectoryEntry entry;
-    uint16_t count = 0U;
-    for (uint16_t i = 0U; i < SETTINGS_GAME_SLOTS; i++)
-    {
-        if (readDirEntry(i, &entry) == SETTINGS_STORAGE_STATUS_OK && entryOccupied(&entry))
-        {
-            count++;
-        }
-    }
-    return count;
+    return writeHeader();
 }
 
 /* ------------------------------------------------------------------ lifecycle */
@@ -289,14 +69,14 @@ SettingsStorageStatus settingsStorageCleanupCorrupted(uint16_t *const cleared_co
     for (uint16_t i = 0U; i < SETTINGS_GAME_SLOTS; i++)
     {
         GameDirectoryEntry entry;
-        SettingsStorageStatus st = readDirEntry(i, &entry);
+        SettingsStorageStatus st = settingsDirReadEntry(i, &entry);
         if (st != SETTINGS_STORAGE_STATUS_OK)
         {
             return st;
         }
 
         /* Only ACTIVE+valid entries are occupied; everything else is free. */
-        if (!entryOccupied(&entry))
+        if (!settingsDirEntryOccupied(&entry))
         {
             continue;
         }
@@ -305,12 +85,12 @@ SettingsStorageStatus settingsStorageCleanupCorrupted(uint16_t *const cleared_co
         if (entry.write_seq != 0U) /* 0 == reserved, no data written yet */
         {
             GameDataEntity data;
-            st = eepromRead(slotAddr(i), &data, sizeof(data));
+            st = settingsEepromRead(settingsSlotAddr(i), &data, sizeof(data));
             if (st != SETTINGS_STORAGE_STATUS_OK)
             {
                 return st;
             }
-            if (structCrc(&data, sizeof(data)) != data.crc16 || data.data_size > SETTINGS_GAME_MAX_DATA)
+            if (settingsStructCrc(&data, sizeof(data)) != data.crc16 || data.data_size > SETTINGS_GAME_MAX_DATA)
             {
                 corrupted = true;
             }
@@ -319,7 +99,7 @@ SettingsStorageStatus settingsStorageCleanupCorrupted(uint16_t *const cleared_co
         if (corrupted)
         {
             LOGGER_LOG_WARN(LOGGER_SETTINGS, "clearing corrupted save '%s' (slot %u)", entry.name, i);
-            st = freeSlot(i);
+            st = settingsDirFreeSlot(i);
             if (st != SETTINGS_STORAGE_STATUS_OK)
             {
                 return st;
@@ -356,7 +136,7 @@ SettingsStorageStatus settingsStorageInit(void)
     s_game_bound = false;
     s_bound_name[0] = '\0';
 
-    SettingsStorageStatus st = eepromRead(ADDR_SYS_HEADER, &s_header, sizeof(s_header));
+    SettingsStorageStatus st = settingsEepromRead(ADDR_SYS_HEADER, &s_header, sizeof(s_header));
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_ERROR(LOGGER_SETTINGS, "header read failed");
@@ -364,7 +144,7 @@ SettingsStorageStatus settingsStorageInit(void)
     }
 
     const bool valid = (s_header.magic_version == SETTINGS_MAGIC_VERSION) &&
-                       (structCrc(&s_header, sizeof(s_header)) == s_header.crc16);
+                       (settingsStructCrc(&s_header, sizeof(s_header)) == s_header.crc16);
     if (!valid)
     {
         LOGGER_LOG_WARN(LOGGER_SETTINGS, "no valid header — formatting storage");
@@ -405,60 +185,6 @@ SettingsStorageStatus settingsStorageClear(void)
 
 /* ------------------------------------------------------------------ console */
 
-/* The console blob (ConsoleSettingsEntity) and every game slot (GameDataEntity) are
- * the same 2 KB record — {version, data_size, data[], crc16} — so these two helpers
- * are the single encode / verify path for both, keeping the CRC + version invariant
- * in one place. The working buffer is a GameDataEntity, but its byte layout is
- * identical to ConsoleSettingsEntity (both are one slot; see the static_asserts), so
- * the bytes written/read are the same either way. `max` is the entity's data
- * capacity (SETTINGS_CONSOLE_MAX_DATA / SETTINGS_GAME_MAX_DATA — equal by layout). */
-static SettingsStorageStatus entityWrite(uint16_t addr, uint16_t version,
-                                         const uint8_t *data, uint16_t size, uint16_t max)
-{
-    if (data == NULL || size > max)
-    {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
-    }
-    GameDataEntity entity;
-    memset(&entity, 0, sizeof(entity));
-    entity.version = version;
-    entity.data_size = size;
-    memcpy(entity.data, data, size);
-    entity.crc16 = structCrc(&entity, sizeof(entity));
-    return eepromWrite(addr, &entity, sizeof(entity));
-}
-
-static SettingsStorageStatus entityRead(uint16_t addr, uint16_t expected_version,
-                                        uint8_t *buffer, uint16_t *size, uint16_t max)
-{
-    GameDataEntity entity;
-    const SettingsStorageStatus st = eepromRead(addr, &entity, sizeof(entity));
-    if (st != SETTINGS_STORAGE_STATUS_OK)
-    {
-        return st;
-    }
-    if (structCrc(&entity, sizeof(entity)) != entity.crc16)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (entity.version != expected_version)
-    {
-        return SETTINGS_STORAGE_STATUS_VERSION_MISMATCH;
-    }
-    if (entity.data_size > max)
-    {
-        return SETTINGS_STORAGE_STATUS_CHECKSUM_MISMATCH;
-    }
-    if (*size < entity.data_size)
-    {
-        *size = entity.data_size;
-        return SETTINGS_STORAGE_STATUS_BUFFER_TOO_SMALL;
-    }
-    memcpy(buffer, entity.data, entity.data_size);
-    *size = entity.data_size;
-    return SETTINGS_STORAGE_STATUS_OK;
-}
-
 SettingsStorageStatus settingsStorageConsoleWrite(const uint16_t struct_version, const uint8_t *const data, const uint16_t size)
 {
     if (!s_initialized)
@@ -467,7 +193,7 @@ SettingsStorageStatus settingsStorageConsoleWrite(const uint16_t struct_version,
     }
 
     const SettingsStorageStatus st =
-        entityWrite(ADDR_CONSOLE_SETTINGS, struct_version, data, size, SETTINGS_CONSOLE_MAX_DATA);
+        settingsEntityWrite(ADDR_CONSOLE_SETTINGS, struct_version, data, size, SETTINGS_CONSOLE_MAX_DATA);
     if (st == SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_DEBUG(LOGGER_SETTINGS, "console write %u B v%u", size, struct_version);
@@ -486,7 +212,7 @@ SettingsStorageStatus settingsStorageConsoleRead(const uint16_t expected_struct_
         return SETTINGS_STORAGE_STATUS_INVALID_ARG;
     }
 
-    return entityRead(ADDR_CONSOLE_SETTINGS, expected_struct_version, buffer, size, SETTINGS_CONSOLE_MAX_DATA);
+    return settingsEntityRead(ADDR_CONSOLE_SETTINGS, expected_struct_version, buffer, size, SETTINGS_CONSOLE_MAX_DATA);
 }
 
 SettingsStorageStatus settingsStorageConsoleDelete(void)
@@ -513,19 +239,19 @@ SettingsStorageStatus settingsStorageGameEnsure(const char *const game_name)
     }
 
     char key[SETTINGS_GAME_NAME_MAX];
-    normalizeName(game_name, key);
-    if (key[0] == '\0')
+    SettingsStorageStatus st = normalizeKeyChecked(game_name, key);
+    if (st != SETTINGS_STORAGE_STATUS_OK)
     {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
+        return st;
     }
 
-    if (findEntry(key, NULL, NULL) == SETTINGS_STORAGE_STATUS_OK)
+    if (settingsDirFindEntry(key, NULL, NULL) == SETTINGS_STORAGE_STATUS_OK)
     {
         return SETTINGS_STORAGE_STATUS_OK; /* already present */
     }
 
     uint16_t index;
-    SettingsStorageStatus st = findFreeSlot(&index);
+    st = settingsDirFindFreeSlot(&index);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_WARN(LOGGER_SETTINGS, "storage full — no slot for '%s'", key);
@@ -537,12 +263,12 @@ SettingsStorageStatus settingsStorageGameEnsure(const char *const game_name)
     memcpy(entry.name, key, SETTINGS_GAME_NAME_MAX);
     entry.state = SLOT_STATE_ACTIVE;
     entry.write_seq = 0U; /* reserved; no data yet */
-    st = writeDirEntry(index, &entry);
+    st = settingsDirWriteEntry(index, &entry);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
     }
-    if (externalEepromClearRange(slotAddr(index), GAME_SLOT_SIZE) != 0U)
+    if (externalEepromClearRange(settingsSlotAddr(index), GAME_SLOT_SIZE) != 0U)
     {
         return SETTINGS_STORAGE_STATUS_EEPROM_ERROR;
     }
@@ -568,18 +294,18 @@ SettingsStorageStatus settingsStorageGameWrite(const char *const game_name, cons
     }
 
     char key[SETTINGS_GAME_NAME_MAX];
-    normalizeName(game_name, key);
-    if (key[0] == '\0')
+    SettingsStorageStatus st = normalizeKeyChecked(game_name, key);
+    if (st != SETTINGS_STORAGE_STATUS_OK)
     {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
+        return st;
     }
 
     uint16_t index;
     bool created = false;
-    SettingsStorageStatus st = findEntry(key, NULL, &index);
+    st = settingsDirFindEntry(key, NULL, &index);
     if (st == SETTINGS_STORAGE_STATUS_NOT_FOUND)
     {
-        st = findFreeSlot(&index);
+        st = settingsDirFindFreeSlot(&index);
         if (st != SETTINGS_STORAGE_STATUS_OK)
         {
             LOGGER_LOG_WARN(LOGGER_SETTINGS, "storage full — cannot save '%s'", key);
@@ -594,7 +320,7 @@ SettingsStorageStatus settingsStorageGameWrite(const char *const game_name, cons
 
     const uint32_t seq = s_header.write_seq;
 
-    st = entityWrite(slotAddr(index), struct_version, data, size, SETTINGS_GAME_MAX_DATA);
+    st = settingsEntityWrite(settingsSlotAddr(index), struct_version, data, size, SETTINGS_GAME_MAX_DATA);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
@@ -605,7 +331,7 @@ SettingsStorageStatus settingsStorageGameWrite(const char *const game_name, cons
     memcpy(entry.name, key, SETTINGS_GAME_NAME_MAX);
     entry.state = SLOT_STATE_ACTIVE;
     entry.write_seq = seq;
-    st = writeDirEntry(index, &entry);
+    st = settingsDirWriteEntry(index, &entry);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
@@ -637,15 +363,15 @@ SettingsStorageStatus settingsStorageGameRead(const char *const game_name, const
     }
 
     char key[SETTINGS_GAME_NAME_MAX];
-    normalizeName(game_name, key);
-    if (key[0] == '\0')
+    SettingsStorageStatus st = normalizeKeyChecked(game_name, key);
+    if (st != SETTINGS_STORAGE_STATUS_OK)
     {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
+        return st;
     }
 
     GameDirectoryEntry entry;
     uint16_t index;
-    SettingsStorageStatus st = findEntry(key, &entry, &index);
+    st = settingsDirFindEntry(key, &entry, &index);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st; /* NOT_FOUND */
@@ -655,7 +381,7 @@ SettingsStorageStatus settingsStorageGameRead(const char *const game_name, const
         return SETTINGS_STORAGE_STATUS_NOT_FOUND; /* reserved but never written */
     }
 
-    return entityRead(slotAddr(index), expected_struct_version, buffer, size, SETTINGS_GAME_MAX_DATA);
+    return settingsEntityRead(settingsSlotAddr(index), expected_struct_version, buffer, size, SETTINGS_GAME_MAX_DATA);
 }
 
 SettingsStorageStatus settingsStorageGameDelete(const char *const game_name)
@@ -666,30 +392,20 @@ SettingsStorageStatus settingsStorageGameDelete(const char *const game_name)
     }
 
     char key[SETTINGS_GAME_NAME_MAX];
-    normalizeName(game_name, key);
-    if (key[0] == '\0')
+    SettingsStorageStatus st = normalizeKeyChecked(game_name, key);
+    if (st != SETTINGS_STORAGE_STATUS_OK)
     {
-        return SETTINGS_STORAGE_STATUS_INVALID_ARG;
+        return st;
     }
 
     uint16_t index;
-    SettingsStorageStatus st = findEntry(key, NULL, &index);
+    st = settingsDirFindEntry(key, NULL, &index);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
     }
 
-    st = freeSlot(index);
-    if (st != SETTINGS_STORAGE_STATUS_OK)
-    {
-        return st;
-    }
-
-    if (s_header.game_count > 0U)
-    {
-        s_header.game_count--;
-    }
-    st = writeHeader();
+    st = freeSlotAndCommit(index);
     if (st == SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_INFO(LOGGER_SETTINGS, "deleted save '%s' (slot %u)", key, index);
@@ -704,19 +420,18 @@ bool settingsStorageGameExists(const char *const game_name)
         return false;
     }
     char key[SETTINGS_GAME_NAME_MAX];
-    normalizeName(game_name, key);
-    if (key[0] == '\0')
+    if (normalizeKeyChecked(game_name, key) != SETTINGS_STORAGE_STATUS_OK)
     {
         return false;
     }
-    return findEntry(key, NULL, NULL) == SETTINGS_STORAGE_STATUS_OK;
+    return settingsDirFindEntry(key, NULL, NULL) == SETTINGS_STORAGE_STATUS_OK;
 }
 
 /* ------------------------------------------------------------------ management */
 
 uint16_t settingsStorageGameCount(void)
 {
-    return s_initialized ? countGames() : 0U;
+    return s_initialized ? settingsDirCountGames() : 0U;
 }
 
 uint16_t settingsStorageGameCapacity(void)
@@ -736,12 +451,12 @@ SettingsStorageStatus settingsStorageGameInfoByIndex(const uint16_t slot_index, 
     }
 
     GameDirectoryEntry entry;
-    SettingsStorageStatus st = readDirEntry(slot_index, &entry);
+    SettingsStorageStatus st = settingsDirReadEntry(slot_index, &entry);
     if (st != SETTINGS_STORAGE_STATUS_OK)
     {
         return st;
     }
-    if (!entryOccupied(&entry))
+    if (!settingsDirEntryOccupied(&entry))
     {
         return SETTINGS_STORAGE_STATUS_NOT_FOUND;
     }
@@ -754,12 +469,12 @@ SettingsStorageStatus settingsStorageGameInfoByIndex(const uint16_t slot_index, 
     if (entry.write_seq != 0U)
     {
         GameDataEntity data_entity;
-        st = eepromRead(slotAddr(slot_index), &data_entity, sizeof(data_entity));
+        st = settingsEepromRead(settingsSlotAddr(slot_index), &data_entity, sizeof(data_entity));
         if (st != SETTINGS_STORAGE_STATUS_OK)
         {
             return st;
         }
-        if (structCrc(&data_entity, sizeof(data_entity)) == data_entity.crc16)
+        if (settingsStructCrc(&data_entity, sizeof(data_entity)) == data_entity.crc16)
         {
             info_out->data_size = data_entity.data_size;
             info_out->data_version = data_entity.version;
@@ -782,12 +497,12 @@ SettingsStorageStatus settingsStorageEvictOldest(SettingsGameInfo *const evicted
 
     for (uint16_t i = 0U; i < SETTINGS_GAME_SLOTS; i++)
     {
-        const SettingsStorageStatus st = readDirEntry(i, &entry);
+        const SettingsStorageStatus st = settingsDirReadEntry(i, &entry);
         if (st != SETTINGS_STORAGE_STATUS_OK)
         {
             return st;
         }
-        if (!entryOccupied(&entry))
+        if (!settingsDirEntryOccupied(&entry))
         {
             continue;
         }
@@ -810,20 +525,11 @@ SettingsStorageStatus settingsStorageEvictOldest(SettingsGameInfo *const evicted
     }
 
     char evicted_name[SETTINGS_GAME_NAME_MAX];
-    (void)readDirEntry(oldest_index, &entry);
+    (void)settingsDirReadEntry(oldest_index, &entry);
     memcpy(evicted_name, entry.name, SETTINGS_GAME_NAME_MAX);
     evicted_name[SETTINGS_GAME_NAME_MAX - 1U] = '\0';
 
-    SettingsStorageStatus st = freeSlot(oldest_index);
-    if (st != SETTINGS_STORAGE_STATUS_OK)
-    {
-        return st;
-    }
-    if (s_header.game_count > 0U)
-    {
-        s_header.game_count--;
-    }
-    st = writeHeader();
+    const SettingsStorageStatus st = freeSlotAndCommit(oldest_index);
     if (st == SETTINGS_STORAGE_STATUS_OK)
     {
         LOGGER_LOG_INFO(LOGGER_SETTINGS, "evicted oldest save '%s' (seq %lu)",
@@ -841,7 +547,7 @@ SettingsStorageStatus settingsStorageBindGame(const char *const game_name)
         return SETTINGS_STORAGE_STATUS_NOT_INITIALIZED;
     }
 
-    normalizeName(game_name, s_bound_name);
+    settingsNormalizeName(game_name, s_bound_name);
     if (s_bound_name[0] == '\0')
     {
         s_game_bound = false;

@@ -67,9 +67,9 @@ static void fsmcInit(void)
 
 static void ili9341Reset(void)
 {
-    GPIOC->BSRR = GPIO_BSRR_BR7; // RST low
+    gpioClearPin(GPIOC, GPIO_DISPLAY_RST); // RST low
     delay(1U);
-    GPIOC->BSRR = GPIO_BSRR_BS7; // RST high
+    gpioSetPin(GPIOC, GPIO_DISPLAY_RST); // RST high
 }
 
 static void ili9341WriteDataBuffer(const uint8_t *buff, uint32_t buff_size)

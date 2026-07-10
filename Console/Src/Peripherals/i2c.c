@@ -1,6 +1,7 @@
 #include "Peripherals/i2c.h"
 #include <stm32f407xx.h>
 #include <stddef.h>
+#include "Peripherals/gpio.h"
 #include "Peripherals/sysclock.h"
 #include "Peripherals/systime.h"
 #include "Logger/logger.h"
@@ -21,33 +22,34 @@
 static uint8_t i2cBusRecovery(void)
 {
     // Release both lines, then take SCL+SDA as GPIO outputs.
-    GPIOB->BSRR = GPIO_BSRR_BS8 | GPIO_BSRR_BS9;
-    GPIOB->MODER = (GPIOB->MODER & ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk)) |
-                   (1U << GPIO_MODER_MODE8_Pos) | (1U << GPIO_MODER_MODE9_Pos);
+    gpioSetPin(GPIOB, GPIO_I2C_SCL);
+    gpioSetPin(GPIOB, GPIO_I2C_SDA);
+    gpioSetPinMode(GPIOB, GPIO_I2C_SCL, GPIO_MODE_OUTPUT);
+    gpioSetPinMode(GPIOB, GPIO_I2C_SDA, GPIO_MODE_OUTPUT);
 
-    // Clock SCL until SDA (PB9) comes high, up to a full byte + ack (9 pulses).
+    // Clock SCL until SDA comes high, up to a full byte + ack (9 pulses).
     uint8_t pulses = 0U;
-    while (pulses < 9U && (GPIOB->IDR & GPIO_IDR_ID9_Msk) == 0U)
+    while (pulses < 9U && !gpioReadPin(GPIOB, GPIO_I2C_SDA))
     {
-        GPIOB->BSRR = GPIO_BSRR_BR8; // SCL low
+        gpioClearPin(GPIOB, GPIO_I2C_SCL); // SCL low
         delayUs(5U);
-        GPIOB->BSRR = GPIO_BSRR_BS8; // SCL high
+        gpioSetPin(GPIOB, GPIO_I2C_SCL); // SCL high
         delayUs(5U);
         pulses++;
     }
 
     // STOP: with SCL high, drive SDA low then release it (a low->high SDA edge
     // while SCL is high) to leave the bus idle.
-    GPIOB->BSRR = GPIO_BSRR_BR9; // SDA low
+    gpioClearPin(GPIOB, GPIO_I2C_SDA); // SDA low
     delayUs(5U);
-    GPIOB->BSRR = GPIO_BSRR_BS8; // SCL high
+    gpioSetPin(GPIOB, GPIO_I2C_SCL); // SCL high
     delayUs(5U);
-    GPIOB->BSRR = GPIO_BSRR_BS9; // SDA high  => STOP
+    gpioSetPin(GPIOB, GPIO_I2C_SDA); // SDA high  => STOP
     delayUs(5U);
 
-    // Hand PB8/PB9 back to AF4 (I2C1); OTYPER/PUPDR/AFR from gpioInit stay put.
-    GPIOB->MODER = (GPIOB->MODER & ~(GPIO_MODER_MODE8_Msk | GPIO_MODER_MODE9_Msk)) |
-                   (2U << GPIO_MODER_MODE8_Pos) | (2U << GPIO_MODER_MODE9_Pos);
+    // Hand SCL/SDA back to AF4 (I2C1); OTYPER/PUPDR/AFR from gpioInit stay put.
+    gpioSetPinMode(GPIOB, GPIO_I2C_SCL, GPIO_MODE_AF);
+    gpioSetPinMode(GPIOB, GPIO_I2C_SDA, GPIO_MODE_AF);
     return pulses;
 }
 
